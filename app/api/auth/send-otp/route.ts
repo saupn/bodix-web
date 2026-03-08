@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendSMS, buildOtpMessage } from '@/lib/sms/provider'
 import { authRateLimit, getClientIp, rateLimitExceeded } from '@/lib/middleware/rate-limit'
@@ -98,6 +99,19 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error('[send-otp] SMS failed:', err)
     return NextResponse.json({ error: 'Không gửi được SMS. Vui lòng thử lại.' }, { status: 502 })
+  }
+
+  // --- Save phone to profile (so it's persisted even if user doesn't complete OTP) ---
+  const userSupabase = await createClient()
+  const {
+    data: { user },
+  } = await userSupabase.auth.getUser()
+
+  if (user) {
+    await supabase
+      .from('profiles')
+      .update({ phone })
+      .eq('id', user.id)
   }
 
   return NextResponse.json({ success: true, message: `OTP đã gửi đến ${phone}.` })

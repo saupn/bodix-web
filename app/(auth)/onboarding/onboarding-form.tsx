@@ -526,6 +526,18 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                   Đổi số điện thoại
                 </button>
               )}
+
+              {/* Skip — phone will be saved (with phone_verified=false) in handleComplete */}
+              {!otpVerified && (
+                <button
+                  type="button"
+                  onClick={() => goNext(4)}
+                  className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
+                  suppressHydrationWarning
+                >
+                  Bỏ qua, xác minh sau
+                </button>
+              )}
             </motion.div>
           )}
 

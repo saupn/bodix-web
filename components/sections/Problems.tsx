@@ -21,7 +21,7 @@ const steps = [
   },
   {
     emoji: "🔥",
-    title: "Mỗi ngày: Check-in & Streak",
+    title: "Mỗi ngày: Check-in hàng ngày & Streak",
     description:
       "Check-in → Streak tích lũy → Cộng đồng thấy bạn hoàn thành. Nhịp đều đặn tạo kết quả.",
   },

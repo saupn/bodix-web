@@ -318,7 +318,7 @@ export default function WorkoutDetailPage() {
             ? "Đang xử lý..."
             : isCompleted
             ? "Đã hoàn thành ✓"
-            : "Hoàn thành bài tập"}
+            : "Hoàn thành ngày"}
         </button>
       </div>
 

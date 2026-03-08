@@ -327,7 +327,7 @@ export function ProgramPageContent() {
               {!data.today_completed ? (
                 <>
                   <div className="mt-4 flex gap-2">
-                    {["hard", "light", "recovery"].map((m) => (
+                    {["hard", "light", "easy"].map((m) => (
                       <button
                         key={m}
                         type="button"
@@ -340,7 +340,7 @@ export function ProgramPageContent() {
                             : "bg-neutral-200 text-neutral-600 hover:bg-neutral-300"
                         }`}
                       >
-                        {m === "hard" ? "Hard" : m === "light" ? "Light" : "Recovery"}
+                        {m === "hard" ? "Hard" : m === "light" ? "Light" : "Easy"}
                       </button>
                     ))}
                   </div>

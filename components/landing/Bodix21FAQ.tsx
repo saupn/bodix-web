@@ -15,7 +15,7 @@ const faqs = [
   {
     question: "Nếu hôm nào bận quá thì sao?",
     answer:
-      "Bạn chọn mức Light hoặc Recovery – chỉ mất 15-20 phút. Quan trọng là bạn vẫn hoàn thành ngày đó, giữ được chuỗi. Một buổi tập ngắn vẫn tốt hơn một buổi tập bị bỏ.",
+      "Bạn chọn mức Light hoặc Easy – chỉ mất 10-14 phút. Quan trọng là bạn vẫn hoàn thành ngày đó, giữ được chuỗi. Một buổi tập ngắn vẫn tốt hơn một buổi tập bị bỏ.",
   },
   {
     question: "Tôi chưa từng tập luyện, có theo được không?",
@@ -25,7 +25,7 @@ const faqs = [
   {
     question: "Mỗi ngày tập bao lâu?",
     answer:
-      "Mức Hard khoảng 25-30 phút. Mức Light khoảng 20 phút. Mức Recovery khoảng 15 phút. Tất cả đã bao gồm khởi động và giãn cơ.",
+      "Mức Hard (3 lượt) khoảng 21 phút. Mức Light (2 lượt) khoảng 14 phút. Mức Easy (1 lượt) khoảng 7 phút. Tất cả đã bao gồm khởi động và giãn cơ.",
   },
   {
     question: "Tôi nhận bài tập như thế nào?",

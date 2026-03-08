@@ -391,7 +391,7 @@ export default function ProgramWorkoutPage() {
               onClick={handleOpenCheckIn}
               className="w-full rounded-xl bg-primary px-4 py-4 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
             >
-              Hoàn thành bài tập
+              Hoàn thành ngày
             </button>
           </div>
         ) : (

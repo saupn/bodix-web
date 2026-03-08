@@ -29,7 +29,7 @@ create table if not exists public.nudge_logs (
   enrollment_id uuid references public.enrollments(id),
   nudge_type text not null check (nudge_type in (
     'morning_reminder',        -- nhắc sáng: "Hôm nay là ngày X, sẵn sàng chưa?"
-    'evening_confirmation',    -- nhắc tối: "Bạn đã tập chưa? Check-in nào!"
+    'evening_confirmation',    -- nhắc tối: "Bạn đã hoàn thành hôm nay chưa? Check-in nào!"
     'rescue_soft',             -- rescue nhẹ (1 ngày miss): "Mọi thứ ổn chứ? Hôm nay thử Light mode nhé"
     'rescue_urgent',           -- rescue khẩn (2 ngày miss): "Đừng bỏ cuộc! 10 phút Recovery cũng được"
     'rescue_critical',         -- rescue nghiêm trọng (3+ ngày miss): "Chúng tôi nhớ bạn. Quay lại bất cứ lúc nào"

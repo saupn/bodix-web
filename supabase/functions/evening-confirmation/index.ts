@@ -46,7 +46,7 @@ const EVENING_VARIANTS: Variant[] = [
   {
     id: 'ec_1',
     title: 'Check-in nào!',
-    body: '{name} ơi, bạn đã tập hôm nay chưa? Nếu rồi, check-in để giữ streak 🔥 nhé!',
+    body: '{name} ơi, bạn đã hoàn thành hôm nay chưa? Check-in để giữ streak 🔥 nhé!',
   },
   {
     id: 'ec_2',
@@ -56,7 +56,7 @@ const EVENING_VARIANTS: Variant[] = [
   {
     id: 'ec_3',
     title: 'Hôm nay thế nào?',
-    body: 'Dù Hard, Light, hay Recovery — mỗi ngày bạn check-in đều đáng tự hào. ✅',
+    body: 'Dù Hard, Light, hay Easy — mỗi ngày bạn check-in đều đáng tự hào. ✅',
   },
 ]
 

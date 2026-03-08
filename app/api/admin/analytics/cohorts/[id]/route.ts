@@ -6,12 +6,12 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const auth = await verifyAdmin()
   if ('error' in auth) return auth.error
 
-  const cohortId = params.id
+  const { id: cohortId } = await params
   const service = createServiceClient()
 
   // ── Verify cohort exists + fetch summary ──────────────────────────────────
@@ -129,11 +129,11 @@ export async function GET(
   type ProfileShape = { id: string; full_name: string | null; avatar_url: string | null }
   type StreakShape  = { current_streak: number; longest_streak: number; last_checkin_date: string | null } | null
 
-  const member_list = (enrollmentRows.data ?? []).map((e: {
+  const member_list = (enrollmentRows.data as unknown as Array<{
     id: string; user_id: string; status: string; current_day: number
     started_at: string | null; amount_paid: number
     profiles: ProfileShape | null; streaks: StreakShape
-  }) => {
+  }>).map((e) => {
     const profile = e.profiles
     const streak  = Array.isArray(e.streaks) ? e.streaks[0] : e.streaks
     const riskScore = riskMap.get(e.id) ?? 0

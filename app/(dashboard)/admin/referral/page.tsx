@@ -215,8 +215,8 @@ export default function AdminReferralPage() {
                         <XAxis dataKey="week" tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
-                          formatter={(value: number, name: string) =>
-                            name === "revenue" ? `${Number(value).toLocaleString("vi-VN")}đ` : value
+                          formatter={(value, name) =>
+                            name === "revenue" && typeof value === 'number' ? `${value.toLocaleString("vi-VN")}đ` : (value as string | number)
                           }
                         />
                         <Legend />

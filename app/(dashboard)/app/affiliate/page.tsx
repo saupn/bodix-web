@@ -538,7 +538,7 @@ export default function AffiliatePage() {
               <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
               <XAxis dataKey="month" tick={{ fontSize: 11 }} />
               <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v: number) => v?.toLocaleString("vi-VN")} />
+              <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString("vi-VN") : v} />
               <Legend />
               <Bar dataKey="conversions" name="Đơn hàng" fill="#3b82f6" />
               <Bar dataKey="revenue" name="Doanh thu (đ)" fill="#22c55e" />

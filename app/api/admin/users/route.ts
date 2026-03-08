@@ -82,8 +82,8 @@ export async function GET(request: NextRequest) {
   let rows = profiles.map((p) => {
     const userEnrollments = enrollmentsByUser.get(p.id) ?? [];
     const activeEnrollment = userEnrollments.find((e: { status: string }) => e.status === "active" || e.status === "completed");
-    const prog = activeEnrollment?.programs as { slug: string; name: string } | null;
-    const cohort = activeEnrollment?.cohorts as { name: string } | null;
+    const prog = activeEnrollment?.programs as unknown as { slug: string; name: string } | null;
+    const cohort = activeEnrollment?.cohorts as unknown as { name: string } | null;
     const enrollmentId = activeEnrollment?.id;
     const streak = enrollmentId ? (streakByEnrollment.get(enrollmentId) ?? 0) : 0;
     const risk = enrollmentId ? (riskByEnrollment.get(enrollmentId) ?? 0) : 0;

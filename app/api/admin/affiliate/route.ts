@@ -103,7 +103,7 @@ export async function GET(request: NextRequest) {
 
   // ── Fetch affiliate codes (approved affiliates) ───────────────────────────
   const approvedUserIds = affiliates.filter(a => a.is_approved).map(a => a.user_id)
-  const codesMap = new Map<string, { code: string; commission_rate: number }>()
+  const codesMap = new Map<string, { code: string; commission_rate: number; conversions: number; revenue: number; is_active: boolean }>()
 
   if (approvedUserIds.length) {
     const { data: codes } = await service

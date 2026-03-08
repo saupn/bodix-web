@@ -277,7 +277,7 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const program = enrollment.program as {
+  const program = enrollment.program as unknown as {
     id: string
     name: string
     price_vnd: number

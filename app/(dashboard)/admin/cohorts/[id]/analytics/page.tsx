@@ -148,10 +148,10 @@ export default function CohortAnalyticsPage() {
           <div>
             <Link href="/admin" className="text-sm text-primary hover:underline">← Dashboard</Link>
             <h1 className="mt-2 font-heading text-2xl font-bold text-primary">
-              {s.cohort_name ?? "Cohort"}
+              {String(s.cohort_name ?? "Cohort")}
             </h1>
             <p className="mt-1 text-sm text-neutral-600">
-              {s.program_name ?? ""} • {String(s.cohort_status ?? "")} • {Number(s.current_members ?? 0)} members • Ngày {today}
+              {String(s.program_name ?? "")} • {String(s.cohort_status ?? "")} • {Number(s.current_members ?? 0)} members • Ngày {today}
             </p>
           </div>
         </div>

@@ -31,7 +31,7 @@ export async function GET() {
     });
   }
 
-  const programDays = (enrollment.programs as { duration_days: number })?.duration_days ?? 0;
+  const programDays = (enrollment.programs as unknown as { duration_days: number })?.duration_days ?? 0;
   const halfwayDay = Math.ceil(programDays / 2);
   const currentDay = enrollment.current_day ?? 0;
   const windowStart = halfwayDay - 3;

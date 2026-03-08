@@ -24,6 +24,9 @@ const INTENSITY_OPTIONS = [
 
 interface ContextData {
   eligible: boolean;
+  reason?: string;
+  eligible_from?: string;
+  eligible_until?: string;
   submitted?: boolean;
   enrollment_id?: string;
   current_day?: number;

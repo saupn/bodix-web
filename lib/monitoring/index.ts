@@ -1,9 +1,8 @@
 /**
  * lib/monitoring/index.ts
  *
- * Structured Sentry error tracking for BodiX business-critical paths.
- * Each function attaches domain-specific tags and safe extra context so
- * Sentry issues are grouped and searchable by feature, user, and operation.
+ * Structured error tracking for BodiX business-critical paths.
+ * Each function logs domain-specific context to the console (server logs / Vercel Log Drain).
  *
  * Privacy rules applied here:
  *   - Phone numbers → only last 4 digits logged
@@ -11,8 +10,6 @@
  *   - Payment amounts → logged (needed for incident investigation)
  *   - No email, full name, or message content is ever logged
  */
-
-import * as Sentry from '@sentry/nextjs'
 
 // ─── Check-in ─────────────────────────────────────────────────────────────────
 
@@ -25,17 +22,7 @@ export function trackCheckInError(
     mode: 'hard' | 'light' | 'recovery' | 'skip'
   },
 ): void {
-  Sentry.captureException(error, {
-    tags: {
-      feature: 'check-in',
-      mode: context.mode,
-    },
-    extra: {
-      userId: context.userId,
-      enrollmentId: context.enrollmentId,
-      dayNumber: context.dayNumber,
-    },
-  })
+  console.error('[check-in]', error, context)
 }
 
 // ─── Payment ──────────────────────────────────────────────────────────────────
@@ -50,20 +37,7 @@ export function trackPaymentError(
     referenceId?: string
   },
 ): void {
-  Sentry.captureException(error, {
-    tags: {
-      feature: 'payment',
-      payment_method: context.paymentMethod,
-      program: context.programSlug,
-    },
-    extra: {
-      userId: context.userId,
-      programSlug: context.programSlug,
-      amountVnd: context.amount,
-      // Reference ID is safe: internal ID only, not a card/bank number
-      referenceId: context.referenceId,
-    },
-  })
+  console.error('[payment]', error, context)
 }
 
 // ─── Zalo ZNS ─────────────────────────────────────────────────────────────────
@@ -78,19 +52,10 @@ export function trackZaloAPIError(
     enrollmentId?: string
   },
 ): void {
-  Sentry.captureException(error, {
-    tags: {
-      feature: 'zalo',
-      nudge_type: context.nudgeType,
-    },
-    extra: {
-      userId: context.userId,
-      enrollmentId: context.enrollmentId,
-      templateId: context.templateId,
-      // Log only last 4 digits to correlate with Zalo delivery logs without
-      // storing a full phone number in Sentry.
-      phoneSuffix: context.phone ? `****${context.phone.slice(-4)}` : undefined,
-    },
+  console.error('[zalo]', error, {
+    ...context,
+    phoneSuffix: context.phone ? `****${context.phone.slice(-4)}` : undefined,
+    phone: undefined,
   })
 }
 
@@ -107,19 +72,7 @@ export function trackRescueFailure(
     daysSinceLast?: number
   },
 ): void {
-  Sentry.captureException(error, {
-    tags: {
-      feature: 'rescue',
-      trigger_reason: context.triggerReason,
-      action: context.actionTaken,
-    },
-    extra: {
-      enrollmentId: context.enrollmentId,
-      userId: context.userId,
-      riskScore: context.riskScore,
-      daysSinceLast: context.daysSinceLast,
-    },
-  })
+  console.error('[rescue]', error, context)
 }
 
 // ─── Generic boundary for Edge Functions ─────────────────────────────────────
@@ -132,14 +85,5 @@ export function trackEdgeFunctionError(
     enrollmentCount?: number
   },
 ): void {
-  Sentry.captureException(error, {
-    tags: {
-      feature: 'edge-function',
-      function_name: context.functionName,
-    },
-    extra: {
-      batchOffset: context.batchOffset,
-      enrollmentCount: context.enrollmentCount,
-    },
-  })
+  console.error('[edge-function]', error, context)
 }

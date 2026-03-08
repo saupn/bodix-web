@@ -177,6 +177,7 @@ async function handleSignup({
   service: any
   referralCode: { id: string; user_id: string }
   user: { id: string }
+  ip: string
   metadata: TrackBody['metadata']
 }) {
   // Self-referral guard

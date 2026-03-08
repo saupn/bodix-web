@@ -158,7 +158,7 @@ export async function GET() {
     revByMonthProgram.set(monthKey, { bodix21: 0, bodix6w: 0, bodix12w: 0, referral: 0 })
   }
   for (const e of enrollmentsWithProgram ?? []) {
-    const prog = e.programs as { slug: string; name: string }
+    const prog = e.programs as unknown as { slug: string; name: string }
     const monthKey = (e.paid_at as string)?.slice(0, 7)
     if (!monthKey) continue
     const entry = revByMonthProgram.get(monthKey) ?? { bodix21: 0, bodix6w: 0, bodix12w: 0, referral: 0 }

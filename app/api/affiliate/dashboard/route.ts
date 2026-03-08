@@ -66,6 +66,7 @@ export async function GET() {
 
   const commissionRate = affiliateCode?.commission_rate
     ?? TIER_COMMISSION[affiliateProfile.affiliate_tier] ?? 15
+  const chartYear = new Date().getFullYear()
 
   if (!affiliateCode) {
     const emptyStats = buildEmptyStats(affiliateProfile)

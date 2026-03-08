@@ -1,5 +1,4 @@
 import type { NextConfig } from "next";
-import { withSentryConfig } from "@sentry/nextjs";
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const withBundleAnalyzer = require("@next/bundle-analyzer")({
@@ -45,23 +44,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withSentryConfig(withBundleAnalyzer(nextConfig), {
-  // ── Source map upload (requires SENTRY_AUTH_TOKEN in CI/Vercel env) ──────
-  org: process.env.SENTRY_ORG,
-  project: process.env.SENTRY_PROJECT ?? "bodix-web",
-
-  // Suppress Sentry CLI output in local dev; show in CI
-  silent: !process.env.CI,
-
-  // Upload a wider set of source map artifacts (catches dynamic imports)
-  widenClientFileUpload: true,
-
-  // Strip source maps from the public bundle — only upload to Sentry
-  hideSourceMaps: true,
-
-  // Remove Sentry SDK debug logging from production bundle (~10 KB saving)
-  disableLogger: true,
-
-  // Automatically instrument Vercel Cron routes as Sentry Cron Monitors
-  automaticVercelMonitors: true,
-});
+export default withBundleAnalyzer(nextConfig);

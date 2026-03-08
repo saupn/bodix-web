@@ -8,7 +8,7 @@ const VALID_TYPES = ['like', 'fire', 'clap', 'heart'] as const
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient()
   const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -16,7 +16,7 @@ export async function POST(
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
 
-  const postId = params.id
+  const { id: postId } = await params
 
   let body: { reaction_type: string }
   try { body = await request.json() } catch {

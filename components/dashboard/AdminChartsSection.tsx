@@ -76,7 +76,7 @@ export default function AdminChartsSection({ charts }: { charts: ChartsData }) {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                 <XAxis dataKey="month" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                <Tooltip formatter={(v: number) => `${v.toLocaleString("vi-VN")}đ`} />
+                <Tooltip formatter={(v) => typeof v === 'number' ? `${v.toLocaleString("vi-VN")}đ` : v} />
                 <Legend />
                 <Bar dataKey="bodix21" name="BodiX 21" stackId="a" fill="#2563eb" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="bodix6w" name="BodiX 6W" stackId="a" fill="#16a34a" radius={[0, 0, 0, 0]} />

@@ -9,7 +9,7 @@ async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>, 
 
 export async function GET(
   _request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   const supabase = await createClient();
   const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -20,7 +20,7 @@ export async function GET(
     return NextResponse.json({ error: "Không có quyền." }, { status: 403 });
   }
 
-  const userId = params.id;
+  const { id: userId } = await params;
   const service = createServiceClient();
 
   const { data: profile, error: profileError } = await service
@@ -64,7 +64,7 @@ export async function GET(
     if (r.status === "fulfilled") riskMap.set(r.value.id, r.value.score);
   }
 
-  const enrollmentsList = (enrollments ?? []).map((e: { id: string; status: string; current_day: number; programs: { name: string } | null; cohorts: { name: string } | null }) => ({
+  const enrollmentsList = (enrollments as unknown as Array<{ id: string; status: string; current_day: number; programs: { name: string } | null; cohorts: { name: string } | null }>).map((e) => ({
     status: e.status,
     program: (e.programs as { name: string })?.name ?? "—",
     cohort: (e.cohorts as { name: string })?.name ?? "—",

@@ -184,8 +184,8 @@ export default function WeeklyReviewPage() {
             <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
               <p className="text-xs text-neutral-500">Mode</p>
               <p className="text-sm font-medium">
-                {existing.week_hard_count ?? 0}H / {existing.week_light_count ?? 0}L /{" "}
-                {existing.week_recovery_count ?? 0}R
+                {Number(existing.week_hard_count ?? 0)}H / {Number(existing.week_light_count ?? 0)}L /{" "}
+                {Number(existing.week_recovery_count ?? 0)}R
               </p>
             </div>
             <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
@@ -198,7 +198,7 @@ export default function WeeklyReviewPage() {
             </div>
           </div>
 
-          {existing.system_suggestion && (
+          {Boolean(existing.system_suggestion) && (
             <div
               className={`rounded-xl border-2 p-4 ${
                 existing.intensity_adjustment === "increase"
@@ -229,19 +229,19 @@ export default function WeeklyReviewPage() {
               <p>
                 Độ khó: {DIFFICULTY_LABELS[(existing.difficulty_rating as number) - 1]}
               </p>
-              {existing.body_changes && (
+              {Boolean(existing.body_changes) && (
                 <p>
                   <span className="text-neutral-500">Cơ thể:</span>{" "}
                   {String(existing.body_changes)}
                 </p>
               )}
-              {existing.biggest_challenge && (
+              {Boolean(existing.biggest_challenge) && (
                 <p>
                   <span className="text-neutral-500">Thử thách:</span>{" "}
                   {String(existing.biggest_challenge)}
                 </p>
               )}
-              {existing.next_week_goal && (
+              {Boolean(existing.next_week_goal) && (
                 <p>
                   <span className="text-neutral-500">Mục tiêu:</span>{" "}
                   {String(existing.next_week_goal)}

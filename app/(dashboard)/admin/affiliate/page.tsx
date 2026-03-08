@@ -386,7 +386,7 @@ export default function AdminAffiliatePage() {
                         <div>
                           <h3 className="font-semibold text-neutral-800">{a.full_name}</h3>
                           <p className="mt-1 text-sm text-neutral-600">
-                            Social: {Array.isArray(a.social_channels) ? a.social_channels.map((c: { platform?: string; followers?: number }) => `${c.platform ?? ''} (${c.followers ?? 0} followers)`).join(", ") : "—"}
+                            Social: {Array.isArray(a.social_channels) ? (a.social_channels as { platform?: string; followers?: number }[]).map((c) => `${c.platform ?? ''} (${c.followers ?? 0} followers)`).join(", ") : "—"}
                           </p>
                           <p className="mt-1 text-sm text-neutral-600">
                             Followers: {a.max_followers?.toLocaleString() ?? "—"}

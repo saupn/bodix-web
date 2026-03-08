@@ -43,7 +43,7 @@ export default async function DashboardLayout({
     .not("status", "eq", "dropped")
     .order("enrolled_at", { ascending: false });
 
-  const enrollments = (enrollmentsRaw ?? []) as StatusEnrollment[];
+  const enrollments = (enrollmentsRaw ?? []) as unknown as StatusEnrollment[];
 
   // Xác định trạng thái user
   const { status: userStatus, activeEnrollment } = getUserStatus(
@@ -75,8 +75,6 @@ export default async function DashboardLayout({
       }}
       userEmail={user.email ?? ""}
       userId={user.id}
-      userStatus={userStatus}
-      activeEnrollment={activeEnrollment}
       hasActiveProgram={hasActiveProgram}
       streak={
         myStats

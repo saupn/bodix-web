@@ -34,7 +34,7 @@ export function RescueBanner({
     return mode ? `${base}?mode=${mode}` : base;
   };
 
-  if (effectiveRisk === "medium") {
+  if (riskLevel === "medium") {
     return (
       <>
         <div className="rounded-xl border border-amber-200 bg-amber-50/80 p-4 shadow-sm">
@@ -64,7 +64,7 @@ export function RescueBanner({
     );
   }
 
-  if (effectiveRisk === "high") {
+  if (riskLevel === "high") {
     return (
       <>
         <div className="rounded-xl border border-orange-200 bg-orange-50/80 p-4 shadow-sm">

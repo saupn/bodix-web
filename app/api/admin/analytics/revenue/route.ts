@@ -34,7 +34,7 @@ export async function GET(request: NextRequest) {
 
   const byMonthProgram = new Map<string, Record<string, number>>()
   for (const e of enrollmentsByMonth ?? []) {
-    const prog = e.programs as { slug: string; name: string }
+    const prog = e.programs as unknown as { slug: string; name: string }
     const monthKey = (e.paid_at as string)?.slice(0, 7) ?? ''
     if (!monthKey) continue
     const entry = byMonthProgram.get(monthKey) ?? { bodix21: 0, bodix6w: 0, bodix12w: 0, referral: 0 }
@@ -86,7 +86,7 @@ export async function GET(request: NextRequest) {
   type ProgramRevMap = { slug: string; name: string; revenue: number; purchases: number }
   const programRevMap = new Map<string, ProgramRevMap>()
   for (const e of programRevRows ?? []) {
-    const prog = e.programs as { slug: string; name: string } | null
+    const prog = e.programs as unknown as { slug: string; name: string } | null
     if (!prog) continue
     const existing = programRevMap.get(prog.slug) ?? { slug: prog.slug, name: prog.name, revenue: 0, purchases: 0 }
     existing.revenue += (e.amount_paid as number) ?? 0

@@ -101,7 +101,7 @@ export function DashboardHomeContent({
           if (pendingData.pending) setReviewPending(pendingData);
         }
 
-        const cm = st.milestones?.find((m) => m.milestone_type === "comeback");
+        const cm = st.milestones?.find((m: { milestone_type: string; achieved_at: string }) => m.milestone_type === "comeback");
         if (cm && isComebackRecent(cm.achieved_at)) {
           try {
             const d = sessionStorage.getItem(COMEBACK_DISMISSED_KEY);

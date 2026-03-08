@@ -66,7 +66,7 @@ export const getCachedAnalyticsHistorical = unstable_cache(
         .from('daily_checkins')
         .select('workout_date, enrollment_id, enrollments!inner(programs(slug))')
         .gte('workout_date', thirtyDaysAgoDate)
-        .then(r => (r.data ?? []) as Array<{
+        .then(r => (r.data ?? []) as unknown as Array<{
           workout_date: string
           enrollments: { programs: { slug: string } | null } | null
         }>),
@@ -107,11 +107,14 @@ export const getCachedAnalyticsHistorical = unstable_cache(
  *        revalidateAnalytics() at the end of POST /api/checkin
  */
 export function revalidateAnalytics() {
-  revalidateTag(CACHE_TAGS.analytics)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ;(revalidateTag as any)(CACHE_TAGS.analytics)
 }
 
 /** Call after the analytics MV cron refreshes (every 2h). */
 export function revalidateAllAnalytics() {
-  revalidateTag(CACHE_TAGS.analytics)
-  revalidateTag(CACHE_TAGS.analyticsHistorical)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const _revalidateTag = revalidateTag as any
+  _revalidateTag(CACHE_TAGS.analytics)
+  _revalidateTag(CACHE_TAGS.analyticsHistorical)
 }

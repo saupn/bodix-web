@@ -142,7 +142,7 @@ export default function RevenueAnalyticsPage() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                 <XAxis dataKey="month_short" tick={{ fontSize: 12 }} />
                 <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                <Tooltip formatter={(v: number) => `${v.toLocaleString("vi-VN")}đ`} />
+                <Tooltip formatter={(v) => typeof v === 'number' ? `${v.toLocaleString("vi-VN")}đ` : v} />
                 <Legend />
                 <Bar dataKey="bodix21" name="BodiX 21" stackId="a" fill="#2563eb" radius={[0, 0, 0, 0]} />
                 <Bar dataKey="bodix6w" name="BodiX 6W" stackId="a" fill="#16a34a" radius={[0, 0, 0, 0]} />
@@ -169,13 +169,13 @@ export default function RevenueAnalyticsPage() {
                     paddingAngle={2}
                     dataKey="value"
                     nameKey="name"
-                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    label={({ name, percent }) => `${name} ${((percent ?? 0) * 100).toFixed(0)}%`}
                   >
                     {pieData.map((entry, i) => (
                       <Cell key={i} fill={entry.color} />
                     ))}
                   </Pie>
-                  <Tooltip formatter={(v: number) => `${v.toLocaleString("vi-VN")}đ`} />
+                  <Tooltip formatter={(v) => typeof v === 'number' ? `${v.toLocaleString("vi-VN")}đ` : v} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
@@ -190,7 +190,7 @@ export default function RevenueAnalyticsPage() {
                   <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
                   <XAxis dataKey="month_short" tick={{ fontSize: 12 }} />
                   <YAxis tick={{ fontSize: 12 }} tickFormatter={(v) => `${(v / 1e6).toFixed(0)}M`} />
-                  <Tooltip formatter={(v: number) => `${v.toLocaleString("vi-VN")}đ`} />
+                  <Tooltip formatter={(v) => typeof v === 'number' ? `${v.toLocaleString("vi-VN")}đ` : v} />
                   <Line type="monotone" dataKey="cumulative" stroke="#2563eb" strokeWidth={2} name="Cumulative" />
                 </LineChart>
               </ResponsiveContainer>

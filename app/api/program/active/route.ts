@@ -50,7 +50,7 @@ export async function GET() {
     );
   }
 
-  const program = enrollment.program as {
+  const program = enrollment.program as unknown as {
     id: string;
     slug: string;
     name: string;
@@ -58,7 +58,7 @@ export async function GET() {
     description: string | null;
   } | null;
 
-  const cohort = enrollment.cohort as {
+  const cohort = enrollment.cohort as unknown as {
     id: string;
     name: string;
     start_date: string;

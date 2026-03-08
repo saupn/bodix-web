@@ -27,10 +27,10 @@ export function Bodix21FinalCTA() {
         <AnimatedSection>
           <div className="mt-10">
             <Link
-              href="#cta"
+              href="/signup"
               className="inline-flex items-center rounded-lg bg-accent px-8 py-4 text-base font-medium text-white transition-colors hover:bg-accent-dark"
             >
-              Tham gia BodiX 21 ngay →
+              Đăng ký miễn phí →
             </Link>
           </div>
         </AnimatedSection>

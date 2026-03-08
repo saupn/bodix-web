@@ -24,7 +24,7 @@ export function ProgramCard({
 }: ProgramCardProps) {
   return (
     <div
-      className={`rounded-xl border-2 bg-white p-4 sm:p-6 shadow-sm transition-shadow hover:shadow-md ${
+      className={`rounded-xl border-2 bg-white p-4 sm:p-6 shadow-sm transition-all duration-200 card-lift ${
         highlighted
           ? "border-accent"
           : "border-neutral-200"

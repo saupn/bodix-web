@@ -40,10 +40,10 @@ export function Bodix21Hero() {
           className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center"
         >
           <Link
-            href="#cta"
+            href="/signup"
             className="inline-flex items-center justify-center rounded-lg bg-primary px-8 py-4 text-base font-medium text-secondary-light transition-colors hover:bg-primary-dark"
           >
-            Tham gia BodiX 21 ngay
+            Đăng ký miễn phí
           </Link>
           <Link
             href="#video"

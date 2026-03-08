@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 const problems = [
   {
     emoji: "😔",
-    title: "Mua khóa nhưng bỏ",
+    title: "Mua khóa tập nhưng bỏ",
     description:
       "Bạn đã từng mua khóa tập online, xem được vài video đầu tiên, rồi quên luôn. Tiền mất, kết quả không có, và bạn tự trách mình thiếu kỷ luật.",
   },

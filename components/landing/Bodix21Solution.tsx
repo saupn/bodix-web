@@ -80,10 +80,10 @@ export function Bodix21Solution() {
         <AnimatedSection>
           <div className="mt-12 text-center">
             <Link
-              href="#cta"
+              href="/signup"
               className="inline-flex items-center rounded-lg bg-primary px-8 py-4 text-base font-medium text-secondary-light transition-colors hover:bg-primary-dark"
             >
-              Tôi muốn bắt đầu 21 ngày →
+              Đăng ký miễn phí →
             </Link>
           </div>
         </AnimatedSection>

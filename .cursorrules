@@ -1,0 +1,32 @@
+# BodiX Project Rules
+
+## General
+- Giữ nguyên giao diện và nội dung hiện có, KHÔNG thay đổi layout/style đã có
+- TypeScript strict, không dùng any
+- Tailwind CSS cho styling
+- Server Components mặc định
+
+## Components
+- Đặt tên file: PascalCase (VD: CheckInButton.tsx)
+- Dùng named exports cho components
+- Props type đặt ngay trên component (không dùng file riêng cho type nhỏ)
+
+## Supabase
+- Client-side: import từ @/lib/supabase/client
+- Server-side: import từ @/lib/supabase/server
+- Luôn handle error từ Supabase queries
+- Luôn dùng TypeScript types cho database (từ supabase gen types)
+
+## Styling
+- Tailwind utility-first
+- Responsive: mobile-first (sm: → md: → lg:)
+- Dark mode: chưa cần, focus light mode trước
+- Font và color scheme: giữ theo design hiện tại
+
+## File Structure cho features mới
+- app/(auth)/ → login, signup, onboarding
+- app/(dashboard)/ → protected pages sau khi đăng nhập
+- app/(marketing)/ → landing pages hiện có (KHÔNG SỬA)
+- components/auth/ → auth-related components
+- components/dashboard/ → dashboard components
+- components/ui/ → shared UI components

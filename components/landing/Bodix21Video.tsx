@@ -23,10 +23,10 @@ export function Bodix21Video() {
             </p>
             <div className="mt-8 text-center">
               <Link
-                href="#cta"
+                href="/signup"
                 className="inline-flex items-center rounded-lg bg-primary px-8 py-4 text-base font-medium text-secondary-light transition-colors hover:bg-primary-dark"
               >
-                Tôi đã xem xong – Bắt đầu ngay →
+                Tôi đã xem xong – Đăng ký miễn phí →
               </Link>
             </div>
           </div>

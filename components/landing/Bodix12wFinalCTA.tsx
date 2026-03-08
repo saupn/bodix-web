@@ -33,10 +33,10 @@ export function Bodix12wFinalCTA() {
         <AnimatedSection>
           <div className="mt-12">
             <Link
-              href="#cta"
+              href="/signup"
               className="inline-flex items-center rounded-lg bg-accent px-10 py-4 text-lg font-bold text-white transition-colors hover:bg-accent-dark"
             >
-              Tôi sẵn sàng 12 tuần →
+              Bắt đầu hành trình →
             </Link>
           </div>
         </AnimatedSection>

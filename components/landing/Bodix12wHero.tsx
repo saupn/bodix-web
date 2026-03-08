@@ -39,10 +39,10 @@ export function Bodix12wHero() {
           className="mt-10 flex flex-col gap-4 sm:flex-row sm:justify-center"
         >
           <Link
-            href="#cta"
+            href="/signup"
             className="inline-flex items-center justify-center rounded-lg bg-accent px-8 py-4 text-base font-bold text-white transition-colors hover:bg-accent-dark"
           >
-            Tôi sẵn sàng 12 tuần
+            Bắt đầu hành trình
           </Link>
           <Link
             href="#requirements"

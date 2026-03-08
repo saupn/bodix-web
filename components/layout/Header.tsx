@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { Menu, X } from "lucide-react";
 import { NAV_ITEMS } from "@/lib/constants";
+import { AuthButtons } from "./AuthButtons";
 
 function ScrollLink({
   href,
@@ -81,7 +82,7 @@ export function Header() {
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-8">
+        <nav className="hidden md:flex items-center gap-6 md:gap-8">
           {NAV_ITEMS.map((item) => (
             <ScrollLink
               key={item.href}
@@ -97,6 +98,7 @@ export function Header() {
               </span>
             </ScrollLink>
           ))}
+          <AuthButtons isScrolled={isScrolled} variant="desktop" />
           <ScrollLink href="#programs" onClick={() => setIsMobileMenuOpen(false)}>
             <span className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light hover:bg-primary-dark transition-colors sm:px-5 sm:py-2.5">
               Bắt đầu ngay
@@ -133,6 +135,13 @@ export function Header() {
                 </span>
               </ScrollLink>
             ))}
+            <div className="mt-2 flex flex-col gap-2">
+              <AuthButtons
+                isScrolled={true}
+                variant="mobile"
+                onMobileMenuClose={() => setIsMobileMenuOpen(false)}
+              />
+            </div>
             <ScrollLink href="#programs" onClick={() => setIsMobileMenuOpen(false)}>
               <span className="block py-3">
                 <span className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-secondary-light w-full">

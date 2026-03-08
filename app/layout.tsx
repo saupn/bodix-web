@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Montserrat, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { ToastProvider } from "@/components/ui/Toast";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 
 const montserrat = Montserrat({
   variable: "--font-montserrat",
@@ -30,7 +33,12 @@ export default function RootLayout({
       <body
         className={`${montserrat.variable} ${playfairDisplay.variable} font-body antialiased`}
       >
-        {children}
+        <a href="#main-content" className="sr-only">
+          Bỏ qua đến nội dung chính
+        </a>
+        <ToastProvider>{children}</ToastProvider>
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

@@ -1,0 +1,506 @@
+{
+  "info": {
+    "name": "BodiX API",
+    "description": "Complete API collection for BodiX fitness platform. Set the `base_url` variable to https://bodix.vn (prod) or http://localhost:3000 (dev). Set `access_token` to a valid Supabase JWT.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://localhost:3000", "type": "string" },
+    { "key": "access_token", "value": "", "type": "string" },
+    { "key": "enrollment_id", "value": "", "type": "string" },
+    { "key": "program_id", "value": "", "type": "string" },
+    { "key": "cohort_id", "value": "", "type": "string" }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [{ "key": "token", "value": "{{access_token}}", "type": "string" }]
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Send OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/auth/send-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "send-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+84901234567\"\n}" }
+          }
+        },
+        {
+          "name": "Verify OTP",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/auth/verify-otp", "host": ["{{base_url}}"], "path": ["api", "auth", "verify-otp"] },
+            "body": { "mode": "raw", "raw": "{\n  \"phone\": \"+84901234567\",\n  \"otp\": \"123456\"\n}" }
+          }
+        },
+        {
+          "name": "Complete Onboarding",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/auth/complete-onboarding", "host": ["{{base_url}}"], "path": ["api", "auth", "complete-onboarding"] },
+            "body": { "mode": "raw", "raw": "{\n  \"full_name\": \"Nguyen Van A\",\n  \"date_of_birth\": \"1995-06-15\",\n  \"gender\": \"male\",\n  \"fitness_goal\": [\"giam_can\", \"tang_co\"]\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Trial",
+      "item": [
+        {
+          "name": "Start Trial",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/trial/start", "host": ["{{base_url}}"], "path": ["api", "trial", "start"] },
+            "body": { "mode": "raw", "raw": "{\n  \"program_id\": \"{{program_id}}\"\n}" }
+          }
+        },
+        {
+          "name": "Get Trial Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/trial/status", "host": ["{{base_url}}"], "path": ["api", "trial", "status"] }
+          }
+        },
+        {
+          "name": "Get Trial Workouts",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/trial/workouts", "host": ["{{base_url}}"], "path": ["api", "trial", "workouts"] }
+          }
+        },
+        {
+          "name": "Get Trial Workout Day",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/trial/workout/1", "host": ["{{base_url}}"], "path": ["api", "trial", "workout", "1"] }
+          }
+        },
+        {
+          "name": "Track Trial Activity",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/trial/activity", "host": ["{{base_url}}"], "path": ["api", "trial", "activity"] },
+            "body": { "mode": "raw", "raw": "{\n  \"program_id\": \"{{program_id}}\",\n  \"activity_type\": \"view_workout\",\n  \"metadata\": { \"day_number\": 1 }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Program",
+      "item": [
+        {
+          "name": "Get Active Program",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/program/active", "host": ["{{base_url}}"], "path": ["api", "program", "active"] }
+          }
+        },
+        {
+          "name": "Get Workout Day",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/program/workout/5", "host": ["{{base_url}}"], "path": ["api", "program", "workout", "5"] }
+          }
+        },
+        {
+          "name": "Mark Day Complete",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/program/complete", "host": ["{{base_url}}"], "path": ["api", "program", "complete"] },
+            "body": { "mode": "raw", "raw": "{\n  \"day\": 5\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Check-in",
+      "item": [
+        {
+          "name": "Submit Check-in",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/checkin", "host": ["{{base_url}}"], "path": ["api", "checkin"] },
+            "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": \"{{enrollment_id}}\",\n  \"day_number\": 5,\n  \"mode\": \"hard\",\n  \"feeling\": 4,\n  \"feeling_note\": \"Cảm thấy ổn\",\n  \"duration_minutes\": 32\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Completion",
+      "item": [
+        {
+          "name": "Get My Stats",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/completion/my-stats", "host": ["{{base_url}}"], "path": ["api", "completion", "my-stats"] }
+          }
+        },
+        {
+          "name": "Get History",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/completion/history?enrollment_id={{enrollment_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "completion", "history"],
+              "query": [{ "key": "enrollment_id", "value": "{{enrollment_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Get Cohort Board",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/completion/cohort-board?cohort_id={{cohort_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "completion", "cohort-board"],
+              "query": [{ "key": "cohort_id", "value": "{{cohort_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Rescue",
+      "item": [
+        {
+          "name": "Get Rescue Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/rescue/status", "host": ["{{base_url}}"], "path": ["api", "rescue", "status"] }
+          }
+        },
+        {
+          "name": "Acknowledge Rescue",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/rescue/acknowledge", "host": ["{{base_url}}"], "path": ["api", "rescue", "acknowledge"] },
+            "body": { "mode": "raw", "raw": "{\n  \"intervention_id\": \"<intervention-uuid>\",\n  \"action\": \"return\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Checkout",
+      "item": [
+        {
+          "name": "Create Checkout",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/checkout/create", "host": ["{{base_url}}"], "path": ["api", "checkout", "create"] },
+            "body": { "mode": "raw", "raw": "{\n  \"slug\": \"bodix-21\",\n  \"payment_method\": \"vnpay\",\n  \"referral_code\": \"BODIX-A7K3\"\n}" }
+          }
+        },
+        {
+          "name": "Confirm Payment",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/checkout/confirm", "host": ["{{base_url}}"], "path": ["api", "checkout", "confirm"] },
+            "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": \"{{enrollment_id}}\",\n  \"payment_reference\": \"VNP12345\"\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reviews",
+      "item": [
+        {
+          "name": "Weekly - Check Pending",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/reviews/weekly/pending", "host": ["{{base_url}}"], "path": ["api", "reviews", "weekly", "pending"] }
+          }
+        },
+        {
+          "name": "Weekly - Get Context",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/reviews/weekly/context", "host": ["{{base_url}}"], "path": ["api", "reviews", "weekly", "context"] }
+          }
+        },
+        {
+          "name": "Weekly - Submit Review",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/reviews/weekly", "host": ["{{base_url}}"], "path": ["api", "reviews", "weekly"] },
+            "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": \"{{enrollment_id}}\",\n  \"week_number\": 3,\n  \"fatigue_level\": 3,\n  \"progress_feeling\": 4,\n  \"difficulty_rating\": 3,\n  \"body_changes\": \"Bụng bớt to hơn\",\n  \"biggest_challenge\": \"Dậy sớm\",\n  \"next_week_goal\": \"Tập đủ 7 ngày\"\n}" }
+          }
+        },
+        {
+          "name": "Weekly - Get All Reviews",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/reviews/weekly?enrollment_id={{enrollment_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "reviews", "weekly"],
+              "query": [{ "key": "enrollment_id", "value": "{{enrollment_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Mid-program - Get Context",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/reviews/mid-program/context", "host": ["{{base_url}}"], "path": ["api", "reviews", "mid-program", "context"] }
+          }
+        },
+        {
+          "name": "Mid-program - Submit",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/reviews/mid-program", "host": ["{{base_url}}"], "path": ["api", "reviews", "mid-program"] },
+            "body": { "mode": "raw", "raw": "{\n  \"enrollment_id\": \"{{enrollment_id}}\",\n  \"overall_progress\": 7,\n  \"visible_changes\": [\"Giảm mỡ bụng\", \"Tăng sức bền\"],\n  \"goal_still_relevant\": true,\n  \"wants_intensity_change\": \"keep_same\",\n  \"would_recommend\": true,\n  \"recommendation_score\": 9\n}" }
+          }
+        },
+        {
+          "name": "Mid-program - Get",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/reviews/mid-program?enrollment_id={{enrollment_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "reviews", "mid-program"],
+              "query": [{ "key": "enrollment_id", "value": "{{enrollment_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Notifications",
+      "item": [
+        {
+          "name": "Get Preferences",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/notifications/preferences", "host": ["{{base_url}}"], "path": ["api", "notifications", "preferences"] }
+          }
+        },
+        {
+          "name": "Update Preferences",
+          "request": {
+            "method": "PUT",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/notifications/preferences", "host": ["{{base_url}}"], "path": ["api", "notifications", "preferences"] },
+            "body": { "mode": "raw", "raw": "{\n  \"morning_reminder\": true,\n  \"evening_confirmation\": false,\n  \"rescue_messages\": true,\n  \"preferred_channel\": \"zalo\"\n}" }
+          }
+        },
+        {
+          "name": "Community Unread Count",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/notifications/community-unread", "host": ["{{base_url}}"], "path": ["api", "notifications", "community-unread"] }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Community",
+      "item": [
+        {
+          "name": "Get Posts",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/community/posts?cohort_id={{cohort_id}}&page=0",
+              "host": ["{{base_url}}"], "path": ["api", "community", "posts"],
+              "query": [{ "key": "cohort_id", "value": "{{cohort_id}}" }, { "key": "page", "value": "0" }]
+            }
+          }
+        },
+        {
+          "name": "Create Post",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/community/posts", "host": ["{{base_url}}"], "path": ["api", "community", "posts"] },
+            "body": { "mode": "raw", "raw": "{\n  \"cohort_id\": \"{{cohort_id}}\",\n  \"post_type\": \"completion_share\",\n  \"content\": \"Xong ngày 5 rồi! 💪\",\n  \"media_urls\": []\n}" }
+          }
+        },
+        {
+          "name": "Toggle Reaction",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/community/posts/<post-id>/reactions", "host": ["{{base_url}}"], "path": ["api", "community", "posts", "<post-id>", "reactions"] },
+            "body": { "mode": "raw", "raw": "{\n  \"reaction_type\": \"heart\"\n}" }
+          }
+        },
+        {
+          "name": "Upload Image",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/community/upload", "host": ["{{base_url}}"], "path": ["api", "community", "upload"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "/path/to/image.jpg" },
+                { "key": "index", "value": "0", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Post Suggestions",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/community/posts/suggest", "host": ["{{base_url}}"], "path": ["api", "community", "posts", "suggest"] }
+          }
+        },
+        {
+          "name": "Get Posts Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/community/posts/summary?cohort_id={{cohort_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "community", "posts", "summary"],
+              "query": [{ "key": "cohort_id", "value": "{{cohort_id}}" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Photos",
+      "item": [
+        {
+          "name": "Upload Photo",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/api/photos/upload", "host": ["{{base_url}}"], "path": ["api", "photos", "upload"] },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                { "key": "file", "type": "file", "src": "/path/to/photo.jpg" },
+                { "key": "enrollment_id", "value": "{{enrollment_id}}", "type": "text" },
+                { "key": "photo_type", "value": "before", "type": "text" },
+                { "key": "is_public", "value": "false", "type": "text" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "List Photos",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/photos?enrollment_id={{enrollment_id}}",
+              "host": ["{{base_url}}"], "path": ["api", "photos"],
+              "query": [{ "key": "enrollment_id", "value": "{{enrollment_id}}" }]
+            }
+          }
+        },
+        {
+          "name": "Delete Photo",
+          "request": {
+            "method": "DELETE",
+            "url": {
+              "raw": "{{base_url}}/api/photos?photo_id=<photo-uuid>",
+              "host": ["{{base_url}}"], "path": ["api", "photos"],
+              "query": [{ "key": "photo_id", "value": "<photo-uuid>" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Referral",
+      "item": [
+        {
+          "name": "Get My Code",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/referral/code", "host": ["{{base_url}}"], "path": ["api", "referral", "code"] }
+          }
+        },
+        {
+          "name": "Create Custom Code",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/referral/code", "host": ["{{base_url}}"], "path": ["api", "referral", "code"] },
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"MINHBODIX\"\n}" }
+          }
+        },
+        {
+          "name": "Validate Code",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/api/referral/validate?code=BODIX-A7K3",
+              "host": ["{{base_url}}"], "path": ["api", "referral", "validate"],
+              "query": [{ "key": "code", "value": "BODIX-A7K3" }]
+            }
+          }
+        },
+        {
+          "name": "Track Click",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/referral/track", "host": ["{{base_url}}"], "path": ["api", "referral", "track"] },
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"BODIX-A7K3\",\n  \"event\": \"click\",\n  \"metadata\": { \"source\": \"zalo_share\" }\n}" }
+          }
+        },
+        {
+          "name": "Track Conversion",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/referral/track", "host": ["{{base_url}}"], "path": ["api", "referral", "track"] },
+            "body": { "mode": "raw", "raw": "{\n  \"code\": \"BODIX-A7K3\",\n  \"event\": \"conversion\",\n  \"metadata\": {\n    \"program_id\": \"{{program_id}}\",\n    \"enrollment_id\": \"{{enrollment_id}}\",\n    \"conversion_amount\": 990000\n  }\n}" }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Affiliate",
+      "item": [
+        {
+          "name": "Apply",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/affiliate/apply", "host": ["{{base_url}}"], "path": ["api", "affiliate", "apply"] },
+            "body": { "mode": "raw", "raw": "{\n  \"social_channels\": [{ \"platform\": \"instagram\", \"url\": \"https://instagram.com/example\", \"followers\": 5000 }],\n  \"motivation\": \"Tôi muốn chia sẻ hành trình fitness của mình\",\n  \"bank_name\": \"Vietcombank\",\n  \"bank_account_number\": \"1234567890\",\n  \"bank_account_name\": \"NGUYEN VAN A\"\n}" }
+          }
+        },
+        {
+          "name": "Get Dashboard",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/affiliate/dashboard", "host": ["{{base_url}}"], "path": ["api", "affiliate", "dashboard"] }
+          }
+        },
+        {
+          "name": "Get Status",
+          "request": {
+            "method": "GET",
+            "url": { "raw": "{{base_url}}/api/affiliate/status", "host": ["{{base_url}}"], "path": ["api", "affiliate", "status"] }
+          }
+        },
+        {
+          "name": "Request Withdrawal",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": { "raw": "{{base_url}}/api/affiliate/withdraw", "host": ["{{base_url}}"], "path": ["api", "affiliate", "withdraw"] },
+            "body": { "mode": "raw", "raw": "{\n  \"amount\": 500000\n}" }
+          }
+        }
+      ]
+    }
+  ]
+}

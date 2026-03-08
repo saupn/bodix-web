@@ -56,16 +56,31 @@ export default function OnboardingPage() {
   const [otpVerified, setOtpVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
 
-  // Pre-fill from user
+  // Redirect users who have already completed onboarding
   useEffect(() => {
-    async function loadUser() {
+    async function checkOnboardingStatus() {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (user?.user_metadata?.full_name) {
+      if (!user) {
+        router.push("/login");
+        return;
+      }
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("onboarding_completed, full_name")
+        .eq("id", user.id)
+        .single();
+      if (profile?.onboarding_completed) {
+        router.push("/app");
+        return;
+      }
+      if (profile?.full_name) {
+        setFullName(profile.full_name);
+      } else if (user.user_metadata?.full_name) {
         setFullName(user.user_metadata.full_name);
       }
     }
-    loadUser();
+    checkOnboardingStatus();
   }, []);
 
   // Countdown timer
@@ -204,7 +219,6 @@ export default function OnboardingPage() {
       }
 
       router.push("/app");
-      router.refresh();
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);

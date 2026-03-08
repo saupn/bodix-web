@@ -34,8 +34,9 @@ interface Workout {
 }
 
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
-  main: "Main",
-  recovery: "Recovery",
+  main: "Chính",
+  recovery: "Phục hồi",
+  review: "Review",
   flexible: "Linh hoạt",
 };
 
@@ -249,6 +250,9 @@ export default function ProgramWorkoutPage() {
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
           Ngày {day} — {workout.title}
         </h1>
+        {workout.description && (
+          <p className="mt-1 text-sm text-neutral-400">{workout.description}</p>
+        )}
         <div className="mt-2 flex flex-wrap gap-2">
           <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-primary">
             {workout.duration_minutes} phút
@@ -277,23 +281,31 @@ export default function ProgramWorkoutPage() {
       {/* Mode buttons */}
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row">
-          {modeOptions.map((opt) => (
-            <button
-              key={opt.key}
-              type="button"
-              onClick={() => !isCompleted && setMode(opt.key)}
-              disabled={isCompleted}
-              className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold uppercase transition-all ${
-                mode === opt.key
-                  ? "border-2 border-primary bg-primary text-secondary-light shadow-md"
-                  : isCompleted
-                  ? "border-2 border-neutral-100 bg-neutral-50 text-neutral-400"
-                  : "border-2 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
+          {modeOptions.map((opt) => {
+            const rounds = opt.key === "hard" ? 3 : opt.key === "light" ? 2 : 1;
+            const perRound = workout.duration_minutes > 0
+              ? Math.round(workout.duration_minutes / 3)
+              : 7;
+            const dur = rounds * perRound;
+            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "🧘";
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => !isCompleted && setMode(opt.key)}
+                disabled={isCompleted}
+                className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
+                  mode === opt.key
+                    ? "border-2 border-primary bg-primary text-secondary-light shadow-md"
+                    : isCompleted
+                    ? "border-2 border-neutral-100 bg-neutral-50 text-neutral-400"
+                    : "border-2 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                }`}
+              >
+                {emoji} {opt.label} — {rounds} lượt (~{dur} phút)
+              </button>
+            );
+          })}
         </div>
         {!isCompleted && (
           <p className="text-sm text-neutral-600">
@@ -304,12 +316,33 @@ export default function ProgramWorkoutPage() {
 
       {/* Video area */}
       <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
-        <div className="flex h-full w-full items-center justify-center">
-          <div className="flex flex-col items-center gap-2 text-neutral-400">
-            <Play className="h-14 w-14" strokeWidth={1.5} />
-            <span className="text-sm">Video bài tập sẽ được cập nhật</span>
-          </div>
-        </div>
+        {(() => {
+          const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
+          const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
+          if (videoUrl && videoUrl.includes("vimeo.com")) {
+            const vimeoMatch = videoUrl.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
+            if (vimeoMatch) {
+              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}` : ""}`;
+              return (
+                <iframe
+                  src={src}
+                  className="h-full w-full"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title={workout.title}
+                />
+              );
+            }
+          }
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="flex flex-col items-center gap-2 text-neutral-400">
+                <Play className="h-14 w-14" strokeWidth={1.5} />
+                <span className="text-sm">Video bài tập sẽ được cập nhật</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Exercise list */}

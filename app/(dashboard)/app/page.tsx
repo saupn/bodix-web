@@ -23,7 +23,7 @@ const PROGRAM_CARDS = [
     badge: "⭐ Phổ biến nhất",
     note: null,
     features: [
-      "5 phiên tập + phục hồi + Review Chủ nhật mỗi tuần",
+      "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "21 ngày hoàn thành liên tục & Streak",
       "Nhóm tập luyện cùng đợt",
@@ -40,7 +40,7 @@ const PROGRAM_CARDS = [
     badge: null as string | null,
     note: "Phù hợp nếu bạn đã có nền tảng tập luyện",
     features: [
-      "2 phiên tập xen kẽ mỗi buổi (~50 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "42 ngày hoàn thành & Review chuyên sâu",
       "Kết quả rõ rệt từ tuần thứ 3",
@@ -57,7 +57,7 @@ const PROGRAM_CARDS = [
     badge: "🔥 Lột xác toàn diện",
     note: "Cường độ cao, phù hợp người đã tập ít nhất 6 tuần",
     features: [
-      "Phiên thường + phiên nâng cao (~60 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "84 ngày hoàn thành & reflection giữa chương trình",
       "Hướng dẫn dinh dưỡng đi kèm",

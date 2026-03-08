@@ -12,7 +12,7 @@ const PRICING_CARDS = [
     badge: "⭐ Phổ biến nhất",
     badgeStyle: "bg-primary text-white",
     features: [
-      "5 phiên tập + phục hồi + Review Chủ nhật mỗi tuần",
+      "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "21 ngày hoàn thành liên tục & Streak",
       "Nhóm tập luyện cùng đợt",
@@ -29,7 +29,7 @@ const PRICING_CARDS = [
     badge: null,
     badgeStyle: "",
     features: [
-      "2 phiên tập xen kẽ mỗi buổi (~50 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "42 ngày hoàn thành & Review chuyên sâu",
       "Kết quả rõ rệt từ tuần thứ 3",
@@ -46,7 +46,7 @@ const PRICING_CARDS = [
     badge: "🔥 Lột xác toàn diện",
     badgeStyle: "bg-orange-100 text-orange-800",
     features: [
-      "Phiên thường + phiên nâng cao (~60 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
       "84 ngày hoàn thành & reflection giữa chương trình",
       "Hướng dẫn dinh dưỡng đi kèm",

@@ -51,8 +51,9 @@ function Confetti() {
 }
 
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
-  main: "Main",
-  recovery: "Recovery",
+  main: "Chính",
+  recovery: "Phục hồi",
+  review: "Review",
   flexible: "Linh hoạt",
 };
 
@@ -222,12 +223,35 @@ export default function WorkoutDetailPage() {
         </div>
       </div>
 
-      {/* Video placeholder */}
-      <div className="flex aspect-video items-center justify-center rounded-xl border-2 border-dashed border-neutral-200 bg-neutral-50">
-        <div className="flex flex-col items-center gap-2 text-neutral-400">
-          <Play className="h-12 w-12" strokeWidth={1.5} />
-          <span className="text-sm">Video sẽ được cập nhật</span>
-        </div>
+      {/* Video area */}
+      <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
+        {(() => {
+          const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
+          const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
+          if (videoUrl && videoUrl.includes("vimeo.com")) {
+            const vimeoMatch = videoUrl.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
+            if (vimeoMatch) {
+              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}` : ""}`;
+              return (
+                <iframe
+                  src={src}
+                  className="h-full w-full"
+                  allow="autoplay; fullscreen; picture-in-picture"
+                  allowFullScreen
+                  title={workout.title}
+                />
+              );
+            }
+          }
+          return (
+            <div className="flex h-full w-full items-center justify-center">
+              <div className="flex flex-col items-center gap-2 text-neutral-400">
+                <Play className="h-12 w-12" strokeWidth={1.5} />
+                <span className="text-sm">Video sẽ được cập nhật</span>
+              </div>
+            </div>
+          );
+        })()}
       </div>
 
       {/* Mode tabs */}

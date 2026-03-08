@@ -21,9 +21,9 @@ export const PROGRAMS = [
     badge: "⭐ Phổ biến nhất",
     tagline: "21 ngày tạo thói quen",
     description:
-      "Dành cho bạn chưa bao giờ hoàn thành một chương trình tập. 21 ngày, mỗi ngày 10-25 phút. Đây là lần đầu tiên bạn sẽ đi đến cuối.",
+      "Dành cho bạn chưa bao giờ hoàn thành một chương trình tập. 21 ngày, mỗi ngày ~7-21 phút. Đây là lần đầu tiên bạn sẽ đi đến cuối.",
     features: [
-      "Mỗi ngày 10-25 phút tại nhà",
+      "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard / Light / Easy theo cảm giác",
       "Review Chủ nhật mỗi tuần",
     ],
@@ -38,9 +38,9 @@ export const PROGRAMS = [
     badge: "💪 Kết quả rõ rệt",
     tagline: "6 tuần thay đổi rõ rệt",
     description:
-      "Dành cho bạn muốn thấy thay đổi thật sự. 2 phiên tập xen kẽ mỗi buổi, ~50 phút. Từ tuần 3, bạn sẽ nhìn gương và thấy khác.",
+      "Dành cho bạn muốn thấy thay đổi thật sự. 2 phiên tập xen kẽ mỗi buổi, ~14-42 phút. Từ tuần 3, bạn sẽ nhìn gương và thấy khác.",
     features: [
-      "2 phiên tập xen kẽ mỗi buổi (~50 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Kết quả rõ rệt từ tuần thứ 3",
       "Review chuyên sâu mỗi Chủ nhật",
     ],
@@ -55,9 +55,9 @@ export const PROGRAMS = [
     badge: "🔥 Lột xác toàn diện",
     tagline: "12 tuần lột xác có kiểm soát",
     description:
-      "Hành trình đầy đủ nhất. Phiên tập thường + nâng cao, ~60 phút. Dành cho bạn nghiêm túc muốn thay đổi cơ thể.",
+      "Hành trình đầy đủ nhất. Phiên tập thường + nâng cao, ~14-42 phút. Dành cho bạn nghiêm túc muốn thay đổi cơ thể.",
     features: [
-      "Phiên thường + nâng cao (~60 phút)",
+      "Mỗi buổi ~14-42 phút tùy cường độ",
       "Hướng dẫn dinh dưỡng đi kèm",
       "Reflection giữa chương trình",
     ],
@@ -75,7 +75,7 @@ export const COMPARISON_DATA = {
     },
     {
       label: "Thời lượng/buổi",
-      values: ["10-25 phút", "~50 phút", "~60 phút"],
+      values: ["~7-21 phút", "~14-42 phút", "~14-42 phút"],
     },
     {
       label: "Cấu trúc tuần",
@@ -124,12 +124,12 @@ export const FAQS = [
   {
     question: "Mỗi ngày tôi cần tập bao lâu?",
     answer:
-      "Tùy bạn chọn! Mỗi ngày bạn chọn 1 trong 3 mức: Hard (~25 phút, 3 lượt), Light (~18 phút, 2 lượt), hoặc Easy (~10 phút, 1 lượt). Thứ 7 là phiên phục hồi 15 phút, Chủ nhật là Review ~20-30 phút.",
+      "Tùy bạn chọn! Mỗi ngày bạn chọn 1 trong 3 mức: Hard (3 lượt, ~21 phút), Light (2 lượt, ~14 phút), hoặc Easy (1 lượt, ~7 phút). Thứ 7 là phiên phục hồi ~7 phút, Chủ nhật là Review ~25 phút.",
   },
   {
     question: "Nếu một hôm tôi quá mệt, không thể tập được thì sao?",
     answer:
-      "Đó chính là lý do BodiX có chế độ Easy — chỉ 1 lượt, 10 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
+      "Đó chính là lý do BodiX có chế độ Easy — chỉ 1 lượt, ~7 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
   },
   {
     question:

@@ -1,22 +1,14 @@
-import { type NextRequest, NextResponse } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
 import { createServerClient } from '@supabase/ssr'
-
-const PUBLIC_MARKETING_ROUTES = ['/', '/bodix-21', '/bodix-6w', '/bodix-12w']
-const AUTH_ROUTES = ['/login', '/signup', '/onboarding']
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // Marketing & public referral/affiliate landing pages — always allow
-  if (PUBLIC_MARKETING_ROUTES.includes(pathname)) {
-    return await updateSession(request)
-  }
+  let response = NextResponse.next({
+    request: { headers: request.headers },
+  })
 
-  // Refresh session tokens on every request (required by @supabase/ssr)
-  const response = await updateSession(request)
-
-  // Read the user from the refreshed session cookie (no network call — JWT is local)
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
@@ -25,56 +17,62 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll()
         },
-        setAll() {
-          // Read-only copy — cookie writes are handled by updateSession above
+        setAll(cookiesToSet) {
+          cookiesToSet.forEach(({ name, value }) =>
+            request.cookies.set(name, value)
+          )
+          response = NextResponse.next({ request })
+          cookiesToSet.forEach(({ name, value, options }) =>
+            response.cookies.set(name, value, options)
+          )
         },
       },
     }
   )
 
+  // Refresh session (required by @supabase/ssr — must call getUser())
   const {
     data: { user },
   } = await supabase.auth.getUser()
 
-  const isAuthRoute  = AUTH_ROUTES.some((r) => pathname.startsWith(r))
-  const isAppRoute   = pathname.startsWith('/app')
-  const isAdminRoute = pathname.startsWith('/admin')
-
-  // Authenticated user hitting /login or /signup → send to app
-  if (isAuthRoute && user) {
-    return NextResponse.redirect(new URL('/app', request.url))
+  // /app/* and /admin/* require authentication
+  if (pathname.startsWith('/app') || pathname.startsWith('/admin')) {
+    if (!user) {
+      const loginUrl = new URL('/login', request.url)
+      loginUrl.searchParams.set('next', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+    return response
   }
 
-  // Unauthenticated user hitting any protected route → /login
-  // /app/*   — dashboard & program routes
-  // /admin/* — admin-only routes (role check handled by AdminLayout + verifyAdmin())
-  if ((isAppRoute || isAdminRoute) && !user) {
-    const loginUrl = new URL('/login', request.url)
-    loginUrl.searchParams.set('next', pathname) // preserve intended destination
-    return NextResponse.redirect(loginUrl)
+  // /onboarding requires authentication (but authenticated users stay here — no redirect to /app)
+  if (pathname.startsWith('/onboarding')) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return response
   }
 
-  // Security headers on every response
-  response.headers.set('X-Content-Type-Options', 'nosniff')
-  response.headers.set('X-Frame-Options', 'DENY')
-  response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  response.headers.set(
-    'Permissions-Policy',
-    'camera=(), microphone=(), geolocation=()',
-  )
+  // /login and /signup: redirect authenticated users to the dashboard
+  if (pathname === '/login' || pathname === '/signup') {
+    if (user) {
+      return NextResponse.redirect(new URL('/app', request.url))
+    }
+    return response
+  }
 
+  // All other routes (homepage, landing pages, /p/*, /r/*): allow freely
   return response
 }
 
+// Only run on routes that need auth checks
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static, _next/image (Next.js internals)
-     * - favicon.ico, images, svgs
-     * - auth/callback (Supabase OAuth redirect)
-     * - api/webhooks (payment webhooks must not be blocked)
-     */
-    '/((?!_next/static|_next/image|favicon.ico|images|.*\\.svg|auth/callback|api/webhooks).*)',
+    '/app/:path*',
+    '/admin/:path*',
+    '/login',
+    '/signup',
+    '/onboarding/:path*',
+    '/onboarding',
   ],
 }

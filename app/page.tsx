@@ -4,6 +4,7 @@ import { Hero } from "@/components/sections/Hero";
 import { Philosophy } from "@/components/sections/Philosophy";
 import { Problems } from "@/components/sections/Problems";
 import { Programs } from "@/components/sections/Programs";
+import { Pricing } from "@/components/sections/Pricing";
 import { Comparison } from "@/components/sections/Comparison";
 import { FAQ } from "@/components/sections/FAQ";
 import { FinalCTA } from "@/components/sections/FinalCTA";
@@ -15,8 +16,9 @@ export default function Home() {
       <main className="flex-1">
         <Hero />
         <Philosophy />
-        <Problems />
         <Programs />
+        <Problems />
+        <Pricing />
         <Comparison />
         <FAQ />
         <FinalCTA />

@@ -1,23 +1,29 @@
 import { SectionHeading } from "@/components/ui/SectionHeading";
 
-const problems = [
+const steps = [
   {
-    emoji: "😔",
-    title: "Mua khóa tập nhưng bỏ",
+    emoji: "💪",
+    title: "Thứ 2–6: Phiên tập chính",
     description:
-      "Bạn đã từng mua khóa tập online, xem được vài video đầu tiên, rồi quên luôn. Tiền mất, kết quả không có, và bạn tự trách mình thiếu kỷ luật.",
+      "Chọn Hard (3 lượt, 25 phút), Light (2 lượt, 18 phút), hoặc Easy (1 lượt, 10 phút) — tùy cảm giác hôm đó.",
   },
   {
-    emoji: "😓",
-    title: "Tập 1-2 tuần rồi dừng",
+    emoji: "🧘",
+    title: "Thứ 7: Phiên phục hồi",
     description:
-      "Tuần đầu rất quyết tâm. Tuần hai bắt đầu mệt. Tuần ba có việc bận. Rồi dừng hẳn. Chu kỳ này cứ lặp đi lặp lại mãi.",
+      "Stretching nhẹ nhàng, 15 phút. Cơ thể cần nghỉ để mạnh hơn.",
   },
   {
-    emoji: "😢",
-    title: "Bị cảm xúc chi phối",
+    emoji: "📊",
+    title: "Chủ nhật: Review tuần",
     description:
-      "Hôm nào có động lực thì tập. Hôm nào không có thì nghỉ. Kết quả là không bao giờ đi đến đâu, vì cảm xúc thì lên xuống theo ngày.",
+      "Xem video nhận xét, lắng nghe cơ thể, đặt mục tiêu tuần mới. ~20-30 phút.",
+  },
+  {
+    emoji: "🔥",
+    title: "Mỗi ngày: Check-in & Streak",
+    description:
+      "Check-in → Streak tích lũy → Cộng đồng thấy bạn hoàn thành. Nhịp đều đặn tạo kết quả.",
   },
 ];
 
@@ -25,28 +31,28 @@ export function Problems() {
   return (
     <section className="py-12 md:py-20 lg:py-24 bg-neutral-50">
       <div className="container mx-auto px-4 sm:px-6">
-        <SectionHeading title="Nghe quen không?" />
-        <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 sm:grid-cols-2 md:grid-cols-3">
-          {problems.map((problem) => (
+        <SectionHeading title="Một tuần trong BodiX" />
+        <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 sm:grid-cols-2 md:grid-cols-4">
+          {steps.map((step, i) => (
             <div
-              key={problem.title}
-              className="rounded-xl bg-white p-4 sm:p-6 border border-neutral-200 shadow-sm"
+              key={step.title}
+              className="relative rounded-xl bg-white p-4 sm:p-6 border border-neutral-200 shadow-sm"
             >
-              <span className="text-4xl">{problem.emoji}</span>
-              <h3 className="mt-4 font-heading text-lg font-semibold text-primary">
-                {problem.title}
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">{step.emoji}</span>
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                  {i + 1}
+                </span>
+              </div>
+              <h3 className="mt-4 font-heading text-base sm:text-lg font-semibold text-primary">
+                {step.title}
               </h3>
-              <p className="mt-3 text-neutral-600 leading-relaxed">
-                {problem.description}
+              <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+                {step.description}
               </p>
             </div>
           ))}
         </div>
-        <p className="mt-8 sm:mt-12 max-w-[600px] mx-auto text-center text-neutral-600 text-sm sm:text-base leading-relaxed px-2">
-          Nếu bạn thấy mình trong những tình huống trên, vấn đề không phải ở bạn.
-          Vấn đề là bạn chưa có một hệ thống phù hợp. BodiX được thiết kế để giải
-          quyết đúng những vấn đề này.
-        </p>
       </div>
     </section>
   );

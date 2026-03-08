@@ -1,13 +1,14 @@
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
-  slogan: "Không phải tập cho vui. Tập để hoàn thành.",
-  targetAudience: "Phụ nữ Việt Nam, 20-55 tuổi",
+  slogan: "Thay đổi vóc dáng tại nhà — không cần phòng tập, không cần PT",
+  targetAudience: "Phụ nữ Việt Nam, 25-45 tuổi",
 } as const;
 
 export const NAV_ITEMS = [
-  { label: "Triết lý", href: "#philosophy" },
+  { label: "Vì sao BodiX", href: "#why-different" },
   { label: "Chương trình", href: "#programs" },
+  { label: "Bảng giá", href: "#pricing" },
   { label: "FAQ", href: "#faq" },
 ] as const;
 
@@ -17,15 +18,16 @@ export const PROGRAMS = [
     name: "BodiX 21",
     slug: "/bodix-21",
     duration: "21 ngày",
-    tagline: "Nền tảng kỷ luật",
+    badge: "⭐ Phổ biến nhất",
+    tagline: "21 ngày tạo thói quen",
     description:
-      "Chương trình khởi đầu dành cho người muốn xây dựng thói quen tập luyện. 21 ngày không đủ để thay đổi cơ thể, nhưng đủ để thay đổi cách bạn nhìn chính mình.",
+      "Dành cho bạn chưa bao giờ hoàn thành một chương trình tập. 21 ngày, mỗi ngày 10-25 phút. Đây là lần đầu tiên bạn sẽ đi đến cuối.",
     features: [
-      "Người mới bắt đầu",
-      "Người từng bỏ giữa chừng nhiều lần",
-      "Người muốn tạo thói quen",
+      "Mỗi ngày 10-25 phút tại nhà",
+      "Chọn Hard / Light / Easy theo cảm giác",
+      "Review Chủ nhật mỗi tuần",
     ],
-    cta: "Bắt đầu với 21 ngày",
+    cta: "Bắt đầu miễn phí 3 ngày",
     highlighted: true,
   },
   {
@@ -33,15 +35,16 @@ export const PROGRAMS = [
     name: "BodiX 6W",
     slug: "/bodix-6w",
     duration: "6 tuần",
-    tagline: "Bắt đầu thấy form",
+    badge: "💪 Kết quả rõ rệt",
+    tagline: "6 tuần thay đổi rõ rệt",
     description:
-      "Sau khi đã có nền tảng kỷ luật từ BodiX 21, đây là lúc đẩy xa hơn. 6 tuần đủ để cơ thể bắt đầu thích nghi và bạn bắt đầu thấy những thay đổi đầu tiên.",
+      "Dành cho bạn muốn thấy thay đổi thật sự. 2 phiên tập xen kẽ mỗi buổi, ~50 phút. Từ tuần 3, bạn sẽ nhìn gương và thấy khác.",
     features: [
-      "Người đã hoàn thành BodiX 21",
-      "Người có nền tảng tập luyện cơ bản",
-      "Người muốn thấy kết quả rõ hơn",
+      "2 phiên tập xen kẽ mỗi buổi (~50 phút)",
+      "Kết quả rõ rệt từ tuần thứ 3",
+      "Review chuyên sâu mỗi Chủ nhật",
     ],
-    cta: "Xem chương trình 6W",
+    cta: "Bắt đầu miễn phí 3 ngày",
     highlighted: false,
   },
   {
@@ -49,15 +52,16 @@ export const PROGRAMS = [
     name: "BodiX 12W",
     slug: "/bodix-12w",
     duration: "12 tuần",
-    tagline: "Thay đổi rõ rệt",
+    badge: "🔥 Lột xác toàn diện",
+    tagline: "12 tuần lột xác có kiểm soát",
     description:
-      "Chương trình toàn diện cho người sẵn sàng cam kết dài hạn. 12 tuần là thời gian đủ để tạo ra thay đổi thực sự về vóc dáng, sức khỏe và lối sống.",
+      "Hành trình đầy đủ nhất. Phiên tập thường + nâng cao, ~60 phút. Dành cho bạn nghiêm túc muốn thay đổi cơ thể.",
     features: [
-      "Người đã có thói quen tập luyện ổn định",
-      "Người muốn thay đổi rõ rệt",
-      "Người sẵn sàng cam kết 3 tháng",
+      "Phiên thường + nâng cao (~60 phút)",
+      "Hướng dẫn dinh dưỡng đi kèm",
+      "Reflection giữa chương trình",
     ],
-    cta: "Xem chương trình 12W",
+    cta: "Bắt đầu miễn phí 3 ngày",
     highlighted: false,
   },
 ] as const;
@@ -70,36 +74,32 @@ export const COMPARISON_DATA = {
       values: ["21 ngày", "6 tuần (42 ngày)", "12 tuần (84 ngày)"],
     },
     {
-      label: "Số buổi tập",
-      values: ["18 buổi", "36 buổi", "72 buổi"],
+      label: "Thời lượng/buổi",
+      values: ["10-25 phút", "~50 phút", "~60 phút"],
     },
     {
-      label: "Số ngày review",
-      values: ["3 ngày", "6 ngày", "12 ngày"],
+      label: "Cấu trúc tuần",
+      values: ["5 chính + Recovery + Review", "5 chính + Recovery + Review", "5 chính + Recovery + Review"],
+    },
+    {
+      label: "Chế độ tập",
+      values: ["Hard / Light / Easy", "Hard / Light / Easy", "Hard / Light / Easy"],
     },
     {
       label: "Mục tiêu chính",
       values: [
-        "Xây dựng thói quen",
-        "Tăng sức bền, thấy form",
+        "Tạo thói quen, hoàn thành lần đầu",
         "Thay đổi vóc dáng rõ rệt",
+        "Lột xác toàn diện",
       ],
     },
     {
-      label: "Cường độ",
-      values: ["⚡", "⚡⚡", "⚡⚡⚡"],
-    },
-    {
-      label: "Cần dụng cụ",
-      values: ["Không", "Thảm, tạ nhẹ", "Thảm, tạ, dây kháng lực"],
-    },
-    {
       label: "Phù hợp với",
-      values: ["Người mới, hay bỏ cuộc", "Đã có nền tảng", "Sẵn sàng cam kết"],
+      values: ["Mới bắt đầu, từng bỏ cuộc", "Muốn thấy kết quả", "Nghiêm túc thay đổi"],
     },
     {
-      label: "Mức cam kết",
-      values: ["⭐⭐", "⭐⭐⭐", "⭐⭐⭐⭐"],
+      label: "Giá",
+      values: ["499.000đ", "1.199.000đ", "1.999.000đ"],
     },
   ],
 } as const;
@@ -109,56 +109,56 @@ export const FAQS = [
     question:
       "Tôi hoàn toàn mới, chưa bao giờ tập luyện. Nên bắt đầu từ đâu?",
     answer:
-      "Hãy bắt đầu với BodiX 21. Chương trình này được thiết kế dành cho người mới, với cường độ nhẹ và mục tiêu chính là giúp bạn xây dựng thói quen. Bạn không cần có nền tảng gì trước đó.",
+      "Hãy bắt đầu với BodiX 21. Chương trình này được thiết kế dành cho người mới, với cường độ nhẹ và mục tiêu chính là giúp bạn xây dựng thói quen. Ngày nào mệt, bạn chọn Easy chỉ 10 phút. Bạn không cần có nền tảng gì trước đó.",
   },
   {
     question: "Tôi có cần đến phòng gym không?",
     answer:
-      "Không. Tất cả các chương trình BodiX đều có thể tập tại nhà. BodiX 21 không cần bất kỳ dụng cụ nào. BodiX 6W và 12W có thể cần thảm tập và tạ nhẹ, nhưng đều có thể thay thế bằng đồ vật trong nhà.",
+      "Không. Tất cả các chương trình BodiX đều tập tại nhà. BodiX 21 không cần bất kỳ dụng cụ nào. BodiX 6W và 12W có thể cần thảm tập và tạ nhẹ, nhưng đều có thể thay thế bằng đồ vật trong nhà.",
   },
   {
-    question: "BodiX có phù hợp với nữ không?",
+    question: "BodiX có phù hợp với nam không?",
     answer:
-      "BodiX được thiết kế dành riêng cho phụ nữ. Các bài tập tập trung vào những vùng cơ thể phụ nữ thường muốn cải thiện như eo, mông, đùi, bắp tay. Cường độ và thời lượng cũng được điều chỉnh phù hợp với thể trạng và lịch trình của phụ nữ.",
+      "Hiện tại BodiX được thiết kế dành riêng cho phụ nữ. Các bài tập tập trung vào những vùng cơ thể phụ nữ thường muốn cải thiện. Phiên bản dành cho nam đang được phát triển và sẽ ra mắt sớm!",
   },
   {
     question: "Mỗi ngày tôi cần tập bao lâu?",
     answer:
-      "BodiX 21: khoảng 20-30 phút/ngày. BodiX 6W: khoảng 30-40 phút/ngày. BodiX 12W: khoảng 40-50 phút/ngày. Thời gian này bao gồm cả khởi động và giãn cơ.",
+      "Tùy bạn chọn! Mỗi ngày bạn chọn 1 trong 3 mức: Hard (~25 phút, 3 lượt), Light (~18 phút, 2 lượt), hoặc Easy (~10 phút, 1 lượt). Thứ 7 là phiên phục hồi 15 phút, Chủ nhật là Review ~20-30 phút.",
   },
   {
-    question: "Nếu một hôm tôi quá mệt, không thể tập hết bài thì sao?",
+    question: "Nếu một hôm tôi quá mệt, không thể tập được thì sao?",
     answer:
-      "Trong BodiX, tập ở mức 60-70% vẫn được tính là hoàn thành. Mục tiêu là giữ nhịp, không phải tập kỷ lục. Một buổi tập \"tạm được\" vẫn tốt hơn một buổi tập bị bỏ.",
+      "Đó chính là lý do BodiX có chế độ Easy — chỉ 1 lượt, 10 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
   },
   {
     question:
       "Sau khi hoàn thành BodiX 21, tôi có bắt buộc phải tiếp tục với 6W không?",
     answer:
-      "Không bắt buộc. Bạn có thể lặp lại BodiX 21 nếu muốn củng cố thói quen, hoặc nghỉ ngơi một thời gian trước khi tiếp tục. Tuy nhiên, nếu bạn muốn thấy thay đổi rõ rệt về hình thể, việc tiếp tục với 6W hoặc 12W sẽ mang lại kết quả tốt hơn.",
+      "Không bắt buộc. Bạn có thể lặp lại BodiX 21 nếu muốn củng cố thói quen, hoặc nghỉ ngơi trước khi tiếp tục. Tuy nhiên, nếu bạn muốn thấy thay đổi rõ rệt về hình thể, việc tiếp tục với 6W hoặc 12W sẽ mang lại kết quả tốt hơn.",
   },
   {
     question: "Chi phí như thế nào?",
     answer:
-      "Chi phí cả tháng tập BodiX không bằng một buổi tập với PT. Bạn có thể xem chi tiết mức phí tại trang của từng chương trình.",
+      "BodiX 21 chỉ 499.000đ (~24.000đ/ngày, rẻ hơn ly trà sữa). Thanh toán 1 lần, không subscription, không phí ẩn. Bạn được trải nghiệm miễn phí 3 ngày trước khi quyết định.",
   },
   {
-    question: "Tôi có được hỗ trợ gì trong quá trình tập không?",
+    question: "Review Chủ nhật là gì?",
     answer:
-      "Có. BodiX có hệ thống nhắc tập mỗi ngày, theo dõi tiến trình, và cộng đồng để bạn không đơn độc trong hành trình. Bạn cũng có thể đặt câu hỏi và nhận hỗ trợ từ đội ngũ BodiX.",
+      "Mỗi Chủ nhật, bạn xem video nhận xét từ coach, tự đánh giá cơ thể (body scan), và đặt mục tiêu cho tuần mới. Đây là lúc bạn dừng lại, lắng nghe cơ thể, và thấy mình đang tiến lên.",
   },
 ] as const;
 
 export const CTA_PROGRAMS = [
-  { name: "BodiX 21", duration: "21 ngày", href: "/bodix-21", cta: "Bắt đầu →" },
-  { name: "BodiX 6W", duration: "6 tuần", href: "/bodix-6w", cta: "Xem 6W →" },
-  { name: "BodiX 12W", duration: "12 tuần", href: "/bodix-12w", cta: "Xem 12W →" },
+  { name: "BodiX 21", duration: "21 ngày", href: "/signup", cta: "Bắt đầu miễn phí →" },
+  { name: "BodiX 6W", duration: "6 tuần", href: "/signup", cta: "Bắt đầu miễn phí →" },
+  { name: "BodiX 12W", duration: "12 tuần", href: "/signup", cta: "Bắt đầu miễn phí →" },
 ] as const;
 
 export const FOOTER_DATA = {
   brand: {
     name: "BodiX",
-    tagline: "Completion First Fitness",
+    tagline: "Completion First Fitness — Dành cho phụ nữ Việt Nam",
   },
   columns: [
     {
@@ -167,6 +167,7 @@ export const FOOTER_DATA = {
         { label: "BodiX 21", href: "/bodix-21" },
         { label: "BodiX 6W", href: "/bodix-6w" },
         { label: "BodiX 12W", href: "/bodix-12w" },
+        { label: "Dành cho Nam (Sắp ra mắt)", href: "#" },
       ],
     },
     {

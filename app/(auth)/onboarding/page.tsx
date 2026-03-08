@@ -265,6 +265,7 @@ export default function OnboardingPage() {
                   placeholder="Họ và tên"
                   required
                   className={inputBase}
+                  suppressHydrationWarning
                 />
               </div>
 
@@ -277,6 +278,7 @@ export default function OnboardingPage() {
                   value={dateOfBirth}
                   onChange={(e) => setDateOfBirth(e.target.value)}
                   className={inputBase}
+                  suppressHydrationWarning
                 />
               </div>
 
@@ -295,6 +297,7 @@ export default function OnboardingPage() {
                           ? "border-primary bg-primary/10 text-primary"
                           : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
                       }`}
+                      suppressHydrationWarning
                     >
                       {g.label}
                     </button>
@@ -312,6 +315,7 @@ export default function OnboardingPage() {
                   goNext(2);
                 }}
                 className={btnPrimary}
+                suppressHydrationWarning
               >
                 Tiếp tục
               </button>
@@ -348,6 +352,7 @@ export default function OnboardingPage() {
                         ? "border-primary bg-primary/10 text-primary"
                         : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
                     }`}
+                    suppressHydrationWarning
                   >
                     {g}
                   </button>
@@ -359,6 +364,7 @@ export default function OnboardingPage() {
                   type="button"
                   onClick={goBack}
                   className="flex-1 rounded-lg border-2 border-neutral-300 px-4 py-3 font-medium text-neutral-700 hover:bg-neutral-50"
+                  suppressHydrationWarning
                 >
                   Quay lại
                 </button>
@@ -373,6 +379,7 @@ export default function OnboardingPage() {
                     goNext(3);
                   }}
                   className="flex-1 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light hover:bg-primary-dark"
+                  suppressHydrationWarning
                 >
                   Tiếp tục
                 </button>
@@ -421,6 +428,7 @@ export default function OnboardingPage() {
                       placeholder="0912345678"
                       disabled={loading}
                       className={inputBase}
+                      suppressHydrationWarning
                     />
                   </div>
                   <div className="flex gap-3">
@@ -428,6 +436,7 @@ export default function OnboardingPage() {
                       type="button"
                       onClick={goBack}
                       className="flex-1 rounded-lg border-2 border-neutral-300 px-4 py-3 font-medium text-neutral-700 hover:bg-neutral-50"
+                      suppressHydrationWarning
                     >
                       Quay lại
                     </button>
@@ -436,6 +445,7 @@ export default function OnboardingPage() {
                       onClick={handleSendOtp}
                       disabled={loading}
                       className="flex-1 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light hover:bg-primary-dark"
+                      suppressHydrationWarning
                     >
                       {loading ? "Đang gửi..." : "Gửi mã xác nhận"}
                     </button>
@@ -459,6 +469,7 @@ export default function OnboardingPage() {
                           onChange={(e) => handleOtpChange(i, e.target.value)}
                           disabled={loading}
                           className="h-12 w-10 rounded-lg border border-neutral-300 text-center text-lg font-semibold focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          suppressHydrationWarning
                         />
                       ))}
                     </div>
@@ -474,6 +485,7 @@ export default function OnboardingPage() {
                         onClick={handleSendOtp}
                         disabled={loading}
                         className="text-primary font-medium hover:underline"
+                        suppressHydrationWarning
                       >
                         Gửi lại mã
                       </button>
@@ -484,6 +496,7 @@ export default function OnboardingPage() {
                     onClick={handleVerifyOtp}
                     disabled={loading || otp.join("").length !== 6}
                     className={btnPrimary}
+                    suppressHydrationWarning
                   >
                     {loading ? "Đang xác minh..." : "Bắt đầu hành trình"}
                   </button>
@@ -497,6 +510,7 @@ export default function OnboardingPage() {
                     type="button"
                     onClick={() => goNext(4)}
                     className={`mt-4 ${btnPrimary}`}
+                    suppressHydrationWarning
                   >
                     Tiếp tục
                   </button>
@@ -512,6 +526,7 @@ export default function OnboardingPage() {
                     setCountdown(0);
                   }}
                   className="text-sm text-neutral-500 hover:underline"
+                  suppressHydrationWarning
                 >
                   Đổi số điện thoại
                 </button>
@@ -569,6 +584,7 @@ export default function OnboardingPage() {
                 onClick={handleComplete}
                 disabled={loading}
                 className={btnPrimary}
+                suppressHydrationWarning
               >
                 {loading ? (
                   <>

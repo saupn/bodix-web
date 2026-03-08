@@ -130,6 +130,7 @@ export default function LoginPage() {
                 required
                 disabled={loading}
                 className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                suppressHydrationWarning
               />
             </div>
 
@@ -149,6 +150,7 @@ export default function LoginPage() {
                 required
                 disabled={loading}
                 className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
+                suppressHydrationWarning
               />
             </div>
 
@@ -156,6 +158,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
               className="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light transition-colors hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
+              suppressHydrationWarning
             >
               {loading ? (
                 <>
@@ -199,6 +202,7 @@ export default function LoginPage() {
             onClick={handleGoogleLogin}
             disabled={loading}
             className="mt-6 flex w-full items-center justify-center gap-3 rounded-lg border-2 border-neutral-300 bg-white px-4 py-3 font-medium text-neutral-700 transition-colors hover:border-neutral-400 hover:bg-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50"
+            suppressHydrationWarning
           >
             <GoogleIcon />
             Đăng nhập với Google

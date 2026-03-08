@@ -41,21 +41,15 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const now = new Date();
-  const trialEnds = new Date(now);
-  trialEnds.setDate(trialEnds.getDate() + 3);
-
   const service = createServiceClient();
 
-  // Build update object — always include phone if provided
+  // Build update object — trial starts when user selects a program, not here
   const updateData: Record<string, unknown> = {
     full_name: body.full_name?.trim() || null,
     date_of_birth: body.date_of_birth || null,
     gender: body.gender || null,
     fitness_goal: body.fitness_goal || [],
     onboarding_completed: true,
-    trial_started_at: now.toISOString(),
-    trial_ends_at: trialEnds.toISOString(),
   };
 
   if (body.phone) {

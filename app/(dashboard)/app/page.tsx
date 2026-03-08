@@ -139,6 +139,22 @@ function ProgramCardGrid({ cta, ctaHref }: { cta: string; ctaHref: (slug: string
   );
 }
 
+function UpgradeBanner({ upgradeBanner }: { upgradeBanner: { message: string; targetSlug: string } }) {
+  return (
+    <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
+      <p className="font-medium text-primary text-sm sm:text-base">
+        {upgradeBanner.message}
+      </p>
+      <Link
+        href={`/app/checkout/${upgradeBanner.targetSlug}`}
+        className="mt-3 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+      >
+        Đăng ký ngay với ưu đãi
+      </Link>
+    </div>
+  );
+}
+
 export default async function AppPage() {
   const supabase = await createClient();
   const {
@@ -154,90 +170,56 @@ export default async function AppPage() {
     .single();
 
   const displayName = profile?.full_name?.trim() || user.email || "bạn";
-  const trialEndsAt = profile?.trial_ends_at;
-  const now = new Date();
-  const isInTrial = trialEndsAt && new Date(trialEndsAt) > now;
-  const trialEnded = trialEndsAt && new Date(trialEndsAt) <= now;
 
-  const { data: activeEnrollment } = await supabase
+  // Fetch all enrollments to determine state
+  const { data: enrollments } = await supabase
     .from("enrollments")
-    .select("id")
+    .select("id, status, program_id, programs(slug)")
     .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
+    .order("enrolled_at", { ascending: false });
 
-  const hasActiveEnrollment = !!activeEnrollment;
+  const allEnrollments = enrollments ?? [];
+  const activeEnrollment = allEnrollments.find((e) => e.status === "active");
+  const trialEnrollment = allEnrollments.find((e) => e.status === "trial");
+  const completedEnrollments = allEnrollments.filter((e) => e.status === "completed");
 
-  if (hasActiveEnrollment) {
+  // --- State 1: Active enrollment → show dashboard ---
+  if (activeEnrollment) {
     return <DashboardHomeContent displayName={displayName} />;
   }
 
-  // Check completed enrollments for upgrade banners
-  const { data: completedEnrollments } = await supabase
-    .from("enrollments")
-    .select("program_id, programs(slug)")
-    .eq("user_id", user.id)
-    .eq("status", "completed");
+  // --- State 2: Trial enrollment exists ---
+  if (trialEnrollment) {
+    const trialEndsAt = profile?.trial_ends_at;
+    const now = new Date();
+    const trialActive = trialEndsAt && new Date(trialEndsAt) > now;
 
-  const completedSlugs = (completedEnrollments ?? [])
-    .map((e) => {
-      const prog = e.programs as unknown as { slug: string } | null;
-      return prog?.slug;
-    })
-    .filter(Boolean) as string[];
-
-  const upgradeBanner =
-    UPGRADE_BANNERS[completedSlugs.includes("bodix-6w") ? "bodix-6w" : ""]
-    ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
-    ?? null;
-
-  if (isInTrial) {
-    return (
-      <div className="space-y-8">
-        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
-          <h2 className="font-heading text-lg font-semibold text-primary">
-            Bạn đang trong 3 ngày trải nghiệm miễn phí
-          </h2>
-          <p className="mt-2 text-neutral-600">
-            Khám phá các chương trình BodiX và chọn hành trình phù hợp với bạn.
-          </p>
-          <p className="mt-4 text-sm font-medium text-primary">
-            Còn {formatCountdown(trialEndsAt!)} trải nghiệm
-          </p>
-        </div>
-
-        {upgradeBanner && (
-          <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
-            <p className="font-medium text-primary text-sm sm:text-base">
-              {upgradeBanner.message}
+    if (trialActive) {
+      // Trial active — show trial content with countdown
+      return (
+        <div className="space-y-8">
+          <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+            <h2 className="font-heading text-lg font-semibold text-primary">
+              Bạn đang trong 3 ngày trải nghiệm miễn phí
+            </h2>
+            <p className="mt-2 text-neutral-600">
+              Khám phá bài tập và trải nghiệm chương trình BodiX.
+            </p>
+            <p className="mt-4 text-sm font-medium text-primary">
+              Còn {formatCountdown(trialEndsAt)} trải nghiệm
             </p>
             <Link
-              href={`/app/checkout/${upgradeBanner.targetSlug}`}
-              className="mt-3 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+              href="/app/trial"
+              className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
             >
-              Đăng ký ngay với ưu đãi
+              Xem bài tập hôm nay
             </Link>
           </div>
-        )}
-
-        <div>
-          <h2 className="font-heading text-xl font-bold text-primary mb-6">
-            Chọn hành trình của bạn
-          </h2>
-          <ProgramCardGrid
-            cta="Thử nghiệm miễn phí 3 ngày"
-            ctaHref={(slug) => `/app/checkout/${slug}`}
-          />
-          <p className="mt-6 text-center text-sm text-neutral-500">
-            Thanh toán 1 lần. Không subscription. Không phí ẩn.
-          </p>
         </div>
-      </div>
-    );
-  }
+      );
+    }
 
-  if (trialEnded) {
+    // Trial expired — show CTA to buy
     return (
       <div className="space-y-8">
         <div className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 sm:p-6">
@@ -249,26 +231,27 @@ export default async function AppPage() {
           </p>
         </div>
 
-        {upgradeBanner && (
-          <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
-            <p className="font-medium text-primary text-sm sm:text-base">
-              {upgradeBanner.message}
-            </p>
-            <Link
-              href={`/app/checkout/${upgradeBanner.targetSlug}`}
-              className="mt-3 inline-flex items-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-            >
-              Đăng ký ngay với ưu đãi
-            </Link>
-          </div>
-        )}
+        {/* Upgrade banner if applicable */}
+        {(() => {
+          const completedSlugs = completedEnrollments
+            .map((e) => {
+              const prog = e.programs as unknown as { slug: string } | null;
+              return prog?.slug;
+            })
+            .filter(Boolean) as string[];
+          const banner =
+            UPGRADE_BANNERS[completedSlugs.includes("bodix-6w") ? "bodix-6w" : ""]
+            ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
+            ?? null;
+          return banner ? <UpgradeBanner upgradeBanner={banner} /> : null;
+        })()}
 
         <div>
           <h2 className="font-heading text-xl font-bold text-primary mb-6">
             Chọn hành trình của bạn
           </h2>
           <ProgramCardGrid
-            cta="Thử nghiệm miễn phí 3 ngày"
+            cta="Đăng ký ngay"
             ctaHref={(slug) => `/app/checkout/${slug}`}
           />
           <p className="mt-6 text-center text-sm text-neutral-500">
@@ -279,7 +262,19 @@ export default async function AppPage() {
     );
   }
 
-  // No trial — welcome state
+  // --- State 3: No enrollment at all → program selection ---
+  // Check for upgrade banner from completed enrollments
+  const completedSlugs = completedEnrollments
+    .map((e) => {
+      const prog = e.programs as unknown as { slug: string } | null;
+      return prog?.slug;
+    })
+    .filter(Boolean) as string[];
+  const upgradeBanner =
+    UPGRADE_BANNERS[completedSlugs.includes("bodix-6w") ? "bodix-6w" : ""]
+    ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
+    ?? null;
+
   return (
     <div className="space-y-8">
       <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
@@ -287,9 +282,11 @@ export default async function AppPage() {
           Chào mừng {displayName}!
         </h2>
         <p className="mt-2 text-neutral-600">
-          Khám phá các chương trình BodiX và chọn hành trình phù hợp với bạn.
+          Chọn chương trình để bắt đầu 3 ngày trải nghiệm miễn phí.
         </p>
       </div>
+
+      {upgradeBanner && <UpgradeBanner upgradeBanner={upgradeBanner} />}
 
       <div>
         <h2 className="font-heading text-xl font-bold text-primary mb-6">
@@ -297,7 +294,7 @@ export default async function AppPage() {
         </h2>
         <ProgramCardGrid
           cta="Thử nghiệm miễn phí 3 ngày"
-          ctaHref={(slug) => `/app/checkout/${slug}`}
+          ctaHref={() => "/app/programs"}
         />
         <p className="mt-6 text-center text-sm text-neutral-500">
           Thanh toán 1 lần. Không subscription. Không phí ẩn.

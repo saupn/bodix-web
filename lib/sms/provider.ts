@@ -1,15 +1,10 @@
-/**
- * SMS provider abstraction for BodiX.
- * TODO: Tích hợp SpeedSMS / eSMS / Twilio bằng cách thay thế phần bên dưới.
- *
- * SpeedSMS: https://speedsms.vn/sms-api/
- * eSMS:     https://esms.vn/
- * Twilio:   https://www.twilio.com/docs/sms
- */
+import { sendSMSviaESMS } from './esms-provider'
 
 export async function sendSMS(phone: string, message: string): Promise<void> {
-  // TODO: replace with real provider
-  console.log(`[SMS mock] To: ${phone} | Message: ${message}`)
+  const result = await sendSMSviaESMS({ phone, content: message, smsType: 8 })
+  if (!result.success) {
+    throw new Error(result.error ?? 'SMS send failed')
+  }
 }
 
 export function buildOtpMessage(otp: string): string {

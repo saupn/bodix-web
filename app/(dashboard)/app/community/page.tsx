@@ -7,18 +7,13 @@ import { createClient } from "@/lib/supabase/client";
 import { StreakBadge } from "@/components/completion/StreakBadge";
 import { Camera } from "lucide-react";
 
-const MODE_LABEL: Record<string, string> = {
-  hard: "Hard",
-  light: "Light",
-  recovery: "Recovery",
-  skip: "Skip",
-};
-
-const MODE_CLASS: Record<string, string> = {
-  hard: "bg-primary/15 text-primary border-primary/30",
-  light: "bg-success/15 text-success border-success/30",
-  recovery: "bg-accent/15 text-accent border-accent/30",
-  skip: "bg-neutral-200 text-neutral-600 border-neutral-300",
+const MODE_EMOJI: Record<string, string> = {
+  hard: "💪",
+  light: "🌿",
+  easy: "☀️",
+  recovery: "🧘",
+  review: "📝",
+  skip: "⏭️",
 };
 
 const POST_TYPE_BADGE: Record<string, string> = {
@@ -412,7 +407,7 @@ export default function CommunityPage() {
   const todayCompleted = boardData.me_checked_in_today ?? false;
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 pb-8">
+    <div className={`mx-auto max-w-2xl space-y-6 ${!todayCompleted && programDay > 0 ? "pb-28" : "pb-8"}`}>
       {/* Tabs */}
       <div className="flex gap-2 border-b border-neutral-200">
         <button
@@ -464,7 +459,7 @@ export default function CommunityPage() {
             <div className="space-y-6">
               <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <h2 className="mb-4 font-heading text-base font-semibold text-primary">
-                  Đã hoàn thành hôm nay
+                  ✅ Đã hoàn thành
                 </h2>
                 {completed.length === 0 ? (
                   <p className="py-6 text-center text-sm text-neutral-500">
@@ -472,48 +467,56 @@ export default function CommunityPage() {
                   </p>
                 ) : (
                   <ul className="space-y-3">
-                    {completed.map((m) => (
-                      <li
-                        key={m.user_id}
-                        className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${
-                          newlyCompletedIds.has(m.user_id) ? "animate-fade-slide-up" : ""
-                        } ${
-                          m.is_highlighted ? "border-amber-300 bg-amber-50/50" : "border-neutral-200"
-                        }`}
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary">
-                          {m.avatar_url ? (
-                            <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
-                          ) : (
-                            getInitials(m.display_name)
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="font-medium text-neutral-800">
-                            {m.display_name}
-                            {m.is_highlighted && (
-                              <span className="ml-1.5 text-amber-600" aria-hidden>🔥</span>
+                    {completed.map((m) => {
+                      const isMe = m.user_id === currentUserIdRef.current;
+                      return (
+                        <li
+                          key={m.user_id}
+                          className={`flex items-center gap-3 rounded-lg border p-3 transition-all ${
+                            newlyCompletedIds.has(m.user_id) ? "animate-fade-slide-up" : ""
+                          } ${
+                            isMe
+                              ? "border-primary ring-2 ring-primary/30 bg-primary/5"
+                              : m.is_highlighted
+                              ? "border-amber-300 bg-amber-50/50"
+                              : "border-neutral-200"
+                          }`}
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-sm font-semibold text-primary">
+                            {m.avatar_url ? (
+                              <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              getInitials(m.display_name)
                             )}
-                          </span>
-                        </div>
-                        {m.mode_today && (
-                          <span
-                            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-xs font-medium ${
-                              MODE_CLASS[m.mode_today] ?? MODE_CLASS.skip
-                            }`}
-                          >
-                            {MODE_LABEL[m.mode_today] ?? m.mode_today}
-                          </span>
-                        )}
-                      </li>
-                    ))}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium text-neutral-800">
+                              {m.display_name}
+                              {isMe && (
+                                <span className="ml-1.5 text-xs text-primary font-normal">(Bạn)</span>
+                              )}
+                            </span>
+                            {m.current_streak > 0 && (
+                              <p className="text-xs text-neutral-500">
+                                🔥{m.current_streak}
+                              </p>
+                            )}
+                          </div>
+                          {m.mode_today && (
+                            <span className="shrink-0 text-xl" title={m.mode_today}>
+                              {MODE_EMOJI[m.mode_today] ?? MODE_EMOJI.skip}
+                            </span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>
 
               <section className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <h2 className="mb-4 font-heading text-base font-semibold text-primary">
-                  Chưa hoàn thành
+                  Đang chờ...
                 </h2>
                 {pending.length === 0 ? (
                   <p className="py-6 text-center text-sm text-neutral-500">
@@ -521,24 +524,36 @@ export default function CommunityPage() {
                   </p>
                 ) : (
                   <ul className="space-y-3">
-                    {pending.map((m) => (
-                      <li
-                        key={m.user_id}
-                        className="flex items-center gap-3 rounded-lg border border-neutral-200 p-3"
-                      >
-                        <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-sm font-medium text-neutral-400">
-                          {m.avatar_url ? (
-                            <img src={m.avatar_url} alt="" className="h-full w-full object-cover opacity-60" />
-                          ) : (
-                            getInitials(m.display_name)
-                          )}
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <span className="font-medium text-neutral-500">{m.display_name}</span>
-                          <p className="text-xs text-neutral-400">Đang chờ...</p>
-                        </div>
-                      </li>
-                    ))}
+                    {pending.map((m) => {
+                      const isMe = m.user_id === currentUserIdRef.current;
+                      return (
+                        <li
+                          key={m.user_id}
+                          className={`flex items-center gap-3 rounded-lg border p-3 opacity-60 ${
+                            isMe
+                              ? "border-primary ring-2 ring-primary/30 opacity-100"
+                              : "border-neutral-200"
+                          }`}
+                        >
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-sm font-medium text-neutral-400">
+                            {m.avatar_url ? (
+                              <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
+                            ) : (
+                              getInitials(m.display_name)
+                            )}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="font-medium text-neutral-500">
+                              {m.display_name}
+                              {isMe && (
+                                <span className="ml-1.5 text-xs text-primary font-normal">(Bạn)</span>
+                              )}
+                            </span>
+                            <p className="text-xs text-neutral-400">Đang chờ...</p>
+                          </div>
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </section>
@@ -580,14 +595,15 @@ export default function CommunityPage() {
           </div>
 
           {!todayCompleted && programDay > 0 && (
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-4 text-center">
-              <p className="font-medium text-primary">Bạn đã hoàn thành chưa?</p>
-              <Link
-                href={`/app/program/workout/${programDay}`}
-                className="mt-3 inline-block rounded-xl bg-primary px-6 py-3 font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
-              >
-                Check-in ngay
-              </Link>
+            <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
+              <div className="mx-auto max-w-2xl">
+                <Link
+                  href={`/app/program/workout/${programDay}`}
+                  className="block w-full rounded-xl bg-primary px-4 py-4 text-center text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
+                >
+                  Hoàn thành ngày →
+                </Link>
+              </div>
             </div>
           )}
         </>

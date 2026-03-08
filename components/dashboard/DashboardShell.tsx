@@ -17,7 +17,7 @@ const NAV_LINKS = [
   { href: "/app/referral", label: "🎁 Giới thiệu", icon: Gift },
   { href: "/app/affiliate", label: "🤝 Đối tác", icon: Handshake },
   { href: "/app/community", label: "👥 Cộng đồng", icon: Users, badgeKey: "community" },
-  { href: "/app/progress", label: "Tiến độ", icon: BarChart3 },
+  { href: "/app/progress", label: "📊 Tiến độ", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
 ];
 

@@ -45,6 +45,7 @@ interface ProgramData {
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
   main: "Chính",
   recovery: "Recovery",
+  review: "Review",
   flexible: "Linh hoạt",
 };
 
@@ -283,8 +284,32 @@ export function ProgramPageContent() {
       {/* Cohort active */}
       {data.cohort_active && (
         <>
+          {/* Sunday Review card */}
+          {data.today_workout?.workout_type === "review" && !data.today_completed && (
+            <div className="rounded-xl border-2 border-purple-300 bg-gradient-to-br from-purple-50 to-white p-6 shadow-md">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">☀️</span>
+                <div>
+                  <h2 className="font-heading text-xl font-bold text-primary">
+                    Review Chủ nhật
+                  </h2>
+                  <p className="text-sm text-neutral-500">~25 phút</p>
+                </div>
+              </div>
+              <p className="mt-3 text-sm text-neutral-600">
+                Xem lại tuần qua, lắng nghe cơ thể, và chuẩn bị cho tuần mới.
+              </p>
+              <Link
+                href="/app/program/review"
+                className="mt-4 inline-flex rounded-lg bg-primary px-4 py-2.5 font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+              >
+                Bắt đầu Review
+              </Link>
+            </div>
+          )}
+
           {/* Today's workout card */}
-          {data.today_workout && (
+          {data.today_workout && data.today_workout.workout_type !== "review" && (
             <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 shadow-md">
               <h2 className="font-heading text-xl font-bold text-primary">
                 Ngày {program_day} — {data.today_workout.title}
@@ -345,6 +370,23 @@ export function ProgramPageContent() {
                   )}
                 </p>
               )}
+            </div>
+          )}
+
+          {/* Today completed — review type */}
+          {data.today_workout?.workout_type === "review" && data.today_completed && (
+            <div className="rounded-xl border-2 border-purple-200 bg-purple-50/50 p-6">
+              <div className="flex items-center gap-3">
+                <span className="text-3xl">☀️</span>
+                <div>
+                  <h2 className="font-heading text-lg font-semibold text-primary">
+                    Review Chủ nhật
+                  </h2>
+                  <p className="mt-1 flex items-center gap-2 text-success font-medium">
+                    ✓ Đã hoàn thành
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 

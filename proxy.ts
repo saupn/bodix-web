@@ -18,19 +18,15 @@ export async function middleware(request: NextRequest) {
           return request.cookies.getAll()
         },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
+          cookiesToSet.forEach(({ name, value, options }) => {
             request.cookies.set(name, value)
-          )
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
             response.cookies.set(name, value, options)
-          )
+          })
         },
       },
     }
   )
 
-  // Refresh session (required by @supabase/ssr — must call getUser())
   const {
     data: { user },
   } = await supabase.auth.getUser()
@@ -38,22 +34,12 @@ export async function middleware(request: NextRequest) {
   // /app/* and /admin/* require authentication
   if (pathname.startsWith('/app') || pathname.startsWith('/admin')) {
     if (!user) {
-      const loginUrl = new URL('/login', request.url)
-      loginUrl.searchParams.set('next', pathname)
-      return NextResponse.redirect(loginUrl)
-    }
-    return response
-  }
-
-  // /onboarding requires authentication (but authenticated users stay here — no redirect to /app)
-  if (pathname.startsWith('/onboarding')) {
-    if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
     }
     return response
   }
 
-  // /login and /signup: redirect authenticated users to the dashboard
+  // /login and /signup: redirect authenticated users to dashboard
   if (pathname === '/login' || pathname === '/signup') {
     if (user) {
       return NextResponse.redirect(new URL('/app', request.url))
@@ -61,11 +47,18 @@ export async function middleware(request: NextRequest) {
     return response
   }
 
-  // All other routes (homepage, landing pages, /p/*, /r/*): allow freely
+  // /onboarding: require authentication
+  if (pathname.startsWith('/onboarding')) {
+    if (!user) {
+      return NextResponse.redirect(new URL('/login', request.url))
+    }
+    return response
+  }
+
   return response
 }
 
-// Only run on routes that need auth checks
+// Only run on routes that need auth checks — NOT on static files
 export const config = {
   matcher: [
     '/app/:path*',
@@ -73,6 +66,5 @@ export const config = {
     '/login',
     '/signup',
     '/onboarding/:path*',
-    '/onboarding',
   ],
 }

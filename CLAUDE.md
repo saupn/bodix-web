@@ -63,7 +63,7 @@ docs/                   → API reference, Flutter setup, data models
 
 ---
 
-## Database Tables (27 tables)
+## Database Tables (29 tables)
 
 ### Auth & Profiles
 | Table | Mô tả |
@@ -77,14 +77,16 @@ docs/                   → API reference, Flutter setup, data models
 | `programs` | 3 chương trình — slug, name, duration_days, price_vnd, features (jsonb) |
 | `cohorts` | Đợt chạy — program_id, start_date, end_date, max_members, status (upcoming/active/completed) |
 | `enrollments` | User tham gia — user_id, program_id, cohort_id, status (trial/pending_payment/active/paused/completed/dropped), current_day, amount_paid, referral_code_id, referral_discount_amount |
-| `workout_templates` | Bài tập theo ngày — program_id, day_number, week_number, workout_type (main/recovery/flexible), hard_version (jsonb), light_version (jsonb) |
+| `workout_templates` | Bài tập theo ngày — program_id, day_number, week_number, workout_type (main/recovery/review/flexible), hard_version (jsonb), light_version (jsonb) |
+| `review_content` | Coach review videos & notes per week — program_id, week_number, review_video_url, coach_note, next_week_focus |
 | `trial_activities` | Hoạt động trong 3 ngày trial — activity_type (view_program/view_workout/try_workout/complete_trial_day) |
 
 ### Completion Engine
 | Table | Mô tả |
 |-------|-------|
-| `daily_checkins` | Check-in hàng ngày — enrollment_id, day_number, workout_date, mode (hard/light/recovery/skip), feeling (1-5), duration_minutes |
-| `streaks` | Streak tracking — current_streak, longest_streak, total_completed/hard/light/recovery/skip_days, last_checkin_date |
+| `daily_checkins` | Check-in hàng ngày — enrollment_id, day_number, workout_date, mode (hard/light/easy/recovery/review/skip), feeling (1-5), duration_minutes |
+| `streaks` | Streak tracking — current_streak, longest_streak, total_completed/hard/light/easy/recovery/review/skip_days, last_checkin_date |
+| `body_checks` | Weekly body scan self-assessment — enrollment_id, week_number, shoulders/upper_back/lower_back/core_area/glutes/quads/hamstrings/calves/arms (1-3) |
 | `dropout_signals` | Tín hiệu bỏ cuộc — signal_type (missed_1_day/missed_2_days/missed_3_plus_days/downgrade_pattern/low_feeling_trend/skip_pattern/d3_risk/d7_risk/d14_risk), risk_score (0-100), resolved |
 | `completion_milestones` | Thành tích — milestone_type (streak_3/7/14/21/week_complete/halfway/final_week/program_complete/all_hard/first_checkin/comeback) |
 

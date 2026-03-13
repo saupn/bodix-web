@@ -4,19 +4,14 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 const REFERRAL_LINK_BASE = 'https://bodix.vn/ref'
 
-const TIER_COMMISSION: Record<string, number> = {
-  basic: 15,
-  silver: 18,
-  gold: 20,
-  platinum: 25,
-}
+import { TIER_COMMISSION } from '@/lib/affiliate/config'
 
 // Commission rate → tier mapping (pick highest matching tier)
 function rateToTier(rate: number): string {
-  if (rate >= 25) return 'platinum'
-  if (rate >= 20) return 'gold'
-  if (rate >= 18) return 'silver'
-  return 'basic'
+  if (rate >= 40) return 'basic'
+  if (rate >= 30) return 'silver'
+  if (rate >= 25) return 'gold'
+  return 'gold'
 }
 
 // ─── Admin guard ──────────────────────────────────────────────────────────────
@@ -274,7 +269,7 @@ export async function PUT(request: NextRequest) {
         code: generatedCode,
         code_type: 'affiliate',
         reward_type: 'credit',
-        reward_value: 50000,
+        reward_value: 100000,
         referee_reward_type: 'discount_percent',
         referee_reward_value: 10,
         commission_rate: finalRate,

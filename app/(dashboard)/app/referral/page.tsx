@@ -171,7 +171,7 @@ export default function ReferralPage() {
           Giới thiệu bạn bè — Nhận thưởng! 🎁
         </h1>
         <p className="mt-2 text-neutral-600">
-          Mỗi bạn bè đăng ký qua link của bạn, bạn nhận 50.000đ credit
+          Mỗi bạn bè đăng ký qua link của bạn, bạn nhận 100.000đ credit
         </p>
       </div>
 
@@ -257,7 +257,7 @@ export default function ReferralPage() {
           Thưởng của bạn
         </h2>
         <ul className="mt-4 space-y-2 text-left text-neutral-600 sm:mx-auto sm:max-w-md">
-          <li>• Bạn bè đăng ký → Bạn nhận 50.000đ credit</li>
+          <li>• Bạn bè đăng ký → Bạn nhận 100.000đ credit</li>
           <li>• Bạn bè được giảm 10% chương trình đầu tiên</li>
           <li>• Credit dùng để mua chương trình tiếp theo hoặc gia hạn</li>
         </ul>

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const REFERRAL_COOKIE_TTL_DAYS = 30
-const REFERRAL_REWARD_AMOUNT = 50000     // 50k credit cho referrer
+import { REFERRAL_REWARD_AMOUNT } from '@/lib/affiliate/config'
 const NOTIFICATION_APP_URL = '/app/credits'
 
 // ─── Types ────────────────────────────────────────────────────────────────────

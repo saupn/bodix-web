@@ -32,7 +32,7 @@ function ScrollLink({
   };
 
   return (
-    <Link href={path} onClick={handleClick}>
+    <Link href={path} onClick={handleClick} prefetch={false}>
       {children}
     </Link>
   );
@@ -41,15 +41,21 @@ function ScrollLink({
 export function Header() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
     handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
+  }, [mounted]);
 
   useEffect(() => {
     if (isMobileMenuOpen) {
@@ -59,10 +65,13 @@ export function Header() {
     }
   }, [isMobileMenuOpen]);
 
+  // Use consistent initial styles to avoid hydration mismatch (isScrolled unknown until mount)
+  const headerScrolled = mounted && isScrolled;
+
   return (
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-300 ${
-        isScrolled
+        headerScrolled
           ? "bg-white/95 backdrop-blur-md border-b border-neutral-200 shadow-sm"
           : "bg-black/30 backdrop-blur-sm border-b border-white/10"
       }`}
@@ -75,14 +84,14 @@ export function Header() {
             width={140}
             height={48}
             className={`h-8 w-auto sm:h-10 md:h-12 transition-all ${
-              !isScrolled ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""
+              !headerScrolled ? "drop-shadow-[0_0_8px_rgba(255,255,255,0.8)]" : ""
             }`}
             priority
           />
         </Link>
 
         {/* Desktop nav */}
-        <nav className="hidden md:flex items-center gap-6 md:gap-8">
+        <nav className="hidden md:flex items-center gap-6 md:gap-8" suppressHydrationWarning>
           {NAV_ITEMS.map((item) => (
             <ScrollLink
               key={item.href}
@@ -91,19 +100,14 @@ export function Header() {
             >
               <span
                 className={`text-sm font-medium transition-colors hover:text-primary ${
-                  isScrolled ? "text-neutral-700" : "text-white"
+                  headerScrolled ? "text-neutral-700" : "text-white"
                 }`}
               >
                 {item.label}
               </span>
             </ScrollLink>
           ))}
-          <AuthButtons isScrolled={isScrolled} variant="desktop" />
-          <ScrollLink href="#programs" onClick={() => setIsMobileMenuOpen(false)}>
-            <span className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light hover:bg-primary-dark transition-colors sm:px-5 sm:py-2.5">
-              Bắt đầu ngay
-            </span>
-          </ScrollLink>
+          <AuthButtons isScrolled={headerScrolled} variant="desktop" />
         </nav>
 
         {/* Mobile menu button */}
@@ -122,7 +126,7 @@ export function Header() {
 
       {/* Mobile menu */}
       {isMobileMenuOpen && (
-        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-neutral-200 shadow-lg">
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white border-b border-neutral-200 shadow-lg" suppressHydrationWarning>
           <nav className="container mx-auto px-4 py-4 flex flex-col gap-2">
             {NAV_ITEMS.map((item) => (
               <ScrollLink
@@ -142,13 +146,6 @@ export function Header() {
                 onMobileMenuClose={() => setIsMobileMenuOpen(false)}
               />
             </div>
-            <ScrollLink href="#programs" onClick={() => setIsMobileMenuOpen(false)}>
-              <span className="block py-3">
-                <span className="inline-flex items-center justify-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-secondary-light w-full">
-                  Bắt đầu ngay
-                </span>
-              </span>
-            </ScrollLink>
           </nav>
         </div>
       )}

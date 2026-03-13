@@ -3,8 +3,10 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
 const REFERRAL_LINK_BASE = 'https://bodix.vn/ref'
-const DEFAULT_REWARD_VALUE = 50000           // 50k credit cho referrer
-const DEFAULT_REFEREE_REWARD_VALUE = 10      // giảm 10% cho referee
+import { REFERRAL_REWARD_AMOUNT, REFERRAL_DISCOUNT_PERCENT } from '@/lib/affiliate/config'
+
+const DEFAULT_REWARD_VALUE = REFERRAL_REWARD_AMOUNT
+const DEFAULT_REFEREE_REWARD_VALUE = REFERRAL_DISCOUNT_PERCENT
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -133,13 +135,8 @@ export async function POST(request: NextRequest) {
     .eq('user_id', user.id)
     .single()
 
-  const TIER_COMMISSION: Record<string, number> = {
-    basic: 10,
-    silver: 15,
-    gold: 20,
-    platinum: 25,
-  }
-  const commissionRate = TIER_COMMISSION[affiliateProfile?.affiliate_tier ?? 'basic'] ?? 10
+  const { TIER_COMMISSION: TC } = await import('@/lib/affiliate/config')
+  const commissionRate = TC[affiliateProfile?.affiliate_tier ?? 'basic'] ?? TC.basic
 
   // ── Insert affiliate code ─────────────────────────────────────────────────
   const service = createServiceClient()

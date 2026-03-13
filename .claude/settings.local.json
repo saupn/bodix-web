@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(npx supabase:*)"
+      "Bash(npx supabase:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npm run:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find D:\\\\Prog\\\\bodix-web\\\\app\\\\\\(dashboard\\):*)",
+      "Bash(git:*)",
+      "Bash(npx next:*)"
     ]
   }
 }

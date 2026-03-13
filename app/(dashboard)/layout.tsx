@@ -1,20 +1,19 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import {
-  getUserStatus,
-  getRedirectPath,
-  canAccessDashboard,
-  type StatusEnrollment,
-} from "@/lib/user/status";
+import { getUserStatus, type StatusEnrollment } from "@/lib/user/status";
 import { getMyStats } from "@/lib/completion/fetch-stats";
 import { getRescueStatus } from "@/lib/rescue/fetch-status";
+
+export const dynamic = "force-dynamic";
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Auth check with session-aware client
   const supabase = await createClient();
   const {
     data: { user },
@@ -24,14 +23,15 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Fetch profile (bao gồm onboarding_completed để phân loại status)
-  const { data: profile } = await supabase
+  // Profile check with service client (bypasses RLS — same as complete-onboarding API)
+  const service = createServiceClient();
+  const { data: profile } = await service
     .from("profiles")
     .select("full_name, avatar_url, trial_ends_at, onboarding_completed")
     .eq("id", user.id)
     .single();
 
-  // Fetch enrollments đang hoạt động (bỏ qua dropped)
+  // Fetch enrollments (keep using session client for RLS-protected data)
   const { data: enrollmentsRaw } = await supabase
     .from("enrollments")
     .select(
@@ -46,20 +46,13 @@ export default async function DashboardLayout({
   const enrollments = (enrollmentsRaw ?? []) as unknown as StatusEnrollment[];
 
   // Xác định trạng thái user
-  const { status: userStatus, activeEnrollment } = getUserStatus(
-    profile
-      ? {
-          onboarding_completed: profile.onboarding_completed,
-          trial_ends_at: profile.trial_ends_at,
-        }
-      : null,
+  const { status: userStatus } = getUserStatus(
+    {
+      onboarding_completed: profile?.onboarding_completed ?? false,
+      trial_ends_at: profile?.trial_ends_at ?? null,
+    },
     enrollments
   );
-
-  // Redirect nếu chưa qua onboarding
-  if (!canAccessDashboard(userStatus)) {
-    redirect(getRedirectPath(userStatus));
-  }
 
   const hasActiveProgram =
     userStatus === "active_program" || userStatus === "waiting_cohort";

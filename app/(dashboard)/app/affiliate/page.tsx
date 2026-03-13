@@ -15,7 +15,7 @@ import {
 } from "recharts";
 
 const PARTNER_BASE = "https://bodix.vn/p";
-const COMMISSION_RATE = 15;
+const COMMISSION_RATE = 40;
 const MIN_WITHDRAWAL = 200_000;
 const TIER_LABEL: Record<string, string> = {
   basic: "🥉 Basic",
@@ -417,7 +417,7 @@ export default function AffiliatePage() {
             {TIER_LABEL[dashboard?.profile?.tier ?? "basic"] ?? dashboard?.profile?.tier}
           </span>
           <span className="text-sm text-neutral-600">
-            Commission: {dashboard?.profile?.commission_rate ?? 15}%
+            Commission: {dashboard?.profile?.commission_rate ?? 40}%
           </span>
         </div>
       </div>

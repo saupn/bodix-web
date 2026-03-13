@@ -74,7 +74,7 @@ export async function GET(request: NextRequest) {
     const code = t.referral_code_id ? codeMap.get(t.referral_code_id) : null;
     const discountPct = code?.referee_reward_type === "discount_percent" ? (code.referee_reward_value ?? 0) : 0;
     const discount = Math.round(amount * (discountPct / 100));
-    const reward = code?.referee_reward_type === "discount_percent" ? 50000 : 0;
+    const reward = code?.referee_reward_type === "discount_percent" ? 100000 : 0;
 
     return {
       id: t.id,

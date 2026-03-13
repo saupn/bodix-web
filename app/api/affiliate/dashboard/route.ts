@@ -4,12 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service'
 
 const PARTNER_LINK_BASE = 'https://bodix.vn/p'
 
-const TIER_COMMISSION: Record<string, number> = {
-  basic: 15,
-  silver: 18,
-  gold: 20,
-  platinum: 25,
-}
+import { TIER_COMMISSION } from '@/lib/affiliate/config'
 
 // ─── GET — Affiliate dashboard ────────────────────────────────────────────────
 
@@ -65,7 +60,7 @@ export async function GET() {
     .maybeSingle()
 
   const commissionRate = affiliateCode?.commission_rate
-    ?? TIER_COMMISSION[affiliateProfile.affiliate_tier] ?? 15
+    ?? TIER_COMMISSION[affiliateProfile.affiliate_tier] ?? 40
   const chartYear = new Date().getFullYear()
 
   if (!affiliateCode) {

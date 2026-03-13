@@ -27,11 +27,9 @@ export async function proxy(request: NextRequest) {
     }
   )
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+  const { data: { user } } = await supabase.auth.getUser()
 
-  // /app/* and /admin/* require authentication
+  // /app/* cần đăng nhập — KHÔNG CHECK ONBOARDING
   if (pathname.startsWith('/app') || pathname.startsWith('/admin')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
@@ -39,7 +37,7 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // /login and /signup: redirect authenticated users to dashboard
+  // /login, /signup: đã đăng nhập thì đi /app
   if (pathname === '/login' || pathname === '/signup') {
     if (user) {
       return NextResponse.redirect(new URL('/app', request.url))
@@ -47,7 +45,7 @@ export async function proxy(request: NextRequest) {
     return response
   }
 
-  // /onboarding: require authentication
+  // /onboarding: cần đăng nhập — KHÔNG CHECK ONBOARDING
   if (pathname.startsWith('/onboarding')) {
     if (!user) {
       return NextResponse.redirect(new URL('/login', request.url))
@@ -58,7 +56,6 @@ export async function proxy(request: NextRequest) {
   return response
 }
 
-// Only run on routes that need auth checks — NOT on static files
 export const config = {
   matcher: [
     '/app/:path*',

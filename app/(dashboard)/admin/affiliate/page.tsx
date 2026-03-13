@@ -152,7 +152,7 @@ export default function AdminAffiliatePage() {
 
   const handleApprove = async () => {
     if (!modalApprove) return;
-    const rate = parseInt(modalCommissionRate || "15", 10);
+    const rate = parseInt(modalCommissionRate || "40", 10);
     if (rate < 1 || rate > 50) {
       alert("Commission rate phải từ 1–50%");
       return;
@@ -400,7 +400,7 @@ export default function AdminAffiliatePage() {
                             type="button"
                             onClick={() => {
                               setModalApprove(a);
-                              setModalCommissionRate("15");
+                              setModalCommissionRate("40");
                             }}
                             className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
                           >
@@ -831,9 +831,9 @@ export default function AdminAffiliatePage() {
               onChange={(e) => setModalTierValue(e.target.value)}
               className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
             >
-              <option value="basic">Basic (15%)</option>
-              <option value="silver">Silver (18%)</option>
-              <option value="gold">Gold (20%)</option>
+              <option value="basic">Basic (40%)</option>
+              <option value="silver">Silver (30%)</option>
+              <option value="gold">Gold (25%)</option>
               <option value="platinum">Platinum (25%)</option>
             </select>
             <div className="mt-4 flex justify-end gap-2">

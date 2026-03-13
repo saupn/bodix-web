@@ -188,5 +188,5 @@ export const FOOTER_DATA = {
       ],
     },
   ],
-  copyright: "© 2025 BodiX. All rights reserved.",
+  copyright: "© 2025 BodiX. Đây là một sản phẩm trong hệ sinh thái của Công ty TNHH Avio Group.",
 } as const;

@@ -36,7 +36,12 @@ export function AuthButtons({
 
   if (!mounted) {
     return (
-      <div className="flex items-center gap-3">
+      <div
+        className={`flex items-center gap-2 sm:gap-3 ${
+          variant === "mobile" ? "flex-col w-full" : ""
+        }`}
+        suppressHydrationWarning
+      >
         <span className="h-9 w-20 animate-pulse rounded-lg bg-neutral-200" />
         <span className="h-9 w-24 animate-pulse rounded-lg bg-neutral-200" />
       </div>
@@ -48,11 +53,11 @@ export function AuthButtons({
       <Link
         href="/app"
         onClick={onMobileMenuClose}
-        className={`inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark ${
+        className={`inline-flex items-center justify-center gap-1 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark ${
           variant === "mobile" ? "w-full py-3" : ""
         }`}
       >
-        Vào Dashboard
+        Vào Dashboard →
       </Link>
     );
   }
@@ -81,7 +86,7 @@ export function AuthButtons({
           variant === "mobile" ? "w-full py-3" : ""
         }`}
       >
-        Đăng ký miễn phí
+        Bắt đầu miễn phí
       </Link>
     </div>
   );

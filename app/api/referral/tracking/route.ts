@@ -1,7 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 
-const REWARD_PER_CONVERSION = 50000;
+import { REFERRAL_REWARD_AMOUNT } from '@/lib/affiliate/config';
+
+const REWARD_PER_CONVERSION = REFERRAL_REWARD_AMOUNT;
 
 export async function GET() {
   const supabase = await createClient();

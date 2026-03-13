@@ -2,18 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 
-const TIER_COMMISSION: Record<string, number> = {
-  basic: 15,
-  silver: 18,
-  gold: 20,
-  platinum: 25,
-};
+import { TIER_COMMISSION } from '@/lib/affiliate/config';
 
 function rateToTier(rate: number): string {
-  if (rate >= 25) return "platinum";
-  if (rate >= 20) return "gold";
-  if (rate >= 18) return "silver";
-  return "basic";
+  if (rate >= 40) return "basic";
+  if (rate >= 30) return "silver";
+  if (rate >= 25) return "gold";
+  return "gold";
 }
 
 async function requireAdmin(supabase: Awaited<ReturnType<typeof createClient>>, userId: string): Promise<boolean> {

@@ -24,6 +24,11 @@ export default async function OnboardingPage() {
     .eq("id", user.id)
     .single();
 
+  // Đã onboard → redirect /app
+  if (profile?.onboarding_completed) {
+    redirect("/app");
+  }
+
   return (
     <OnboardingForm
       userId={user.id}

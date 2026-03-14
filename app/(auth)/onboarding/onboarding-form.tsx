@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PROGRAMS } from "@/lib/constants";
+import { PROGRAMS, ZALO_OA_LINK } from "@/lib/constants";
 
 const GOALS = [
   "Giảm mỡ",
@@ -57,6 +57,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [otpVerified, setOtpVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
+  const [showFollowOA, setShowFollowOA] = useState(false);
+  const verifyingRef = useRef(false);
 
   // Countdown timer
   useEffect(() => {
@@ -97,7 +99,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
     setLoading(true);
     try {
-      const res = await fetch("/api/auth/send-otp", {
+      const res = await fetch("/api/auth/send-zalo-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: trimmed }),
@@ -125,11 +127,16 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       setError("Vui lòng nhập đủ 6 số.");
       return;
     }
+    await doVerifyOtp(code);
+  };
 
+  const doVerifyOtp = async (code: string) => {
+    if (verifyingRef.current) return;
+    verifyingRef.current = true;
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/auth/verify-otp", {
+      const res = await fetch("/api/auth/verify-zalo-otp", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ phone: phone.trim(), otp: code }),
@@ -146,6 +153,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+      verifyingRef.current = false;
     }
   };
 
@@ -157,8 +165,12 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         if (index + i < 6) newOtp[index + i] = d;
       });
       setOtp(newOtp);
-      const next = document.getElementById(`otp-${Math.min(index + digits.length, 5)}`);
+      const nextIdx = Math.min(index + digits.length, 5);
+      const next = document.getElementById(`otp-${nextIdx}`);
       (next as HTMLInputElement)?.focus();
+      if (newOtp.join("").length === 6) {
+        doVerifyOtp(newOtp.join(""));
+      }
       return;
     }
     const newOtp = [...otp];
@@ -166,6 +178,9 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     setOtp(newOtp);
     if (value && index < 5) {
       (document.getElementById(`otp-${index + 1}`) as HTMLInputElement)?.focus();
+    }
+    if (newOtp.join("").length === 6) {
+      doVerifyOtp(newOtp.join(""));
     }
   };
 
@@ -195,11 +210,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         return;
       }
 
-      // Use window.location to force full reload — avoids stale RSC cache
-
-      // Use window.location instead of router.push to force a full page reload
-      // This ensures Next.js fetches fresh server data (no stale cache)
-      window.location.href = "/app";
+      setShowFollowOA(true);
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);
@@ -210,6 +221,40 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     "w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50";
   const btnPrimary =
     "flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light transition-colors hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50";
+
+  if (showFollowOA) {
+    return (
+      <div className="relative w-full max-w-lg mx-auto">
+        <div className="rounded-2xl border border-white/10 bg-white/95 p-6 shadow-xl backdrop-blur-sm sm:p-8 text-center">
+          <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+            Đăng ký thành công! 🎉
+          </h1>
+          <div className="mt-6 rounded-xl border-2 border-[#2D4A3E]/30 bg-[#2D4A3E]/5 p-6">
+            <p className="font-medium text-neutral-800">
+              Follow BodiX trên Zalo để nhận tin nhắc tập mỗi sáng 6:30
+            </p>
+            <div className="mt-4 flex flex-col gap-3">
+              <a
+                href={ZALO_OA_LINK}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white hover:opacity-90 transition-opacity"
+              >
+                Follow BodiX trên Zalo
+              </a>
+              <button
+                type="button"
+                onClick={() => (window.location.href = "/app")}
+                className="rounded-xl border-2 border-[#2D4A3E] py-4 w-full font-semibold text-[#2D4A3E] hover:bg-[#2D4A3E]/5 transition-colors"
+              >
+                Vào Dashboard →
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="relative w-full max-w-lg mx-auto">
@@ -420,11 +465,15 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       type="tel"
                       value={phone}
                       onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0912345678"
+                      placeholder="0909 123 456"
+                      maxLength={10}
                       disabled={loading}
-                      className={inputBase}
+                      className="w-full rounded-lg border border-gray-200 py-3 px-4 focus:border-[#2D4A3E] focus:ring-1 focus:ring-[#2D4A3E] focus:outline-none"
                       suppressHydrationWarning
                     />
+                    <p className="mt-2 text-sm text-neutral-500">
+                      Bạn sẽ nhận mã OTP 6 số qua tin nhắn Zalo
+                    </p>
                   </div>
                   <div className="flex gap-3">
                     <button
@@ -439,15 +488,41 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       type="button"
                       onClick={handleSendOtp}
                       disabled={loading}
-                      className="flex-1 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light hover:bg-primary-dark"
+                      className="flex-1 rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white"
                       suppressHydrationWarning
                     >
-                      {loading ? "Đang gửi..." : "Gửi mã xác nhận"}
+                      {loading ? (
+                        <span className="inline-flex items-center gap-2">
+                          <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+                          </svg>
+                          Đang gửi...
+                        </span>
+                      ) : (
+                        "Gửi mã xác nhận qua Zalo"
+                      )}
                     </button>
                   </div>
+                  {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
                 </>
               ) : !otpVerified ? (
                 <>
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-neutral-600">{phone}</span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setOtpSent(false);
+                        setOtp(["", "", "", "", "", ""]);
+                        setCountdown(0);
+                      }}
+                      className="text-sm text-[#2D4A3E] font-medium hover:underline"
+                      suppressHydrationWarning
+                    >
+                      Đổi SĐT
+                    </button>
+                  </div>
                   <div>
                     <label className="mb-1.5 block text-sm font-medium text-neutral-700">
                       Mã OTP (6 số)
@@ -462,8 +537,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                           maxLength={6}
                           value={digit}
                           onChange={(e) => handleOtpChange(i, e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Backspace" && !digit && i > 0) {
+                              (document.getElementById(`otp-${i - 1}`) as HTMLInputElement)?.focus();
+                            }
+                          }}
                           disabled={loading}
-                          className="h-12 w-10 rounded-lg border border-neutral-300 text-center text-lg font-semibold focus:border-primary focus:ring-2 focus:ring-primary/20"
+                          className="w-12 h-14 text-center text-2xl font-bold border-2 rounded-lg focus:border-[#2D4A3E] focus:ring-1 focus:ring-[#2D4A3E] focus:outline-none"
                           suppressHydrationWarning
                         />
                       ))}
@@ -479,18 +559,19 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                         type="button"
                         onClick={handleSendOtp}
                         disabled={loading}
-                        className="text-primary font-medium hover:underline"
+                        className="text-[#2D4A3E] font-medium hover:underline"
                         suppressHydrationWarning
                       >
                         Gửi lại mã
                       </button>
                     )}
                   </div>
+                  {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
                   <button
                     type="button"
                     onClick={handleVerifyOtp}
                     disabled={loading || otp.join("").length !== 6}
-                    className={btnPrimary}
+                    className="rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white"
                     suppressHydrationWarning
                   >
                     {loading ? "Đang xác minh..." : "Bắt đầu hành trình"}
@@ -510,21 +591,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     Tiếp tục
                   </button>
                 </div>
-              )}
-
-              {otpSent && !otpVerified && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setOtpSent(false);
-                    setOtp(["", "", "", "", "", ""]);
-                    setCountdown(0);
-                  }}
-                  className="text-sm text-neutral-500 hover:underline"
-                  suppressHydrationWarning
-                >
-                  Đổi số điện thoại
-                </button>
               )}
 
               {/* Skip — phone will be saved (with phone_verified=false) in handleComplete */}

@@ -2,7 +2,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { getUserStatus, type StatusEnrollment } from "@/lib/user/status";
+import { getUserStatus, canAccessDashboard, getRedirectPath, type StatusEnrollment } from "@/lib/user/status";
 import { getMyStats } from "@/lib/completion/fetch-stats";
 import { getRescueStatus } from "@/lib/rescue/fetch-status";
 
@@ -53,6 +53,11 @@ export default async function DashboardLayout({
     },
     enrollments
   );
+
+  // Chưa onboard → redirect /onboarding
+  if (!canAccessDashboard(userStatus)) {
+    redirect(getRedirectPath(userStatus));
+  }
 
   const hasActiveProgram =
     userStatus === "active_program" || userStatus === "waiting_cohort";

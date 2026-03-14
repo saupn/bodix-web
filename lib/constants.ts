@@ -1,3 +1,5 @@
+export const ZALO_OA_LINK = `https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_OA_ID || "2495331839057844851"}`;
+
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
@@ -188,5 +190,5 @@ export const FOOTER_DATA = {
       ],
     },
   ],
-  copyright: "© 2025 BodiX. Đây là một sản phẩm trong hệ sinh thái của Công ty TNHH Avio Group.",
+  copyright: "© 2025 BodiX. All rights reserved.",
 } as const;

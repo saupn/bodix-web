@@ -123,8 +123,8 @@ async function handleUserMessage(payload: { sender: { id: string }; message: { t
     return;
   }
 
-  const programData = enrollment.programs as any;
-  const programDays = (Array.isArray(programData) ? programData[0]?.duration_days : programData?.duration_days) ?? 21;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const programDays = ((enrollment as any).programs?.duration_days) ?? ((enrollment as any).programs?.[0]?.duration_days) ?? 21;
   const dayNumber = (enrollment.current_day ?? 0) + 1;
 
   if (dayNumber > programDays) {
@@ -222,7 +222,7 @@ async function handleUserMessage(payload: { sender: { id: string }; message: { t
     total_completed_days: prev.total_completed_days + 1,
     total_hard_days: checkinType === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
     total_light_days: checkinType === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
-    total_recovery_days: checkinType === 'recovery' ? prev.total_recovery_days + 1 : prev.total_recovery_days,
+    total_recovery_days: prev.total_recovery_days, // Zalo chỉ reply HARD/LIGHT/EASY
     total_easy_days: checkinType === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
     total_skip_days: prev.total_skip_days,
     last_checkin_date: workoutDate,

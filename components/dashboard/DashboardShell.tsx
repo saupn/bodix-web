@@ -25,6 +25,13 @@ const PROGRAM_NAV = { href: "/app/program", label: "Chương trình của tôi",
 
 interface DashboardShellProps {
   children: React.ReactNode;
+  giftSection?: {
+    remaining: number;
+    total: number;
+    referralCode: string;
+    baseUrl: string;
+  } | null;
+  unpaidBanner?: React.ReactNode;
   profile: {
     full_name: string | null;
     avatar_url: string | null;
@@ -64,7 +71,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, profile, userEmail, userId, hasActiveProgram, streak, rescue }: DashboardShellProps) {
+export function DashboardShell({ children, giftSection, unpaidBanner, profile, userEmail, userId, hasActiveProgram, streak, rescue }: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [communityBadge, setCommunityBadge] = useState(0);
@@ -257,6 +264,42 @@ export function DashboardShell({ children, profile, userEmail, userId, hasActive
 
         {/* Content */}
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" tabIndex={-1}>
+          {giftSection && (
+            <div className="mb-6 rounded-xl border-2 border-[#2D4A3E]/20 bg-[#2D4A3E]/5 p-4 sm:p-5">
+              <h3 className="font-heading font-semibold text-[#2D4A3E]">
+                Tặng sách cho bạn bè
+              </h3>
+              <p className="mt-1 text-sm text-neutral-600">
+                Còn lại: {giftSection.remaining}/{giftSection.total} suất
+              </p>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <input
+                  type="text"
+                  readOnly
+                  value={`${giftSection.baseUrl}/tang-sach?from=${giftSection.referralCode}`}
+                  className="flex-1 min-w-0 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-mono"
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    navigator.clipboard.writeText(`${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`);
+                  }}
+                  className="rounded-lg border border-[#2D4A3E]/30 px-3 py-2 text-sm font-medium text-[#2D4A3E] hover:bg-[#2D4A3E]/5"
+                >
+                  Copy
+                </button>
+                <a
+                  href={`https://zalo.me/share?text=${encodeURIComponent(`Mình tặng bạn Cẩm nang BodiX Fuel Guide miễn phí! ${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`)}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-[#0068FF] px-3 py-2 text-sm font-medium text-white hover:bg-[#0052cc]"
+                >
+                  Chia sẻ Zalo
+                </a>
+              </div>
+            </div>
+          )}
+          {unpaidBanner}
           {rescue && (
             <div className="mb-6">
               <RescueBanner

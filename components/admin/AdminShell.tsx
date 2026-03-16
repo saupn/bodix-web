@@ -6,6 +6,7 @@ import { Menu, X } from "lucide-react";
 
 const NAV_ITEMS = [
   { href: "/admin", label: "Dashboard", icon: "📊" },
+  { href: "/admin/orders", label: "Đơn hàng", icon: "🛒" },
   { href: "/admin/cohorts", label: "Cohorts", icon: "👥" },
   { href: "/admin/analytics/revenue", label: "Revenue", icon: "💰" },
   { href: "/admin/analytics/funnel", label: "Funnel", icon: "🔄" },

@@ -219,6 +219,14 @@ export default async function ProgramsPage() {
       <p className="mt-8 text-center text-sm text-neutral-500">
         Thanh toán 1 lần. Không subscription. Không phí ẩn.
       </p>
+      <p className="mt-4 text-center">
+        <Link
+          href="/pricing"
+          className="text-sm font-medium text-primary hover:underline"
+        >
+          Hoặc mua ngay (MoMo / Chuyển khoản) →
+        </Link>
+      </p>
     </div>
   );
 }

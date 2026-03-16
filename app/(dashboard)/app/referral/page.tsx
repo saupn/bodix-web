@@ -4,7 +4,12 @@ import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Copy } from "lucide-react";
 
-const REFERRAL_BASE = "https://bodix.vn/r";
+const REFERRAL_BASE =
+  typeof window !== "undefined"
+    ? `${window.location.origin}/r`
+    : process.env.NEXT_PUBLIC_APP_URL
+      ? `${process.env.NEXT_PUBLIC_APP_URL}/r`
+      : "https://bodix.fit/r";
 const SHARE_MESSAGE = (code: string) =>
   `Mình đang tập BodiX — chương trình fitness hoàn thành được, không phải chỉ bắt đầu! 💪\nDùng mã ${code} để giảm 10% chương trình đầu tiên.\n👉 ${REFERRAL_BASE}/${code}`;
 

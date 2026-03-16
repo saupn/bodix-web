@@ -420,6 +420,13 @@ export async function POST(request: NextRequest) {
     }).catch(err => console.error('[checkout/confirm] referral conversion:', err))
   }
 
+  // --- Update referrals table (personalized referral tracking) -------------
+  await service
+    .from('referrals')
+    .update({ status: 'paid' })
+    .eq('referred_id', user.id)
+    .eq('status', 'registered')
+
   return NextResponse.json({
     success: true,
     enrollment: activatedEnrollment,

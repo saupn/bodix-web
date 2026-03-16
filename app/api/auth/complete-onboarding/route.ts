@@ -18,6 +18,7 @@ export async function POST(request: NextRequest) {
     fitness_goal?: string[];
     phone?: string | null;
     phone_verified?: boolean;
+    referred_by?: string;
   };
 
   try {
@@ -60,6 +61,11 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  if (body.referred_by?.trim()) {
+    const code = body.referred_by.trim().toUpperCase();
+    updateData.referred_by = code;
+  }
+
   const { error } = await service
     .from("profiles")
     .update(updateData)
@@ -71,6 +77,49 @@ export async function POST(request: NextRequest) {
       { error: error.message },
       { status: 500 }
     );
+  }
+
+  // Ghi nhận referral: tạo referrals row + tăng referral_count của referrer
+  if (body.referred_by?.trim()) {
+    const code = body.referred_by.trim().toUpperCase();
+    let referrerId: string | null = null;
+
+    const { data: referrerProfile } = await service
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", code)
+      .maybeSingle();
+    if (referrerProfile) referrerId = referrerProfile.id;
+
+    if (!referrerId) {
+      const { data: refCode } = await service
+        .from("referral_codes")
+        .select("user_id")
+        .eq("code", code)
+        .maybeSingle();
+      if (refCode) referrerId = refCode.user_id;
+    }
+
+    if (referrerId && referrerId !== user.id) {
+      await service.from("referrals").insert({
+        referrer_id: referrerId,
+        referrer_code: code,
+        referred_id: user.id,
+        referred_email: user.email ?? null,
+        status: "registered",
+      });
+
+      const { data: refProfile } = await service
+        .from("profiles")
+        .select("referral_count")
+        .eq("id", referrerId)
+        .single();
+      const newCount = (refProfile?.referral_count ?? 0) + 1;
+      await service
+        .from("profiles")
+        .update({ referral_count: newCount })
+        .eq("id", referrerId);
+    }
   }
 
   return NextResponse.json({ success: true });

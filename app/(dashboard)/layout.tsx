@@ -27,7 +27,7 @@ export default async function DashboardLayout({
   const service = createServiceClient();
   const { data: profile } = await service
     .from("profiles")
-    .select("full_name, avatar_url, trial_ends_at, onboarding_completed")
+    .select("full_name, avatar_url, trial_ends_at, onboarding_completed, payment_status, bodix_program, referral_code, gift_remaining, gift_total")
     .eq("id", user.id)
     .single();
 
@@ -64,8 +64,37 @@ export default async function DashboardLayout({
   const myStats = hasActiveProgram ? await getMyStats(supabase) : null;
   const rescueStatus = hasActiveProgram ? await getRescueStatus(supabase) : null;
 
+  const showUnpaidBanner =
+    profile?.onboarding_completed === true &&
+    profile?.payment_status !== "paid";
+
   return (
     <DashboardShell
+      giftSection={
+        profile?.referral_code && (profile?.gift_remaining ?? 10) > 0 ? (
+          {
+            remaining: profile.gift_remaining ?? 10,
+            total: profile.gift_total ?? 10,
+            referralCode: profile.referral_code,
+            baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
+          }
+        ) : null
+      }
+      unpaidBanner={
+        showUnpaidBanner ? (
+          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-3">
+            <p className="text-sm font-medium text-amber-900">
+              Hoàn tất thanh toán để bắt đầu chương trình
+            </p>
+            <a
+              href={`/checkout?program=${profile?.bodix_program || "bodix21"}`}
+              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
+            >
+              Thanh toán ngay →
+            </a>
+          </div>
+        ) : null
+      }
       profile={{
         full_name: profile?.full_name ?? null,
         avatar_url: profile?.avatar_url ?? null,

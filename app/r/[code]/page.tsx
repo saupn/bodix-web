@@ -21,13 +21,49 @@ export default async function ReferralLandingPage({
 
   const supabase = await createClient();
 
-  const { data: referralCode, error } = await supabase
+  // Ưu tiên referral_codes, fallback profiles.referral_code (mã cá nhân hóa)
+  let referralCode: {
+    id: string;
+    user_id: string;
+    code_type: string;
+    referee_reward_type: string;
+    referee_reward_value: number;
+    is_active: boolean;
+    expires_at: string | null;
+    max_uses: number | null;
+    total_conversions: number;
+  } | null = null;
+
+  const { data: refCode, error: refError } = await supabase
     .from("referral_codes")
     .select("id, user_id, code_type, referee_reward_type, referee_reward_value, is_active, expires_at, max_uses, total_conversions")
     .eq("code", codeUpper)
     .maybeSingle();
 
-  if (error || !referralCode) notFound();
+  if (!refError && refCode) {
+    referralCode = refCode;
+  } else {
+    const { data: profileWithCode } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("referral_code", codeUpper)
+      .maybeSingle();
+    if (profileWithCode) {
+      referralCode = {
+        id: "",
+        user_id: profileWithCode.id,
+        code_type: "referral",
+        referee_reward_type: "discount_percent",
+        referee_reward_value: 10,
+        is_active: true,
+        expires_at: null,
+        max_uses: null,
+        total_conversions: 0,
+      };
+    }
+  }
+
+  if (!referralCode) notFound();
   if (!referralCode.is_active) notFound();
   if (referralCode.expires_at && new Date(referralCode.expires_at) < new Date()) notFound();
   if (referralCode.max_uses != null && referralCode.total_conversions >= referralCode.max_uses) notFound();

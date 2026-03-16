@@ -14,7 +14,7 @@ CREATE EXTENSION IF NOT EXISTS pg_cron;
 CREATE EXTENSION IF NOT EXISTS pg_net;
 
 -- Lưu secret vào Vault (thay YOUR_CRON_SECRET_HERE bằng giá trị thật từ .env CRON_SECRET)
-SELECT vault.create_secret('YOUR_CRON_SECRET_HERE', 'cron_secret');
+-- SELECT vault.create_secret('bodix_cron_secret_Phoebe0220!', 'cron_secret');
 
 -- Helper function gọi bodix.fit API
 CREATE OR REPLACE FUNCTION public.call_bodix_cron(endpoint text)

@@ -1,5 +1,9 @@
 export const ZALO_OA_LINK = `https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_OA_ID || "2495331839057844851"}`;
 
+/** Base URL cho link giới thiệu (bodix.fit hoặc bodix.vn) */
+export const REFERRAL_BASE =
+  process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit";
+
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",

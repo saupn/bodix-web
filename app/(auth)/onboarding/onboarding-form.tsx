@@ -3,6 +3,9 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { PROGRAMS, ZALO_OA_LINK } from "@/lib/constants";
+import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
+
+const REFERRAL_STORAGE_KEY = "bodix_referral_code";
 
 const GOALS = [
   "Giảm mỡ",
@@ -58,7 +61,15 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [otpVerified, setOtpVerified] = useState(false);
   const [countdown, setCountdown] = useState(0);
   const [showFollowOA, setShowFollowOA] = useState(false);
+  const [referralCodeFromStorage, setReferralCodeFromStorage] = useState<string | null>(null);
   const verifyingRef = useRef(false);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(REFERRAL_STORAGE_KEY);
+      if (stored) setReferralCodeFromStorage(stored.trim().toUpperCase());
+    } catch {}
+  }, []);
 
   // Countdown timer
   useEffect(() => {
@@ -189,6 +200,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     setError(null);
 
     try {
+      const referredBy = referralCodeFromStorage || undefined;
       const res = await fetch("/api/auth/complete-onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -199,6 +211,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
           fitness_goal: goals,
           phone: phone.trim() || null,
           phone_verified: otpVerified,
+          referred_by: referredBy,
         }),
       });
 
@@ -210,6 +223,9 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         return;
       }
 
+      try {
+        localStorage.removeItem(REFERRAL_STORAGE_KEY);
+      } catch {}
       setShowFollowOA(true);
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
@@ -261,13 +277,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       {/* Progress bar */}
       <div className="mb-8">
         <div className="flex justify-between text-sm text-neutral-500 mb-2">
-          <span>Bước {step} / 4</span>
+          <span>Bước {step} / 5</span>
         </div>
         <div className="h-1.5 w-full rounded-full bg-neutral-200 overflow-hidden">
           <motion.div
             className="h-full bg-primary rounded-full"
             initial={false}
-            animate={{ width: `${(step / 4) * 100}%` }}
+            animate={{ width: `${(step / 5) * 100}%` }}
             transition={{ duration: 0.3 }}
           />
         </div>
@@ -643,49 +659,41 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                 ))}
               </div>
 
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
-                >
-                  {error}
-                </div>
-              )}
-
               <button
                 type="button"
-                onClick={handleComplete}
-                disabled={loading}
+                onClick={() => goNext(5)}
                 className={btnPrimary}
                 suppressHydrationWarning
               >
-                {loading ? (
-                  <>
-                    <svg
-                      className="h-5 w-5 animate-spin"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24"
-                    >
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"
-                      />
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                      />
-                    </svg>
-                    Đang xử lý...
-                  </>
-                ) : (
-                  "Khám phá ngay"
-                )}
+                Tiếp tục
+              </button>
+            </motion.div>
+          )}
+
+          {/* Step 5: Mã giới thiệu */}
+          {step === 5 && (
+            <motion.div
+              key="5"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              <ReferralCodeSelector
+                fullName={fullName}
+                onCodeSet={() => handleComplete()}
+                onSkip={() => handleComplete()}
+              />
+              <button
+                type="button"
+                onClick={goBack}
+                className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
+                suppressHydrationWarning
+              >
+                Quay lại
               </button>
             </motion.div>
           )}

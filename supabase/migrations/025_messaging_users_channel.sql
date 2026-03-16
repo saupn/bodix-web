@@ -6,6 +6,6 @@
 -- Note: BodiX uses public.profiles. If public.users does not exist,
 -- consider altering public.profiles instead, or create users table first.
 
-ALTER TABLE public.users
+ALTER TABLE public.profiles
   ADD COLUMN IF NOT EXISTS preferred_channel text DEFAULT 'zalo',
   ADD COLUMN IF NOT EXISTS channel_user_id text;

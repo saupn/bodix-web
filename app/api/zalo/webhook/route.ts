@@ -23,13 +23,12 @@ export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
 
-    // Verify nhanh — vẫn trả 200 để Zalo không retry
-    if (payload.app_id !== process.env.ZALO_APP_ID) {
-      console.error('Invalid app_id:', payload.app_id);
+    // Nếu app_id không khớp hoặc không có → trả 200 nhưng không xử lý (Zalo verify dùng payload rỗng)
+    if (!payload.app_id || payload.app_id !== process.env.ZALO_APP_ID) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Xử lý theo loại sự kiện (không có query Supabase trước đây)
+    // Xử lý events
     switch (payload.event_name) {
       case 'user_send_text':
         await handleUserMessage(payload);

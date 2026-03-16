@@ -123,7 +123,8 @@ async function handleUserMessage(payload: { sender: { id: string }; message: { t
     return;
   }
 
-  const programDays = (enrollment.programs as { duration_days: number } | null)?.duration_days ?? 21;
+  const programData = enrollment.programs as any;
+  const programDays = (Array.isArray(programData) ? programData[0]?.duration_days : programData?.duration_days) ?? 21;
   const dayNumber = (enrollment.current_day ?? 0) + 1;
 
   if (dayNumber > programDays) {

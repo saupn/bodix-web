@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { sendMessage } from '@/lib/messaging';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -12,76 +13,111 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const { data: tokenRow } = await supabase
-    .from('zalo_tokens').select('access_token').eq('id', 1).single();
+  // Lấy enrollments active + profile
+  const { data: enrollments, error: enrollError } = await supabase
+    .from('enrollments')
+    .select(`
+      id,
+      current_day,
+      user_id,
+      program_id,
+      profiles!inner (
+        id,
+        full_name,
+        channel_user_id,
+        preferred_channel
+      )
+    `)
+    .eq('status', 'active');
 
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, name, zalo_user_id, zalo_phone, bodix_current_day, bodix_last_checkin')
-    .eq('bodix_status', 'active')
-    .not('zalo_user_id', 'is', null);
+  if (enrollError || !enrollments || enrollments.length === 0) {
+    return NextResponse.json({ rescued: 0 });
+  }
 
-  if (!users) return NextResponse.json({ rescued: 0 });
-
-  const now = new Date();
+  const todayStart = new Date();
+  todayStart.setHours(0, 0, 0, 0);
   let rescueCount = 0;
 
-  for (const user of users) {
-    if (!user.bodix_last_checkin) continue;
+  for (const row of enrollments) {
+    const enrollment = row as {
+      id: string;
+      current_day: number;
+      user_id: string;
+      program_id: string;
+      profiles: { id: string; full_name: string | null; channel_user_id: string | null; preferred_channel: string | null } | { id: string; full_name: string | null; channel_user_id: string | null; preferred_channel: string | null }[];
+    };
 
-    const lastCheckin = new Date(user.bodix_last_checkin);
-    const daysMissed = Math.floor((now.getTime() - lastCheckin.getTime()) / (1000 * 60 * 60 * 24));
+    const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
+    const channelUserId = profile?.channel_user_id;
+    const channel = (profile?.preferred_channel as 'zalo' | 'whatsapp') || 'zalo';
+
+    if (!channelUserId) continue;
+
+    // Tìm check-in gần nhất (theo workout_date)
+    const { data: lastCheckin } = await supabase
+      .from('daily_checkins')
+      .select('day_number, workout_date')
+      .eq('enrollment_id', enrollment.id)
+      .order('workout_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (!lastCheckin) continue; // Chưa check-in lần nào → bỏ qua
+
+    const lastCheckinDate = new Date(lastCheckin.workout_date + 'T00:00:00Z');
+    const now = new Date();
+    const daysMissed = Math.floor((now.getTime() - lastCheckinDate.getTime()) / (1000 * 60 * 60 * 24));
 
     if (daysMissed < 2) continue;
 
     // Đã rescue hôm nay chưa?
-    const todayStart = new Date(); todayStart.setHours(0, 0, 0, 0);
     const { data: existingRescue } = await supabase
-      .from('rescues')
+      .from('rescue_interventions')
       .select('id')
-      .eq('zalo_user_id', user.zalo_user_id)
-      .gte('triggered_at', todayStart.toISOString())
+      .eq('enrollment_id', enrollment.id)
+      .gte('created_at', todayStart.toISOString())
       .limit(1);
 
     if (existingRescue && existingRescue.length > 0) continue;
 
-    const level = daysMissed === 2 ? 1 : daysMissed === 3 ? 2 : 3;
+    const triggerReason = daysMissed === 2 ? 'missed_2_days' : 'missed_3_plus_days';
+    const actionTaken = daysMissed <= 3 ? 'send_rescue_message' : 'coach_intervention';
+    const displayName = profile.full_name || 'Bạn';
+    const lastCheckedDay = lastCheckin.day_number;
 
-    // Ghi log rescue
-    await supabase.from('rescues').insert({
-      user_id: user.id,
-      zalo_user_id: user.zalo_user_id,
-      level,
-      days_missed: daysMissed,
+    const rescueMessages: Record<string, string> = {
+      missed_2_days:
+        `${displayName} ơi, mình thấy bạn chưa check-in 2 ngày rồi.\n` +
+        `Chỉ cần 1 lượt Easy (~12 phút) là streak vẫn giữ.\n` +
+        `Reply EASY khi xong nhé!`,
+      missed_3_plus_days:
+        `${displayName} ơi, bạn đã đi được ${lastCheckedDay} ngày rồi.\n` +
+        `Mình có thể chuyển bạn sang Easy Mode — chỉ 1 lượt, ~12 phút.\n` +
+        `Vẫn tính hoàn thành, streak vẫn giữ!\n` +
+        `Reply EASY nếu bạn muốn tiếp tục nhé!`,
+    };
+
+    const messageText = rescueMessages[triggerReason] ?? rescueMessages.missed_3_plus_days;
+
+    // Ghi rescue_interventions
+    await supabase.from('rescue_interventions').insert({
+      enrollment_id: enrollment.id,
+      user_id: enrollment.user_id,
+      trigger_reason: triggerReason,
+      action_taken: actionTaken,
+      message_sent: messageText,
+      outcome: 'pending',
     });
 
-    // Cấp 1–2: gửi tin OA
-    if (level <= 2 && user.zalo_user_id) {
-      const messages: Record<number, string> = {
-        1: `${user.name || 'Bạn'} ơi, mình thấy bạn chưa check-in 2 ngày rồi.\n` +
-           `Chỉ cần 1 lượt Easy (~12 phút) là streak vẫn giữ.\n` +
-           `Reply EASY khi xong nhé!`,
-        2: `${user.name || 'Bạn'} ơi, bạn đã đi được ${(user.bodix_current_day || 1) - 1} ngày rồi.\n` +
-           `Mình có thể chuyển bạn sang Easy Mode — chỉ 1 lượt, ~12 phút.\n` +
-           `Vẫn tính hoàn thành, streak vẫn giữ!\n` +
-           `Reply EASY nếu bạn muốn tiếp tục nhé!`,
-      };
-
-      await fetch('https://openapi.zalo.me/v3.0/oa/message/cs', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'access_token': tokenRow!.access_token,
-        },
-        body: JSON.stringify({
-          recipient: { user_id: user.zalo_user_id },
-          message: { text: messages[level] },
-        }),
+    // Gửi tin (chỉ khi action_taken = send_rescue_message)
+    if (actionTaken === 'send_rescue_message' && channelUserId) {
+      await sendMessage({
+        userId: profile.id,
+        channel,
+        channelUserId,
+        text: messageText,
       });
     }
-
-    // Cấp 3: chỉ log — admin/coach gọi điện thủ công
-    // Dashboard sẽ hiện alert
 
     rescueCount++;
     await new Promise(r => setTimeout(r, 100));

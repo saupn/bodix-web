@@ -1,25 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { createServiceClient } from '@/lib/supabase/service';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
+const service = createServiceClient();
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// MAIN HANDLER — Zalo POST webhook đến đây
+// GET — Zalo dùng để verify webhook
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+export async function GET() {
+  return NextResponse.json({ status: 'ok' }, { status: 200 });
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// POST — Zalo webhook events
+// Trả 200 ngay để Zalo không retry; xử lý logic sau khi parse payload.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export async function POST(request: NextRequest) {
   try {
     const payload = await request.json();
 
-    // Verify nguồn gốc
+    // Verify nhanh — vẫn trả 200 để Zalo không retry
     if (payload.app_id !== process.env.ZALO_APP_ID) {
       console.error('Invalid app_id:', payload.app_id);
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Xử lý theo loại sự kiện
+    // Xử lý theo loại sự kiện (không có query Supabase trước đây)
     switch (payload.event_name) {
       case 'user_send_text':
         await handleUserMessage(payload);
@@ -48,19 +58,17 @@ export async function POST(request: NextRequest) {
 // Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)
 // Cả 3 đều = Done → streak +1
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function parseCheckinType(text: string): string | null {
+function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | null {
   const t = text.trim().toUpperCase();
 
-  // Thứ tự ưu tiên: hard → light → easy
-  const hard  = ['HARD', 'H', '3', 'FULL', 'DONE', 'XONG', '✅', 'DA TAP'];
+  const hard = ['HARD', 'H', '3', 'FULL', 'DONE', 'XONG', '✅', 'DA TAP'];
   const light = ['LIGHT', 'L', '2', 'NHE'];
-  const easy  = ['EASY', 'E', '1', 'DE', 'OK'];
+  const easy = ['EASY', 'E', '1', 'DE', 'OK'];
 
   if (hard.some(k => t === k || t.startsWith(k + ' '))) return 'hard';
   if (light.some(k => t === k || t.startsWith(k + ' '))) return 'light';
   if (easy.some(k => t === k || t.startsWith(k + ' '))) return 'easy';
 
-  // Fallback: check nếu text chứa keyword
   if (hard.some(k => t.includes(k))) return 'hard';
   if (light.some(k => t.includes(k))) return 'light';
   if (easy.some(k => t.includes(k))) return 'easy';
@@ -71,7 +79,7 @@ function parseCheckinType(text: string): string | null {
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // XỬ LÝ CHECK-IN
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function handleUserMessage(payload: any) {
+async function handleUserMessage(payload: { sender: { id: string }; message: { text?: string } }) {
   const zaloUserId = payload.sender.id;
   const messageText = payload.message.text || '';
   const checkinType = parseCheckinType(messageText);
@@ -87,39 +95,51 @@ async function handleUserMessage(payload: any) {
     return;
   }
 
-  // Lấy user từ DB
-  const { data: user, error } = await supabase
-    .from('users')
-    .select('id, name, bodix_current_day, bodix_streak, bodix_total_hard, bodix_total_light, bodix_total_easy, bodix_status')
-    .eq('zalo_user_id', zaloUserId)
+  // 1. Tìm profile theo channel_user_id (Zalo UID)
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id, full_name')
+    .eq('channel_user_id', zaloUserId)
     .single();
 
-  if (error || !user) {
+  if (profileError || !profile) {
     await sendZaloMessage(zaloUserId,
       'Mình chưa tìm thấy tài khoản của bạn. Vui lòng đăng ký tại bodix.fit trước nhé!'
     );
     return;
   }
 
-  if (user.bodix_status !== 'active') {
+  // 2. Tìm enrollment active
+  const { data: enrollment, error: enrollmentError } = await supabase
+    .from('enrollments')
+    .select('id, user_id, cohort_id, current_day, program_id, programs(duration_days)')
+    .eq('user_id', profile.id)
+    .eq('status', 'active')
+    .single();
+
+  if (enrollmentError || !enrollment) {
     await sendZaloMessage(zaloUserId,
-      'Tài khoản của bạn chưa kích hoạt. Vui lòng liên hệ hỗ trợ.'
+      'Bạn chưa đăng ký chương trình. Vui lòng đăng ký tại bodix.fit nhé!'
     );
     return;
   }
 
-  const dayNumber = user.bodix_current_day || 1;
+  const programDays = (enrollment.programs as { duration_days: number } | null)?.duration_days ?? 21;
+  const dayNumber = (enrollment.current_day ?? 0) + 1;
 
-  // Kiểm tra đã check-in ngày này chưa
-  const todayStart = new Date();
-  todayStart.setHours(0, 0, 0, 0);
+  if (dayNumber > programDays) {
+    await sendZaloMessage(zaloUserId,
+      'Bạn đã hoàn thành chương trình rồi! Chúc mừng! 🏆'
+    );
+    return;
+  }
 
+  // 3. Kiểm tra đã check-in ngày này chưa
   const { data: existing } = await supabase
-    .from('checkins')
+    .from('daily_checkins')
     .select('id')
-    .eq('zalo_user_id', zaloUserId)
+    .eq('enrollment_id', enrollment.id)
     .eq('day_number', dayNumber)
-    .gte('created_at', todayStart.toISOString())
     .limit(1);
 
   if (existing && existing.length > 0) {
@@ -129,71 +149,156 @@ async function handleUserMessage(payload: any) {
     return;
   }
 
-  // Ghi check-in
-  await supabase.from('checkins').insert({
-    user_id: user.id,
-    zalo_user_id: zaloUserId,
-    day_number: dayNumber,
-    checkin_type: checkinType,
-    source: 'webhook',
-    message_raw: messageText,
-  });
+  const workoutDate = new Date().toISOString().split('T')[0];
 
-  // Cập nhật user — Cả 3 mức đều = Done → streak luôn +1
-  const newStreak = (user.bodix_streak || 0) + 1;
-  const updates: any = {
-    bodix_current_day: dayNumber + 1,
-    bodix_last_checkin: new Date().toISOString(),
-    bodix_streak: newStreak,
+  // 4. Ghi check-in
+  const { error: checkinError } = await service
+    .from('daily_checkins')
+    .insert({
+      enrollment_id: enrollment.id,
+      user_id: profile.id,
+      cohort_id: enrollment.cohort_id ?? null,
+      day_number: dayNumber,
+      workout_date: workoutDate,
+      mode: checkinType,
+      completed_at: new Date().toISOString(),
+    });
+
+  if (checkinError) {
+    if (checkinError.code === '23505') {
+      await sendZaloMessage(zaloUserId,
+        `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé 💪`
+      );
+      return;
+    }
+    console.error('[zalo/webhook] insert daily_checkins:', checkinError);
+    await sendZaloMessage(zaloUserId, 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+    return;
+  }
+
+  // 5. Cập nhật streak (giống checkin API)
+  const { data: existingStreak } = await service
+    .from('streaks')
+    .select('*')
+    .eq('enrollment_id', enrollment.id)
+    .maybeSingle();
+
+  const prev = existingStreak ?? {
+    current_streak: 0,
+    longest_streak: 0,
+    total_completed_days: 0,
+    total_hard_days: 0,
+    total_light_days: 0,
+    total_recovery_days: 0,
+    total_easy_days: 0,
+    total_skip_days: 0,
+    last_checkin_date: null,
+    streak_started_at: null,
   };
 
-  if (checkinType === 'hard') updates.bodix_total_hard = (user.bodix_total_hard || 0) + 1;
-  if (checkinType === 'light') updates.bodix_total_light = (user.bodix_total_light || 0) + 1;
-  if (checkinType === 'easy') updates.bodix_total_easy = (user.bodix_total_easy || 0) + 1;
+  const prevDayStr = shiftDate(workoutDate, -1);
+  const prevLastCheckin = prev.last_checkin_date ?? null;
 
-  if (dayNumber >= 21) updates.bodix_status = 'completed';
+  let newCurrentStreak = prev.current_streak;
+  let newStreakStartedAt = prev.streak_started_at;
 
-  await supabase.from('users').update(updates).eq('id', user.id);
+  if (prevLastCheckin === null) {
+    newCurrentStreak = 1;
+    newStreakStartedAt = workoutDate;
+  } else if (prevLastCheckin === prevDayStr) {
+    newCurrentStreak = prev.current_streak + 1;
+  } else {
+    newCurrentStreak = 1;
+    newStreakStartedAt = workoutDate;
+  }
 
-  // Gửi phản hồi
+  const newLongestStreak = Math.max(newCurrentStreak, prev.longest_streak);
+
+  const streakUpsert = {
+    enrollment_id: enrollment.id,
+    user_id: profile.id,
+    current_streak: newCurrentStreak,
+    longest_streak: newLongestStreak,
+    total_completed_days: prev.total_completed_days + 1,
+    total_hard_days: checkinType === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
+    total_light_days: checkinType === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
+    total_recovery_days: checkinType === 'recovery' ? prev.total_recovery_days + 1 : prev.total_recovery_days,
+    total_easy_days: checkinType === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
+    total_skip_days: prev.total_skip_days,
+    last_checkin_date: workoutDate,
+    streak_started_at: newStreakStartedAt,
+    updated_at: new Date().toISOString(),
+  };
+
+  await service
+    .from('streaks')
+    .upsert(streakUpsert, { onConflict: 'enrollment_id' });
+
+  // 6. Cập nhật enrollment
+  const isComplete = dayNumber >= programDays;
+  await service
+    .from('enrollments')
+    .update({
+      current_day: dayNumber,
+      ...(isComplete ? { status: 'completed', completed_at: new Date().toISOString() } : {}),
+    })
+    .eq('id', enrollment.id);
+
+  // 7. Phản hồi
   const emojis: Record<string, string> = { hard: '🔥', light: '💪', easy: '✅' };
   const labels: Record<string, string> = { hard: '3 lượt', light: '2 lượt', easy: '1 lượt' };
+  const displayName = profile.full_name || 'Bạn';
 
   await sendZaloMessage(zaloUserId,
-    `${emojis[checkinType]} Ngày ${dayNumber}/21 hoàn thành (${labels[checkinType]})! Streak: ${newStreak} ngày`
+    `${emojis[checkinType]} Ngày ${dayNumber}/${programDays} hoàn thành (${labels[checkinType]})! Streak: ${newCurrentStreak} ngày`
   );
 
-  // Nếu hoàn thành D21
-  if (dayNumber >= 21) {
-    const totalDone = (updates.bodix_total_hard || user.bodix_total_hard || 0)
-                    + (updates.bodix_total_light || user.bodix_total_light || 0)
-                    + (updates.bodix_total_easy || user.bodix_total_easy || 0);
+  if (isComplete) {
+    const totalDone = streakUpsert.total_completed_days;
+    const totalHard = streakUpsert.total_hard_days;
+    const totalLight = streakUpsert.total_light_days;
+    const totalEasy = streakUpsert.total_easy_days;
+    const totalRecovery = streakUpsert.total_recovery_days;
     await sendZaloMessage(zaloUserId,
-      `🏆 CHÚC MỪNG! Bạn đã hoàn thành BodiX 21!\n` +
-      `Tổng ${totalDone} buổi: ${updates.bodix_total_hard || user.bodix_total_hard || 0} Hard + ` +
-      `${updates.bodix_total_light || user.bodix_total_light || 0} Light + ` +
-      `${updates.bodix_total_easy || user.bodix_total_easy || 0} Easy\n` +
+      `🏆 CHÚC MỪNG ${displayName}! Bạn đã hoàn thành BodiX 21!\n` +
+      `Tổng ${totalDone} buổi: ${totalHard} Hard + ${totalLight} Light + ${totalEasy} Easy + ${totalRecovery} Recovery\n` +
       `Bạn là người hoàn thành. Tự hào về bản thân!`
     );
   }
 }
 
+function shiftDate(dateStr: string, days: number): string {
+  const d = new Date(dateStr + 'T00:00:00Z');
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // FOLLOW / UNFOLLOW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-async function handleFollow(payload: any) {
+async function handleFollow(payload: { follower?: { id: string }; user_id_by_app?: string }) {
   const zaloUserId = payload.follower?.id || payload.user_id_by_app;
   if (!zaloUserId) return;
 
   console.log('New follower:', zaloUserId);
 
-  // Lưu UID vào users (upsert — nếu chưa có thì tạo, có rồi thì cập nhật)
-  await supabase.from('users').upsert({
-    zalo_user_id: zaloUserId,
-    bodix_status: 'pending_registration',
-  }, { onConflict: 'zalo_user_id' });
+  // Cập nhật profile nếu đã có (match channel_user_id)
+  const { data: existing } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('channel_user_id', zaloUserId)
+    .maybeSingle();
 
-  // Gửi tin chào mừng
+  if (existing) {
+    await supabase
+      .from('profiles')
+      .update({
+        channel_user_id: zaloUserId,
+        preferred_channel: 'zalo',
+      })
+      .eq('id', existing.id);
+  }
+
   await sendZaloMessage(zaloUserId,
     'Chào mừng bạn đến với BodiX! 💪\n\n' +
     'Để bắt đầu hành trình 21 ngày, đăng ký tại bodix.fit nhé.\n' +
@@ -201,21 +306,29 @@ async function handleFollow(payload: any) {
   );
 }
 
-async function handleUnfollow(payload: any) {
+async function handleUnfollow(payload: { follower?: { id: string }; user_id_by_app?: string }) {
   const zaloUserId = payload.follower?.id || payload.user_id_by_app;
   if (!zaloUserId) return;
 
-  await supabase
-    .from('users')
-    .update({ bodix_status: 'dropped' })
-    .eq('zalo_user_id', zaloUserId);
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('channel_user_id', zaloUserId)
+    .single();
+
+  if (profile) {
+    await supabase
+      .from('enrollments')
+      .update({ status: 'dropped' })
+      .eq('user_id', profile.id)
+      .eq('status', 'active');
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // GỬI TIN NHẮN QUA ZALO OA API
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function sendZaloMessage(userId: string, text: string) {
-  // Lấy access token từ DB
   const { data: tokenRow } = await supabase
     .from('zalo_tokens')
     .select('access_token')

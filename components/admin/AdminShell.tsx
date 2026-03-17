@@ -11,6 +11,7 @@ const NAV_ITEMS = [
   { href: "/admin/analytics/revenue", label: "Revenue", icon: "💰" },
   { href: "/admin/analytics/funnel", label: "Funnel", icon: "🔄" },
   { href: "/admin/analytics/dropout", label: "Dropout", icon: "📉" },
+  { href: "/admin/reviews", label: "Reviews", icon: "📹" },
   { href: "/admin/nudging", label: "Nudging", icon: "🔔" },
   { href: "/admin/zalo", label: "Zalo", icon: "💬" },
   { href: "/admin/referral", label: "Referral", icon: "🎁" },

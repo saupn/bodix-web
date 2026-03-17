@@ -8,7 +8,8 @@
       "Bash(npx tsc:*)",
       "Bash(find D:\\\\Prog\\\\bodix-web\\\\app\\\\\\(dashboard\\):*)",
       "Bash(git:*)",
-      "Bash(npx next:*)"
+      "Bash(npx next:*)",
+      "Bash(find /d/Prog/bodix-web -type f \\\\\\( -name \"*.tsx\" -o -name \"*.ts\" \\\\\\) | xargs grep -l \"Vimeo\\\\|vimeo\" 2>/dev/null | head -20)"
     ]
   }
 }

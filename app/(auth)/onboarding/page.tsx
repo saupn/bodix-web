@@ -4,6 +4,7 @@ import { redirect } from "next/navigation";
 import OnboardingForm from "./onboarding-form";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function OnboardingPage() {
   // Auth check with session-aware client
@@ -16,7 +17,7 @@ export default async function OnboardingPage() {
     redirect("/login");
   }
 
-  // Profile check with service client (bypasses RLS — same as complete-onboarding API)
+  // Profile check with service client (bypasses RLS)
   const service = createServiceClient();
   const { data: profile } = await service
     .from("profiles")
@@ -24,8 +25,10 @@ export default async function OnboardingPage() {
     .eq("id", user.id)
     .single();
 
+  console.log("[onboarding/page] user:", user.id, "onboarding_completed:", profile?.onboarding_completed);
+
   // Đã onboard → redirect /app
-  if (profile?.onboarding_completed) {
+  if (profile?.onboarding_completed === true) {
     redirect("/app");
   }
 

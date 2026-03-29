@@ -84,7 +84,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       const [{ data: profile }, { data: referralCodes }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("full_name, date_of_birth, gender, fitness_goal, phone, phone_verified")
+          .select("full_name, date_of_birth, gender, fitness_goal, phone, phone_verified, onboarding_completed")
           .eq("id", user.id)
           .single(),
         supabase
@@ -95,6 +95,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       ]);
 
       if (!profile) { setStep(1); setInitializing(false); return; }
+
+      // Already completed onboarding — redirect immediately
+      if (profile.onboarding_completed === true) {
+        console.log("[onboarding-form] Already completed, redirecting to /app");
+        window.location.href = "/app";
+        return;
+      }
 
       // Populate form state from existing profile data
       if (profile.full_name) setFullName(profile.full_name);
@@ -115,6 +122,20 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       const step5Done = (referralCodes?.length ?? 0) > 0;
 
       if (step1Done && step2Done && step3Done && step4Done && step5Done) {
+        // All steps done but onboarding_completed not set — set it now and redirect
+        console.log("[onboarding-form] All steps done, completing onboarding");
+        await fetch("/api/auth/complete-onboarding", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            full_name: profile.full_name,
+            date_of_birth: profile.date_of_birth,
+            gender: profile.gender,
+            fitness_goal: profile.fitness_goal,
+            phone: profile.phone,
+            phone_verified: profile.phone_verified,
+          }),
+        });
         window.location.href = "/app";
         return;
       }
@@ -277,21 +298,26 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
     try {
       const referredBy = referralCodeFromStorage || undefined;
+      const payload = {
+        full_name: fullName.trim() || null,
+        date_of_birth: dateOfBirth || null,
+        gender: gender || null,
+        fitness_goal: goals.length > 0 ? goals : null,
+        phone: phone.trim() || null,
+        phone_verified: phoneVerified,
+        referred_by: referredBy,
+      };
+
+      console.log("[onboarding] handleComplete payload:", payload);
+
       const res = await fetch("/api/auth/complete-onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          full_name: fullName.trim(),
-          date_of_birth: dateOfBirth || null,
-          gender,
-          fitness_goal: goals,
-          phone: phone.trim() || null,
-          phone_verified: phoneVerified,
-          referred_by: referredBy,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
+      console.log("[onboarding] handleComplete response:", res.status, data);
 
       if (!res.ok) {
         setError(data.error || "Đã xảy ra lỗi. Vui lòng thử lại.");
@@ -303,8 +329,10 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
       } catch {}
 
+      // Full page reload to ensure Server Components read fresh data
       window.location.href = "/app";
-    } catch {
+    } catch (err) {
+      console.error("[onboarding] handleComplete error:", err);
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);
     }

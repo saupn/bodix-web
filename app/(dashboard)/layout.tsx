@@ -7,6 +7,7 @@ import { getMyStats } from "@/lib/completion/fetch-stats";
 import { getRescueStatus } from "@/lib/rescue/fetch-status";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
 
 export default async function DashboardLayout({
   children,
@@ -53,6 +54,8 @@ export default async function DashboardLayout({
     },
     enrollments
   );
+
+  console.log("[dashboard/layout] user:", user.id, "onboarding_completed:", profile?.onboarding_completed, "status:", userStatus);
 
   // Chưa onboard → redirect /onboarding
   if (!canAccessDashboard(userStatus)) {

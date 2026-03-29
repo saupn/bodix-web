@@ -1,9 +1,11 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { PROGRAMS, ZALO_OA_LINK } from "@/lib/constants";
+import { Copy, Check, CheckCircle, Loader2, ExternalLink } from "lucide-react";
+import { PROGRAMS } from "@/lib/constants";
 import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
+import { createClient } from "@/lib/supabase/client";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
 
@@ -20,14 +22,6 @@ const GENDERS = [
   { value: "male", label: "Nam" },
   { value: "other", label: "Khác" },
 ] as const;
-
-function isValidVietnamPhone(raw: string): boolean {
-  const digits = raw.replace(/\D/g, "");
-  return (
-    (digits.length === 10 && digits.startsWith("0") && /^0[35789]/.test(digits)) ||
-    (digits.length === 9 && /^[35789]/.test(digits))
-  );
-}
 
 const slideVariants = {
   enter: (direction: number) => ({ x: direction > 0 ? 300 : -300, opacity: 0 }),
@@ -54,15 +48,23 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   // Step 2
   const [goals, setGoals] = useState<string[]>([]);
 
-  // Step 3
+  // Step 3 — Zalo verify code flow
   const [phone, setPhone] = useState("");
-  const [otpSent, setOtpSent] = useState(false);
-  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
-  const [otpVerified, setOtpVerified] = useState(false);
-  const [countdown, setCountdown] = useState(0);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [verifyStage, setVerifyStage] = useState<"input" | "waiting" | "success">("input");
+  const [verifyCode, setVerifyCode] = useState("");
+  const [zaloOaLink, setZaloOaLink] = useState("");
+  const [secondsLeft, setSecondsLeft] = useState(0);
+  const [copied, setCopied] = useState(false);
+  const [showResend, setShowResend] = useState(false);
+  const [phoneVerified, setPhoneVerified] = useState(false);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const resendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Other
   const [showFollowOA, setShowFollowOA] = useState(false);
   const [referralCodeFromStorage, setReferralCodeFromStorage] = useState<string | null>(null);
-  const verifyingRef = useRef(false);
 
   useEffect(() => {
     try {
@@ -71,12 +73,20 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     } catch {}
   }, []);
 
-  // Countdown timer
+  // Check if phone already verified on mount
   useEffect(() => {
-    if (countdown <= 0) return;
-    const t = setTimeout(() => setCountdown((c) => c - 1), 1000);
-    return () => clearTimeout(t);
-  }, [countdown]);
+    (async () => {
+      const supabase = createClient();
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("phone_verified")
+        .eq("id", user.id)
+        .single();
+      if (data?.phone_verified) setPhoneVerified(true);
+    })();
+  }, []);
 
   const goNext = (nextStep: number) => {
     setDirection(1);
@@ -96,104 +106,128 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     );
   };
 
-  const handleSendOtp = async () => {
-    setError(null);
-    const trimmed = phone.trim();
-    if (!trimmed) {
-      setError("Vui lòng nhập số điện thoại.");
-      return;
-    }
-    if (!isValidVietnamPhone(trimmed)) {
-      setError("Số điện thoại không hợp lệ. Ví dụ: 0912345678");
-      return;
-    }
+  // ── Step 3: Phone validation ──
 
+  function handlePhoneChange(value: string) {
+    const digits = value.replace(/\D/g, "").slice(0, 10);
+    setPhone(digits);
+    if (!digits) { setPhoneError(null); return; }
+    if (!digits.startsWith("0")) { setPhoneError("SĐT phải bắt đầu bằng 0."); return; }
+    if (digits.length < 10) { setPhoneError("SĐT phải đủ 10 số."); return; }
+    setPhoneError(null);
+  }
+
+  const isPhoneValid = phone.length === 10 && phone.startsWith("0");
+
+  // ── Step 3: Request verify code ──
+
+  async function handleRequestVerify() {
+    if (!isPhoneValid || loading) return;
     setLoading(true);
+    setError(null);
+
     try {
-      const res = await fetch("/api/auth/send-zalo-otp", {
+      const res = await fetch("/api/auth/request-phone-verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: trimmed }),
+        body: JSON.stringify({ phone }),
       });
       const data = await res.json();
 
       if (!res.ok) {
-        setError(data.error || "Không gửi được mã. Vui lòng thử lại.");
+        setError(data.error || "Có lỗi xảy ra.");
         return;
       }
 
-      setOtpSent(true);
-      setOtp(["", "", "", "", "", ""]);
-      setCountdown(60);
+      setVerifyCode(data.verify_code);
+      setZaloOaLink(data.zalo_oa_link);
+      setSecondsLeft(data.expires_in);
+      setShowResend(false);
+      setCopied(false);
+      setVerifyStage("waiting");
     } catch {
-      setError("Đã xảy ra lỗi. Vui lòng thử lại.");
+      setError("Không thể kết nối. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
-  };
+  }
 
-  const handleVerifyOtp = async () => {
-    const code = otp.join("");
-    if (code.length !== 6) {
-      setError("Vui lòng nhập đủ 6 số.");
-      return;
-    }
-    await doVerifyOtp(code);
-  };
+  // ── Step 3: Countdown timer ──
 
-  const doVerifyOtp = async (code: string) => {
-    if (verifyingRef.current) return;
-    verifyingRef.current = true;
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/auth/verify-zalo-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), otp: code }),
+  useEffect(() => {
+    if (verifyStage !== "waiting") return;
+
+    timerRef.current = setInterval(() => {
+      setSecondsLeft((prev) => {
+        if (prev <= 1) {
+          if (timerRef.current) clearInterval(timerRef.current);
+          setShowResend(true);
+          return 0;
+        }
+        return prev - 1;
       });
-      const data = await res.json();
+    }, 1000);
 
-      if (!res.ok) {
-        setError(data.error || "Mã OTP không đúng.");
-        return;
-      }
+    resendTimeoutRef.current = setTimeout(() => setShowResend(true), 120_000);
 
-      setOtpVerified(true);
-    } catch {
-      setError("Đã xảy ra lỗi. Vui lòng thử lại.");
-    } finally {
-      setLoading(false);
-      verifyingRef.current = false;
-    }
-  };
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (resendTimeoutRef.current) clearTimeout(resendTimeoutRef.current);
+    };
+  }, [verifyStage]);
 
-  const handleOtpChange = (index: number, value: string) => {
-    if (value.length > 1) {
-      const digits = value.replace(/\D/g, "").slice(0, 6).split("");
-      const newOtp = [...otp];
-      digits.forEach((d, i) => {
-        if (index + i < 6) newOtp[index + i] = d;
-      });
-      setOtp(newOtp);
-      const nextIdx = Math.min(index + digits.length, 5);
-      const next = document.getElementById(`otp-${nextIdx}`);
-      (next as HTMLInputElement)?.focus();
-      if (newOtp.join("").length === 6) {
-        doVerifyOtp(newOtp.join(""));
-      }
-      return;
+  // ── Step 3: Polling for verification ──
+
+  const checkVerified = useCallback(async () => {
+    const supabase = createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data } = await supabase
+      .from("profiles")
+      .select("phone_verified")
+      .eq("id", user.id)
+      .single();
+
+    if (data?.phone_verified) {
+      setPhoneVerified(true);
+      setVerifyStage("success");
     }
-    const newOtp = [...otp];
-    newOtp[index] = value.replace(/\D/g, "").slice(-1);
-    setOtp(newOtp);
-    if (value && index < 5) {
-      (document.getElementById(`otp-${index + 1}`) as HTMLInputElement)?.focus();
-    }
-    if (newOtp.join("").length === 6) {
-      doVerifyOtp(newOtp.join(""));
-    }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (verifyStage !== "waiting") return;
+
+    pollingRef.current = setInterval(checkVerified, 3000);
+
+    return () => {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+    };
+  }, [verifyStage, checkVerified]);
+
+  // ── Step 3: Success auto-advance ──
+
+  useEffect(() => {
+    if (verifyStage !== "success") return;
+    const t = setTimeout(() => goNext(4), 1500);
+    return () => clearTimeout(t);
+  }, [verifyStage]);
+
+  // ── Step 3: Copy ──
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(verifyCode);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  function formatTime(s: number) {
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${sec.toString().padStart(2, "0")}`;
+  }
+
+  // ── Complete onboarding ──
 
   const handleComplete = async () => {
     setLoading(true);
@@ -210,7 +244,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
           gender,
           fitness_goal: goals,
           phone: phone.trim() || null,
-          phone_verified: otpVerified,
+          phone_verified: phoneVerified,
           referred_by: referredBy,
         }),
       });
@@ -226,7 +260,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       try {
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
       } catch {}
-      setShowFollowOA(true);
+
+      window.location.href = "/app";
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);
@@ -237,40 +272,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     "w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50";
   const btnPrimary =
     "flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light transition-colors hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50";
-
-  if (showFollowOA) {
-    return (
-      <div className="relative w-full max-w-lg mx-auto">
-        <div className="rounded-2xl border border-white/10 bg-white/95 p-6 shadow-xl backdrop-blur-sm sm:p-8 text-center">
-          <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-            Đăng ký thành công! 🎉
-          </h1>
-          <div className="mt-6 rounded-xl border-2 border-[#2D4A3E]/30 bg-[#2D4A3E]/5 p-6">
-            <p className="font-medium text-neutral-800">
-              Follow BodiX trên Zalo để nhận tin nhắc tập mỗi sáng 6:30
-            </p>
-            <div className="mt-4 flex flex-col gap-3">
-              <a
-                href={ZALO_OA_LINK}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white hover:opacity-90 transition-opacity"
-              >
-                Follow BodiX trên Zalo
-              </a>
-              <button
-                type="button"
-                onClick={() => (window.location.href = "/app")}
-                className="rounded-xl border-2 border-[#2D4A3E] py-4 w-full font-semibold text-[#2D4A3E] hover:bg-[#2D4A3E]/5 transition-colors"
-              >
-                Vào Dashboard →
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative w-full max-w-lg mx-auto">
@@ -443,7 +444,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
             </motion.div>
           )}
 
-          {/* Step 3 */}
+          {/* Step 3 — Kết nối Zalo */}
           {step === 3 && (
             <motion.div
               key="3"
@@ -455,42 +456,164 @@ export default function OnboardingForm({ userId, initialName }: Props) {
               transition={{ duration: 0.2 }}
               className="space-y-4"
             >
-              <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-                Xác minh số điện thoại
-              </h1>
-              <p className="text-sm text-neutral-600">
-                Nhập số điện thoại để nhận nhắc tập và hỗ trợ.
-              </p>
-
-              {error && (
-                <div
-                  role="alert"
-                  className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700"
+              {/* If already verified, show success immediately */}
+              {(phoneVerified || verifyStage === "success") ? (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ duration: 0.35, ease: "easeOut" }}
+                  className="flex flex-col items-center py-8"
                 >
-                  {error}
-                </div>
-              )}
-
-              {!otpSent ? (
+                  <CheckCircle className="w-16 h-16 text-green-500 mb-4" />
+                  <h1 className="font-heading text-2xl font-bold text-primary">
+                    Đã kết nối Zalo thành công!
+                  </h1>
+                </motion.div>
+              ) : verifyStage === "waiting" ? (
+                /* ── Trạng thái 2: Chờ xác minh ── */
                 <>
+                  <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+                    Xác minh qua Zalo
+                  </h1>
+
+                  {/* Verify code display */}
+                  <div className="flex items-center justify-center gap-3">
+                    <div className="bg-green-50 rounded-lg px-6 py-4 text-center">
+                      <span className="font-mono font-bold text-3xl tracking-widest select-all text-primary">
+                        {verifyCode}
+                      </span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleCopy}
+                      className="p-2.5 rounded-lg border border-neutral-200 hover:bg-neutral-50 transition-colors"
+                      title="Copy mã"
+                    >
+                      {copied ? (
+                        <Check className="w-5 h-5 text-green-500" />
+                      ) : (
+                        <Copy className="w-5 h-5 text-neutral-500" />
+                      )}
+                    </button>
+                  </div>
+
+                  {/* 3 steps */}
+                  <div className="space-y-3 mt-2">
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-secondary-light flex items-center justify-center text-sm font-bold">
+                        1
+                      </span>
+                      <div className="flex-1 flex items-center gap-2 pt-0.5">
+                        <span className="text-sm text-neutral-700">Mở Zalo và tìm trang BodiX</span>
+                        <button
+                          type="button"
+                          onClick={() => window.open(zaloOaLink, "_blank")}
+                          className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md border border-primary/30 text-primary text-xs font-medium hover:bg-primary/5 transition-colors"
+                        >
+                          Mở Zalo <ExternalLink className="w-3 h-3" />
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-secondary-light flex items-center justify-center text-sm font-bold">
+                        2
+                      </span>
+                      <span className="text-sm text-neutral-700 pt-0.5">
+                        Bấm <strong>Quan tâm</strong> để theo dõi BodiX
+                      </span>
+                    </div>
+
+                    <div className="flex items-start gap-3">
+                      <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-secondary-light flex items-center justify-center text-sm font-bold">
+                        3
+                      </span>
+                      <span className="text-sm text-neutral-700 pt-0.5">
+                        Gửi tin nhắn <span className="font-mono font-bold text-primary">{verifyCode}</span> cho BodiX
+                      </span>
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-neutral-400 text-center mt-1">
+                    Sau khi gửi tin nhắn, trang này sẽ tự động cập nhật
+                  </p>
+
+                  {/* Countdown */}
+                  <p className="text-center text-sm text-neutral-500">
+                    Mã có hiệu lực trong{" "}
+                    <span className="font-mono font-medium text-neutral-700">
+                      {formatTime(secondsLeft)}
+                    </span>
+                  </p>
+
+                  {/* Error */}
+                  {error && (
+                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
+                  {/* Resend / Skip */}
+                  <div className="flex flex-col items-center gap-2 pt-1">
+                    {showResend && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setVerifyStage("input");
+                          setShowResend(false);
+                        }}
+                        className="text-sm font-medium text-primary hover:underline"
+                      >
+                        Gửi lại mã
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => goNext(4)}
+                      className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                      suppressHydrationWarning
+                    >
+                      Bỏ qua, kết nối sau →
+                    </button>
+                  </div>
+                </>
+              ) : (
+                /* ── Trạng thái 1: Nhập SĐT ── */
+                <>
+                  <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+                    Kết nối Zalo
+                  </h1>
+                  <p className="text-sm text-neutral-600">
+                    Nhập số điện thoại Zalo để nhận nhắc tập mỗi ngày
+                  </p>
+
+                  {error && (
+                    <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                      {error}
+                    </div>
+                  )}
+
                   <div>
-                    <label className="mb-1.5 block text-sm font-medium text-neutral-700">
-                      Số điện thoại
-                    </label>
                     <input
                       type="tel"
+                      inputMode="numeric"
                       value={phone}
-                      onChange={(e) => setPhone(e.target.value)}
-                      placeholder="0909 123 456"
-                      maxLength={10}
+                      onChange={(e) => handlePhoneChange(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleRequestVerify()}
+                      placeholder="Số điện thoại Zalo của bạn"
                       disabled={loading}
-                      className="w-full rounded-lg border border-gray-200 py-3 px-4 focus:border-[#2D4A3E] focus:ring-1 focus:ring-[#2D4A3E] focus:outline-none"
+                      className={`${inputBase} ${
+                        phoneError && phone.length >= 3
+                          ? "border-red-400 focus:ring-red-400/20"
+                          : ""
+                      }`}
                       suppressHydrationWarning
                     />
-                    <p className="mt-2 text-sm text-neutral-500">
-                      Bạn sẽ nhận mã OTP 6 số qua tin nhắn Zalo
-                    </p>
+                    {phoneError && phone.length >= 3 && (
+                      <p className="mt-1.5 text-sm text-red-500">{phoneError}</p>
+                    )}
                   </div>
+
                   <div className="flex gap-3">
                     <button
                       type="button"
@@ -502,123 +625,28 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </button>
                     <button
                       type="button"
-                      onClick={handleSendOtp}
-                      disabled={loading}
-                      className="flex-1 rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white"
+                      onClick={handleRequestVerify}
+                      disabled={!isPhoneValid || loading}
+                      className={`flex-1 ${btnPrimary}`}
                       suppressHydrationWarning
                     >
                       {loading ? (
-                        <span className="inline-flex items-center gap-2">
-                          <svg className="h-4 w-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-                          </svg>
-                          Đang gửi...
-                        </span>
+                        <Loader2 className="w-5 h-5 animate-spin" />
                       ) : (
-                        "Gửi mã xác nhận qua Zalo"
+                        "Tiếp tục"
                       )}
                     </button>
                   </div>
-                  {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
-                </>
-              ) : !otpVerified ? (
-                <>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-neutral-600">{phone}</span>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setOtpSent(false);
-                        setOtp(["", "", "", "", "", ""]);
-                        setCountdown(0);
-                      }}
-                      className="text-sm text-[#2D4A3E] font-medium hover:underline"
-                      suppressHydrationWarning
-                    >
-                      Đổi SĐT
-                    </button>
-                  </div>
-                  <div>
-                    <label className="mb-1.5 block text-sm font-medium text-neutral-700">
-                      Mã OTP (6 số)
-                    </label>
-                    <div className="flex gap-2 justify-center">
-                      {otp.map((digit, i) => (
-                        <input
-                          key={i}
-                          id={`otp-${i}`}
-                          type="text"
-                          inputMode="numeric"
-                          maxLength={6}
-                          value={digit}
-                          onChange={(e) => handleOtpChange(i, e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key === "Backspace" && !digit && i > 0) {
-                              (document.getElementById(`otp-${i - 1}`) as HTMLInputElement)?.focus();
-                            }
-                          }}
-                          disabled={loading}
-                          className="w-12 h-14 text-center text-2xl font-bold border-2 rounded-lg focus:border-[#2D4A3E] focus:ring-1 focus:ring-[#2D4A3E] focus:outline-none"
-                          suppressHydrationWarning
-                        />
-                      ))}
-                    </div>
-                  </div>
-                  <div className="flex items-center justify-between text-sm">
-                    {countdown > 0 ? (
-                      <span className="text-neutral-500">
-                        Gửi lại mã sau {countdown}s
-                      </span>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={handleSendOtp}
-                        disabled={loading}
-                        className="text-[#2D4A3E] font-medium hover:underline"
-                        suppressHydrationWarning
-                      >
-                        Gửi lại mã
-                      </button>
-                    )}
-                  </div>
-                  {error && <p className="text-sm text-red-500 mt-1">{error}</p>}
-                  <button
-                    type="button"
-                    onClick={handleVerifyOtp}
-                    disabled={loading || otp.join("").length !== 6}
-                    className="rounded-xl bg-[#2D4A3E] py-4 w-full font-semibold text-white"
-                    suppressHydrationWarning
-                  >
-                    {loading ? "Đang xác minh..." : "Bắt đầu hành trình"}
-                  </button>
-                </>
-              ) : (
-                <div className="rounded-lg border border-success/30 bg-success/10 p-4 text-center">
-                  <p className="font-medium text-primary">
-                    Số điện thoại đã được xác minh!
-                  </p>
+
                   <button
                     type="button"
                     onClick={() => goNext(4)}
-                    className={`mt-4 ${btnPrimary}`}
+                    className="w-full text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
                     suppressHydrationWarning
                   >
-                    Tiếp tục
+                    Bỏ qua, kết nối sau →
                   </button>
-                </div>
-              )}
-
-              {/* Skip — phone will be saved (with phone_verified=false) in handleComplete */}
-              {!otpVerified && (
-                <button
-                  type="button"
-                  onClick={() => goNext(4)}
-                  className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
-                  suppressHydrationWarning
-                >
-                  Bỏ qua, xác minh sau
-                </button>
+                </>
               )}
             </motion.div>
           )}

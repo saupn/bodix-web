@@ -111,6 +111,36 @@ function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | null {
 async function handleUserMessage(payload: any) {
   const zaloUserId = payload.sender.id;
   const messageText = payload.message?.text || '';
+
+  // ── Verify code check (phone verification via Zalo OA) ──
+  const codeCandidate = messageText.trim().toUpperCase();
+  if (/^[A-Z0-9]{5}$/.test(codeCandidate)) {
+    const { data: verification } = await service
+      .from('phone_verifications')
+      .select('id, user_id, phone')
+      .eq('verify_code', codeCandidate)
+      .eq('status', 'pending')
+      .gt('expires_at', new Date().toISOString())
+      .maybeSingle();
+
+    if (verification) {
+      await service
+        .from('phone_verifications')
+        .update({ status: 'verified', zalo_uid: zaloUserId, verified_at: new Date().toISOString() })
+        .eq('id', verification.id);
+
+      await service
+        .from('profiles')
+        .update({ phone_verified: true, channel_user_id: zaloUserId, phone: verification.phone })
+        .eq('id', verification.user_id);
+
+      await sendZaloMessage(zaloUserId,
+        'Xác minh thành công! ✅\n\nChào mừng bạn đến với BodiX. Bạn sẽ nhận được nhắc tập luyện mỗi ngày qua Zalo.'
+      );
+      return;
+    }
+  }
+
   const checkinType = parseCheckinType(messageText);
   const feelingScore = parseFeelingScore(messageText);
 

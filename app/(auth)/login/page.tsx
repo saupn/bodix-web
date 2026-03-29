@@ -50,11 +50,6 @@ export default function LoginPage() {
       if (authError) {
         if (authError.message.includes("Invalid login credentials")) {
           setError("Email hoặc mật khẩu không đúng.");
-        } else if (
-          authError.message.includes("Email not confirmed") ||
-          authError.message.includes("confirm")
-        ) {
-          setError("Tài khoản chưa xác nhận email. Vui lòng kiểm tra hộp thư.");
         } else {
           setError(authError.message);
         }

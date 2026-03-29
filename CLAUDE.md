@@ -160,8 +160,6 @@ Shared utility: `supabase/functions/_shared/supabase-admin.ts`.
 ### Auth
 | Method | Path | Mô tả |
 |--------|------|-------|
-| POST | `/api/auth/send-otp` | Gửi OTP SMS (rate limit: 3/10min) |
-| POST | `/api/auth/verify-otp` | Xác minh OTP + đánh dấu phone_verified |
 | POST | `/api/auth/complete-onboarding` | Lưu thông tin onboarding |
 | GET | `/auth/callback` | Supabase OAuth callback |
 
@@ -329,8 +327,6 @@ Shared utility: `supabase/functions/_shared/supabase-admin.ts`.
 | Variable | Mô tả |
 |----------|-------|
 | `SUPABASE_SERVICE_ROLE_KEY` | Bypass RLS — server-side only |
-| `SMS_PROVIDER_API_KEY` | SpeedSMS / eSMS API key |
-| `SMS_SENDER_ID` | SMS sender ID (mặc định: BodiX) |
 | `ZALO_OA_ACCESS_TOKEN` | Zalo OA token cho ZNS |
 | `ZALO_ZNS_TEMPLATE_MORNING` | Template ID tin nhắn sáng |
 | `ZALO_ZNS_TEMPLATE_RESCUE` | Template ID tin nhắn rescue |

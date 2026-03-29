@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
@@ -33,6 +33,7 @@ function GoogleIcon() {
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function SignupPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -47,7 +48,6 @@ export default function SignupPage() {
   const [referralValidating, setReferralValidating] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [success, setSuccess] = useState(false);
 
   useEffect(() => {
     const ref = searchParams.get("ref")?.trim().toUpperCase();
@@ -114,7 +114,6 @@ export default function SignupPage() {
   const handleEmailSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    setSuccess(false);
 
     const validationError = validate();
     if (validationError) {
@@ -157,7 +156,8 @@ export default function SignupPage() {
         } catch {}
       }
 
-      setSuccess(true);
+      router.push("/onboarding");
+      router.refresh();
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
     } finally {
@@ -187,36 +187,6 @@ export default function SignupPage() {
       setLoading(false);
     }
   };
-
-  if (success) {
-    return (
-      <div className="relative w-full">
-        <div className="rounded-2xl border border-white/10 bg-white/95 p-6 shadow-xl backdrop-blur-sm sm:p-8">
-          <div
-            role="status"
-            className="rounded-lg border border-success/30 bg-success/10 p-4 text-center"
-          >
-            <p className="font-medium text-primary">
-              Kiểm tra email để xác nhận tài khoản.
-            </p>
-            <p className="mt-2 text-sm text-neutral-600">
-              Chúng tôi đã gửi link xác nhận đến <strong>{email}</strong>. Vui
-              lòng kiểm tra hộp thư (và thư mục spam).
-            </p>
-          </div>
-          <p className="mt-6 text-center text-sm text-neutral-600">
-            Đã có tài khoản?{" "}
-            <Link
-              href="/login"
-              className="font-semibold text-primary hover:text-primary-dark hover:underline"
-            >
-              Đăng nhập
-            </Link>
-          </p>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative w-full">

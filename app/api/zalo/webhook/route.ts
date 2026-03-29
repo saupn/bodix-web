@@ -112,6 +112,11 @@ async function handleUserMessage(payload: any) {
   const zaloUserId = payload.sender.id;
   const messageText = payload.message?.text || '';
 
+  console.log('=== DEBUG handleUserMessage ===');
+  console.log('Raw message text:', payload.message?.text);
+  console.log('Trimmed + uppercase:', payload.message?.text?.trim().toUpperCase());
+  console.log('Regex match:', /^[A-Z0-9]{5}$/.test(payload.message?.text?.trim().toUpperCase() || ''));
+
   // ── Verify code check (phone verification via Zalo OA) ──
   const codeCandidate = messageText.trim().toUpperCase();
   if (/^[A-Z0-9]{5}$/.test(codeCandidate)) {

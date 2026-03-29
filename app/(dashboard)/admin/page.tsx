@@ -39,6 +39,8 @@ interface OverviewData {
     signups: number;
     purchases: number;
     revenue: number;
+    voucher_outstanding: number;
+    affiliate_pending: number;
   };
   charts: {
     completion_daily: { date: string; rate_21: number; rate_6w: number; rate_12w: number }[];
@@ -202,6 +204,8 @@ export default function AdminDashboardPage() {
               { label: "Signups", value: today.signups },
               { label: "Purchases", value: today.purchases },
               { label: "Revenue", value: `${today.revenue.toLocaleString("vi-VN")}đ` },
+              { label: "Voucher outstanding", value: `${(today.voucher_outstanding ?? 0).toLocaleString("vi-VN")}đ` },
+              { label: "Affiliate pending", value: `${(today.affiliate_pending ?? 0).toLocaleString("vi-VN")}đ` },
             ].map((item) => (
               <div
                 key={item.label}

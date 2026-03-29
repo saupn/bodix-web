@@ -61,6 +61,12 @@ export default function AdminReferralPage() {
     page: number;
     has_more: boolean;
   }>({ conversions: [], page: 0, has_more: false });
+  const [voucherStats, setVoucherStats] = useState<{
+    total_issued: number;
+    outstanding_amount: number;
+    used_count: number;
+    expired_count: number;
+  } | null>(null);
   const [loading, setLoading] = useState<Record<string, boolean>>({});
 
   const [codeFilters, setCodeFilters] = useState({
@@ -78,7 +84,12 @@ export default function AdminReferralPage() {
     setLoading((l) => ({ ...l, overview: true }));
     try {
       const r = await fetch("/api/admin/referral/overview");
-      if (r.ok) setOverview(await r.json());
+      if (r.ok) {
+        const d = await r.json();
+        setOverview(d);
+        // Voucher stats will be included in overview response when API is ready
+        if (d.voucher_stats) setVoucherStats(d.voucher_stats);
+      }
     } finally {
       setLoading((l) => ({ ...l, overview: false }));
     }
@@ -201,6 +212,40 @@ export default function AdminReferralPage() {
                     <p className="mt-1 text-2xl font-bold text-primary">
                       {overview.referral_share}%
                     </p>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="font-heading text-lg font-semibold text-primary">
+                    Voucher Statistics
+                  </h3>
+                  <div className="mt-3 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                    <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                      <p className="text-sm text-neutral-500">Voucher đã phát</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {voucherStats ? voucherStats.total_issued : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                      <p className="text-sm text-neutral-500">Voucher outstanding</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {voucherStats
+                          ? `${voucherStats.outstanding_amount.toLocaleString("vi-VN")}đ`
+                          : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                      <p className="text-sm text-neutral-500">Voucher đã dùng</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {voucherStats ? voucherStats.used_count : "—"}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+                      <p className="text-sm text-neutral-500">Voucher hết hạn</p>
+                      <p className="mt-1 text-2xl font-bold text-primary">
+                        {voucherStats ? voucherStats.expired_count : "—"}
+                      </p>
+                    </div>
                   </div>
                 </div>
 

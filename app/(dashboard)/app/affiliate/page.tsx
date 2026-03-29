@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { Copy, Plus, Trash2 } from "lucide-react";
+import { Copy } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -16,20 +16,13 @@ import {
 
 const PARTNER_BASE = "https://bodix.vn/p";
 const COMMISSION_RATE = 40;
-const MIN_WITHDRAWAL = 200_000;
+const MIN_WITHDRAWAL = 500_000;
 const TIER_LABEL: Record<string, string> = {
   basic: "🥉 Basic",
   silver: "🥈 Silver",
   gold: "🥇 Gold",
   platinum: "💎 Platinum",
 };
-const PLATFORM_OPTIONS = [
-  { id: "instagram", label: "Instagram" },
-  { id: "facebook", label: "Facebook" },
-  { id: "tiktok", label: "TikTok" },
-  { id: "youtube", label: "YouTube" },
-  { id: "other", label: "Khác" },
-];
 
 interface StatusData {
   has_profile: boolean;
@@ -70,12 +63,6 @@ interface DashboardData {
   withdrawal_history: { id: string; amount: number; created_at: string; description: string }[];
 }
 
-interface SocialChannel {
-  platform: string;
-  url: string;
-  followers: number;
-}
-
 function formatDate(dateStr: string): string {
   if (!dateStr) return "—";
   return new Date(dateStr).toLocaleDateString("vi-VN", {
@@ -91,18 +78,6 @@ export default function AffiliatePage() {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
-
-  // Apply form state
-  const [socialChannels, setSocialChannels] = useState<SocialChannel[]>([
-    { platform: "instagram", url: "", followers: 0 },
-  ]);
-  const [motivation, setMotivation] = useState("");
-  const [bankName, setBankName] = useState("");
-  const [bankAccount, setBankAccount] = useState("");
-  const [bankAccountName, setBankAccountName] = useState("");
-  const [applySubmitting, setApplySubmitting] = useState(false);
-  const [applySuccess, setApplySuccess] = useState(false);
-  const [applyError, setApplyError] = useState<string | null>(null);
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -166,47 +141,6 @@ export default function AffiliatePage() {
     a.click();
   };
 
-  const addSocialChannel = () => {
-    setSocialChannels((prev) => [...prev, { platform: "instagram", url: "", followers: 0 }]);
-  };
-  const removeSocialChannel = (i: number) => {
-    setSocialChannels((prev) => prev.filter((_, j) => j !== i));
-  };
-  const updateSocialChannel = (i: number, field: keyof SocialChannel, value: string | number) => {
-    setSocialChannels((prev) =>
-      prev.map((ch, j) => (j === i ? { ...ch, [field]: value } : ch))
-    );
-  };
-
-  const handleApply = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setApplySubmitting(true);
-    setApplyError(null);
-    setApplySuccess(false);
-    try {
-      const res = await fetch("/api/affiliate/apply", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          social_channels: socialChannels.filter((ch) => ch.platform && ch.url),
-          motivation: motivation.trim(),
-          bank_name: bankName.trim() || undefined,
-          bank_account_number: bankAccount.trim() || undefined,
-          bank_account_name: bankAccountName.trim() || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (res.ok && data.status === "pending_review") {
-        setApplySuccess(true);
-        setStatus({ has_profile: true, is_approved: false });
-      } else {
-        setApplyError(data.error ?? "Không thể gửi đăng ký.");
-      }
-    } finally {
-      setApplySubmitting(false);
-    }
-  };
-
   const handleUpdateBank = async () => {
     const res = await fetch("/api/affiliate/profile", {
       method: "PATCH",
@@ -259,131 +193,49 @@ export default function AffiliatePage() {
     );
   }
 
-  // ── Chưa có affiliate: trang đăng ký ─────────────────────────────────────
+  // ── Chưa có affiliate: trang giới thiệu + link đăng ký ───────────────────
   if (!status?.has_profile) {
     return (
       <div className="mx-auto max-w-2xl space-y-8 pb-16">
         <div>
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-            Trở thành Đối tác BodiX 🤝
+            Chương trình Đối tác BodiX
           </h1>
           <p className="mt-2 text-neutral-600">
-            Nhận {COMMISSION_RATE}% mỗi đơn hàng qua link của bạn
+            Dành cho KOL, PT, và content creator muốn cùng BodiX lan tỏa lối sống khỏe mạnh.
           </p>
         </div>
 
-        <div className="rounded-xl border border-neutral-200 bg-white p-6">
-          <h2 className="font-heading font-semibold text-primary">Điều kiện</h2>
-          <ul className="mt-2 list-inside list-disc text-neutral-600">
-            <li>Đã hoàn thành ít nhất 1 chương trình BodiX</li>
-            <li>Hoặc có 1.000+ followers trên mạng xã hội</li>
-          </ul>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div className="rounded-xl border border-neutral-200 bg-white p-5">
+            <p className="text-2xl font-bold text-primary">{COMMISSION_RATE}%</p>
+            <p className="mt-1 text-sm text-neutral-600">Hoa hồng trên mỗi đơn hàng thực tế</p>
+          </div>
+          <div className="rounded-xl border border-neutral-200 bg-white p-5">
+            <p className="text-2xl font-bold text-primary">10%</p>
+            <p className="mt-1 text-sm text-neutral-600">Giảm giá cho người dùng qua link của bạn</p>
+          </div>
         </div>
 
-        {applySuccess ? (
-          <div className="rounded-xl border-2 border-green-200 bg-green-50 p-6 text-center">
-            <p className="font-medium text-green-800">
-              Đăng ký đang được xem xét. Chúng tôi sẽ phản hồi trong 24h.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleApply} className="space-y-6 rounded-xl border border-neutral-200 bg-white p-6">
-            <h2 className="font-heading font-semibold text-primary">Đăng ký</h2>
+        <div className="rounded-xl border border-neutral-200 bg-white p-6">
+          <h2 className="font-heading font-semibold text-primary">Cách tham gia</h2>
+          <ol className="mt-3 list-inside list-decimal space-y-2 text-neutral-600">
+            <li>Đăng ký tại trang đối tác</li>
+            <li>Admin xem xét và phản hồi trong 1-2 ngày</li>
+            <li>Nhận link giới thiệu riêng và bắt đầu kiếm hoa hồng</li>
+          </ol>
+        </div>
 
-            <div>
-              <label className="block text-sm font-medium">Kênh mạng xã hội</label>
-              {socialChannels.map((ch, i) => (
-                <div key={i} className="mt-2 flex flex-wrap gap-2">
-                  <select
-                    value={ch.platform}
-                    onChange={(e) => updateSocialChannel(i, "platform", e.target.value)}
-                    className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  >
-                    {PLATFORM_OPTIONS.map((p) => (
-                      <option key={p.id} value={p.id}>{p.label}</option>
-                    ))}
-                  </select>
-                  <input
-                    type="url"
-                    placeholder="URL"
-                    value={ch.url}
-                    onChange={(e) => updateSocialChannel(i, "url", e.target.value)}
-                    className="flex-1 min-w-[120px] rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  />
-                  <input
-                    type="number"
-                    placeholder="Followers"
-                    value={ch.followers || ""}
-                    onChange={(e) => updateSocialChannel(i, "followers", parseInt(e.target.value, 10) || 0)}
-                    className="w-24 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSocialChannel(i)}
-                    className="rounded-lg p-2 text-red-600 hover:bg-red-50"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-              ))}
-              <button
-                type="button"
-                onClick={addSocialChannel}
-                className="mt-2 flex items-center gap-2 text-sm font-medium text-primary"
-              >
-                <Plus className="h-4 w-4" /> Thêm kênh
-              </button>
-            </div>
+        <a
+          href="/affiliate"
+          className="block w-full rounded-lg bg-primary px-4 py-3 text-center font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
+        >
+          Đăng ký làm Đối tác
+        </a>
 
-            <div>
-              <label className="block text-sm font-medium">Lý do muốn làm affiliate</label>
-              <textarea
-                value={motivation}
-                onChange={(e) => setMotivation(e.target.value)}
-                rows={4}
-                required
-                className="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                placeholder="Chia sẻ lý do của bạn..."
-              />
-            </div>
-
-            <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
-              <p className="text-sm font-medium text-neutral-600">Thông tin ngân hàng (tùy chọn, điền sau)</p>
-              <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <input
-                  type="text"
-                  placeholder="Ngân hàng"
-                  value={bankName}
-                  onChange={(e) => setBankName(e.target.value)}
-                  className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Số tài khoản"
-                  value={bankAccount}
-                  onChange={(e) => setBankAccount(e.target.value)}
-                  className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                />
-                <input
-                  type="text"
-                  placeholder="Tên chủ tài khoản"
-                  value={bankAccountName}
-                  onChange={(e) => setBankAccountName(e.target.value)}
-                  className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-                />
-              </div>
-            </div>
-
-            {applyError && <p className="text-sm text-red-600">{applyError}</p>}
-            <button
-              type="submit"
-              disabled={applySubmitting}
-              className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-white hover:bg-primary-dark disabled:opacity-50"
-            >
-              {applySubmitting ? "Đang gửi..." : "Gửi đăng ký"}
-            </button>
-          </form>
-        )}
+        <p className="text-center text-sm text-neutral-400">
+          Có câu hỏi? Liên hệ <a href="mailto:partner@bodix.vn" className="text-primary hover:underline">partner@bodix.vn</a>
+        </p>
       </div>
     );
   }

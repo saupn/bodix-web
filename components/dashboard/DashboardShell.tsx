@@ -4,18 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake } from "lucide-react";
+import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
 import { StreakBadge } from "@/components/completion/StreakBadge";
 import { RescueBanner } from "@/components/rescue/RescueBanner";
 
-const NAV_LINKS = [
+const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
   { href: "/app/programs", label: "Chương trình", icon: Dumbbell },
   { href: "/app/review/history", label: "📝 Review", icon: FileText },
   { href: "/app/referral", label: "🎁 Giới thiệu", icon: Gift },
-  { href: "/app/affiliate", label: "🤝 Đối tác", icon: Handshake },
   { href: "/app/community", label: "👥 Cộng đồng", icon: Users, badgeKey: "community" },
   { href: "/app/progress", label: "📊 Tiến độ", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
@@ -141,7 +140,7 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
     router.refresh();
   };
 
-  const NavLink = ({ href, label, icon: Icon, badgeKey }: (typeof NAV_LINKS)[0]) => (
+  const NavLink = ({ href, label, icon: Icon, badgeKey }: (typeof NAV_LINKS_BASE)[0]) => (
     <Link
       href={href}
       onClick={() => setSidebarOpen(false)}
@@ -198,7 +197,7 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
             {hasActiveProgram && (
               <NavLink key={PROGRAM_NAV.href} {...PROGRAM_NAV} />
             )}
-            {NAV_LINKS.map((link) => (
+            {NAV_LINKS_BASE.map((link) => (
               <NavLink key={link.href} {...link} />
             ))}
           </nav>

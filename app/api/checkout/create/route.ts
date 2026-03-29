@@ -2,15 +2,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  REFERRAL_DISCOUNT_PERCENT,
+  AFFILIATE_DISCOUNT_PERCENT,
+} from "@/lib/affiliate/config";
 
 const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
-// ─── Referral code validation (inline — no HTTP round-trip) ───────────────────
+// ─── Referral / affiliate code validation ─────────────────────────────────────
 
-interface ReferralCodeInfo {
+interface ResolvedCode {
   id: string
-  referee_reward_type: string
-  referee_reward_value: number
+  code_type: "referral" | "affiliate"
 }
 
 async function resolveReferralCode(
@@ -18,12 +21,10 @@ async function resolveReferralCode(
   supabase: any,
   code: string,
   userId: string
-): Promise<{ valid: true; info: ReferralCodeInfo; discount: number; priceAfterDiscount: number; originalPrice: number } |
-            { valid: false }> {
-  // We don't know the program price yet — return the code info; price is passed by caller
+): Promise<{ valid: true; info: ResolvedCode } | { valid: false }> {
   const { data } = await supabase
     .from("referral_codes")
-    .select("id, user_id, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at")
+    .select("id, user_id, code_type, is_active, max_uses, total_conversions, expires_at")
     .eq("code", code.trim().toUpperCase())
     .maybeSingle();
 
@@ -37,31 +38,48 @@ async function resolveReferralCode(
     valid: true,
     info: {
       id: data.id,
-      referee_reward_type: data.referee_reward_type,
-      referee_reward_value: data.referee_reward_value,
+      code_type: data.code_type ?? "referral",
     },
-    // placeholder — caller must fill discount + priceAfterDiscount with actual price
-    discount: 0,
-    priceAfterDiscount: 0,
-    originalPrice: 0,
   };
 }
 
-function computeDiscount(
-  originalPrice: number,
-  rewardType: string,
-  rewardValue: number
-): number {
-  if (rewardType === "discount_percent") {
-    return Math.round(originalPrice * (rewardValue / 100));
-  }
-  if (rewardType === "discount_fixed") {
-    return Math.min(rewardValue, originalPrice); // never exceed price
-  }
-  return 0;
+function computeDiscount(originalPrice: number, codeType: "referral" | "affiliate"): number {
+  const pct = codeType === "affiliate" ? AFFILIATE_DISCOUNT_PERCENT : REFERRAL_DISCOUNT_PERCENT;
+  return Math.round(originalPrice * (pct / 100));
 }
 
-// ─── POST ─────────────────────────────────────────────────────────────────────
+// ─── Voucher validation ───────────────────────────────────────────────────────
+
+interface ResolvedVoucher {
+  id: string
+  remaining_amount: number
+}
+
+async function resolveVoucher(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any,
+  code: string,
+  userId: string
+): Promise<{ valid: true; voucher: ResolvedVoucher } | { valid: false }> {
+  const { data } = await service
+    .from("vouchers")
+    .select("id, user_id, remaining_amount, status, expires_at")
+    .eq("code", code.trim().toUpperCase())
+    .eq("user_id", userId)
+    .maybeSingle();
+
+  if (!data) return { valid: false };
+  if (data.status !== "active") return { valid: false };
+  if (new Date(data.expires_at) < new Date()) return { valid: false };
+  if (data.remaining_amount <= 0) return { valid: false };
+
+  return {
+    valid: true,
+    voucher: { id: data.id, remaining_amount: data.remaining_amount },
+  };
+}
+
+// ─── POST ──���────────────────────────────────��─────────────────────────��───────
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -73,7 +91,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
   }
 
-  let body: { slug?: string; payment_method?: string; referral_code?: string };
+  let body: {
+    slug?: string;
+    payment_method?: string;
+    referral_code?: string;
+    voucher_code?: string;
+  };
   try {
     body = await request.json();
   } catch {
@@ -82,7 +105,7 @@ export async function POST(request: NextRequest) {
 
   const slug = body.slug;
   if (!slug || !VALID_SLUGS.includes(slug as (typeof VALID_SLUGS)[number])) {
-    return NextResponse.json({ error: "Chương trình không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: "Ch��ơng trình không hợp lệ." }, { status: 400 });
   }
 
   const paymentMethod = body.payment_method ?? "bank_transfer";
@@ -93,7 +116,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // ── Fetch program ─────────────────────────────────────────────────────────
+  // ── Fetch program ────────────────���────────────────────────────────────────
   const { data: program } = await supabase
     .from("programs")
     .select("id, name, slug, price_vnd")
@@ -126,36 +149,49 @@ export async function POST(request: NextRequest) {
 
   if (existing) {
     return NextResponse.json(
-      { error: "Bạn đã đăng ký chương trình này.", redirect: "/app/checkout/success?slug=" + slug },
+      { error: "Bạn đã ��ăng ký chương trình này.", redirect: "/app/checkout/success?slug=" + slug },
       { status: 409 }
     );
   }
 
-  // ── Resolve referral code (soft-fail) ─────────────────────────────────────
+  const service = createServiceClient();
+
+  // ���─ Resolve referral / affiliate code (soft-fail) ���────────────────────────
   let referralCodeId: string | null = null;
-  let discountAmount = 0;
-  let finalPrice = program.price_vnd;
-  let referralApplied = false;
+  let referralDiscountAmount = 0;
+  let codeType: "referral" | "affiliate" | null = null;
 
   if (body.referral_code?.trim()) {
     const result = await resolveReferralCode(supabase, body.referral_code, user.id);
     if (result.valid) {
-      discountAmount = computeDiscount(
-        program.price_vnd,
-        result.info.referee_reward_type,
-        result.info.referee_reward_value
-      );
-      if (discountAmount > 0) {
+      referralDiscountAmount = computeDiscount(program.price_vnd, result.info.code_type);
+      if (referralDiscountAmount > 0) {
         referralCodeId = result.info.id;
-        finalPrice = program.price_vnd - discountAmount;
-        referralApplied = true;
+        codeType = result.info.code_type;
       }
     }
-    // Invalid code → silently ignored (soft fail as per spec)
   }
 
+  // ── Resolve voucher (soft-fail) ───────────���───────────────────────────────
+  let voucherId: string | null = null;
+  let voucherDiscountAmount = 0;
+
+  const priceAfterCodeDiscount = program.price_vnd - referralDiscountAmount;
+
+  if (body.voucher_code?.trim()) {
+    const vResult = await resolveVoucher(service, body.voucher_code, user.id);
+    if (vResult.valid) {
+      // Voucher can cover up to the remaining price after % discount
+      voucherDiscountAmount = Math.min(vResult.voucher.remaining_amount, priceAfterCodeDiscount);
+      if (voucherDiscountAmount > 0) {
+        voucherId = vResult.voucher.id;
+      }
+    }
+  }
+
+  const finalPrice = Math.max(0, priceAfterCodeDiscount - voucherDiscountAmount);
+
   // ── Insert enrollment ─────────────────────────────────────────────────────
-  const service = createServiceClient();
   const { data: enrollment, error } = await service
     .from("enrollments")
     .insert({
@@ -166,7 +202,9 @@ export async function POST(request: NextRequest) {
       payment_method: paymentMethod,
       amount_paid: 0,
       referral_code_id: referralCodeId,
-      referral_discount_amount: discountAmount,
+      referral_discount_amount: referralDiscountAmount,
+      voucher_id: voucherId,
+      voucher_discount_amount: voucherDiscountAmount,
     })
     .select("id")
     .single();
@@ -174,7 +212,7 @@ export async function POST(request: NextRequest) {
   if (error || !enrollment) {
     console.error("[checkout/create] insert failed:", error);
     return NextResponse.json(
-      { error: "Không thể tạo đơn đăng ký. Vui lòng thử lại." },
+      { error: "Không thể tạo ��ơn đăng ký. Vui lòng thử lại." },
       { status: 500 }
     );
   }
@@ -184,9 +222,12 @@ export async function POST(request: NextRequest) {
     enrollment_id: enrollment.id,
     pricing: {
       original_price: program.price_vnd,
-      discount_amount: discountAmount,
+      referral_discount_amount: referralDiscountAmount,
+      voucher_discount_amount: voucherDiscountAmount,
       final_price: finalPrice,
-      referral_applied: referralApplied,
+      code_type: codeType,
+      referral_applied: referralCodeId !== null,
+      voucher_applied: voucherId !== null,
     },
     redirect: `/app/checkout/success?slug=${slug}`,
   });

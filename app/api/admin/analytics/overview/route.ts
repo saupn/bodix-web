@@ -118,6 +118,27 @@ export async function GET() {
   const droppedCount = churnRows.filter(e => e.status === 'dropped').length
   const churnRate = churnRows.length ? Math.round(droppedCount / churnRows.length * 1000) / 10 : 0
 
+  // Voucher outstanding (total remaining_amount of active vouchers)
+  const { data: voucherStats } = await service
+    .from('vouchers')
+    .select('remaining_amount')
+    .eq('status', 'active')
+    .gt('expires_at', new Date().toISOString())
+
+  const voucherOutstanding = (voucherStats ?? []).reduce(
+    (sum: number, v: { remaining_amount: number }) => sum + v.remaining_amount, 0
+  )
+
+  // Affiliate pending balance
+  const { data: affiliateStats } = await service
+    .from('affiliate_profiles')
+    .select('pending_balance')
+    .eq('is_approved', true)
+
+  const affiliatePending = (affiliateStats ?? []).reduce(
+    (sum: number, a: { pending_balance: number }) => sum + (a.pending_balance ?? 0), 0
+  )
+
   const revenueToday = todayPurchaseRows.reduce((s, e) => s + (e.amount_paid ?? 0), 0)
   const checkinRate = (activeCount as number) > 0
     ? Math.round((todayCheckinCount as number) / (activeCount as number) * 1000) / 10
@@ -252,6 +273,8 @@ export async function GET() {
       signups: todaySignupCount,
       purchases: todayPurchaseRows.length,
       revenue: revenueToday,
+      voucher_outstanding: voucherOutstanding,
+      affiliate_pending: affiliatePending,
     },
     charts: {
       completion_daily: chart_completion_daily,

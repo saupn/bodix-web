@@ -24,6 +24,8 @@ export interface PaymentMethod {
  * available=false + comingSoon=true → hiển thị "Sắp có" trên UI.
  */
 export function getPaymentMethods(): PaymentMethod[] {
+  const momoEnabled = process.env.NEXT_PUBLIC_MOMO_ENABLED === 'true'
+
   return [
     {
       id: 'bank_transfer',
@@ -37,32 +39,8 @@ export function getPaymentMethods(): PaymentMethod[] {
       name: 'MoMo',
       description: 'Thanh toán qua ví MoMo',
       icon: 'momo',
-      available: false,
-      comingSoon: true,
-    },
-    {
-      id: 'vnpay',
-      name: 'VNPay',
-      description: 'ATM, Visa, Mastercard qua cổng VNPay',
-      icon: 'vnpay',
-      available: false,
-      comingSoon: true,
-    },
-    {
-      id: 'zalopay',
-      name: 'ZaloPay',
-      description: 'Thanh toán qua ví ZaloPay',
-      icon: 'zalopay',
-      available: false,
-      comingSoon: true,
-    },
-    {
-      id: 'stripe',
-      name: 'Thẻ quốc tế',
-      description: 'Visa / Mastercard cho khách quốc tế — powered by Stripe',
-      icon: 'stripe',
-      available: false,
-      comingSoon: true,
+      available: momoEnabled,
+      comingSoon: !momoEnabled,
     },
   ]
 }

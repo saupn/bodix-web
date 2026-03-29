@@ -4,14 +4,38 @@ import { useEffect, useState, useCallback } from "react";
 
 type TabId = "applications" | "active" | "withdrawals" | "payouts";
 
+const PARTNER_TYPE_LABEL: Record<string, string> = {
+  pt: "PT / Trainer",
+  kol: "KOL / Influencer",
+  gym_owner: "Chủ phòng gym",
+  blogger: "Blogger / Creator",
+  other: "Khác",
+};
+
+const CHANNEL_LABEL: Record<string, string> = {
+  zalo: "Zalo",
+  facebook: "Facebook",
+  instagram: "Instagram",
+  tiktok: "TikTok",
+  youtube: "YouTube",
+  website: "Website / Blog",
+  offline: "Offline",
+};
+
 interface AffiliateRow {
   affiliate_id: string;
-  user_id: string;
+  user_id: string | null;
   full_name: string;
   affiliate_tier: string;
   social_channels: unknown[];
   max_followers: number;
   motivation: string | null;
+  phone?: string | null;
+  email?: string | null;
+  partner_type?: string | null;
+  primary_channel?: string | null;
+  social_link?: string | null;
+  estimated_audience?: string | null;
   stats: { total_earned: number; total_paid: number; pending_balance: number };
   code: {
     code: string;
@@ -382,20 +406,41 @@ export default function AdminAffiliatePage() {
                       key={a.affiliate_id}
                       className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm"
                     >
-                      <div className="flex items-start justify-between">
-                        <div>
+                      <div className="flex items-start justify-between gap-4">
+                        <div className="flex-1 space-y-1.5">
                           <h3 className="font-semibold text-neutral-800">{a.full_name}</h3>
-                          <p className="mt-1 text-sm text-neutral-600">
-                            Social: {Array.isArray(a.social_channels) ? (a.social_channels as { platform?: string; followers?: number }[]).map((c) => `${c.platform ?? ''} (${c.followers ?? 0} followers)`).join(", ") : "—"}
-                          </p>
-                          <p className="mt-1 text-sm text-neutral-600">
-                            Followers: {a.max_followers?.toLocaleString() ?? "—"}
-                          </p>
-                          <p className="mt-1 text-sm text-neutral-500">
-                            Motivation: {a.motivation ?? "—"}
-                          </p>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-600">
+                            {a.partner_type && (
+                              <span>{PARTNER_TYPE_LABEL[a.partner_type] ?? a.partner_type}</span>
+                            )}
+                            {a.primary_channel && (
+                              <span>Kênh: {CHANNEL_LABEL[a.primary_channel] ?? a.primary_channel}</span>
+                            )}
+                          </div>
+                          <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-neutral-500">
+                            {a.phone && <span>SĐT: {a.phone}</span>}
+                            {a.email && <span>Email: {a.email}</span>}
+                          </div>
+                          {a.social_link && (
+                            <p className="text-sm text-neutral-500">
+                              Link: <a href={a.social_link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">{a.social_link}</a>
+                            </p>
+                          )}
+                          {a.estimated_audience && (
+                            <p className="text-sm text-neutral-500">Audience: {a.estimated_audience}</p>
+                          )}
+                          {!a.partner_type && Array.isArray(a.social_channels) && (
+                            <p className="text-sm text-neutral-600">
+                              Social: {(a.social_channels as { platform?: string; followers?: number }[]).map((c) => `${c.platform ?? ''} (${c.followers ?? 0})`).join(", ") || "—"}
+                            </p>
+                          )}
+                          {a.motivation && (
+                            <p className="text-sm text-neutral-500 italic">
+                              &ldquo;{a.motivation}&rdquo;
+                            </p>
+                          )}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex shrink-0 gap-2">
                           <button
                             type="button"
                             onClick={() => {
@@ -404,14 +449,14 @@ export default function AdminAffiliatePage() {
                             }}
                             className="rounded bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary-dark"
                           >
-                            Approve
+                            Duyệt
                           </button>
                           <button
                             type="button"
                             onClick={() => setModalReject(a)}
                             className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50"
                           >
-                            Reject
+                            Từ chối
                           </button>
                         </div>
                       </div>

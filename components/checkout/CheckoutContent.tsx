@@ -51,10 +51,24 @@ export function CheckoutContent({
   phone,
 }: CheckoutContentProps) {
   const [referralDiscount, setReferralDiscount] = useState(0);
-  const finalPrice = Math.max(0, program.price_vnd - referralDiscount);
-  const handleReferralChange = useCallback((valid: boolean, discount: number) => {
+  const [referralCodeType, setReferralCodeType] = useState<string | null>(null);
+  const [voucherDiscount, setVoucherDiscount] = useState(0);
+
+  const totalDiscount = referralDiscount + voucherDiscount;
+  const finalPrice = Math.max(0, program.price_vnd - totalDiscount);
+
+  const handleReferralChange = useCallback((valid: boolean, discount: number, codeType?: string) => {
     setReferralDiscount(valid ? discount : 0);
+    setReferralCodeType(valid && codeType ? codeType : null);
   }, []);
+
+  const handleVoucherChange = useCallback((valid: boolean, discount: number) => {
+    setVoucherDiscount(valid ? discount : 0);
+  }, []);
+
+  const discountLabel = referralCodeType === "affiliate"
+    ? "Giảm từ đối tác"
+    : "Giảm từ mã giới thiệu";
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -71,6 +85,7 @@ export function CheckoutContent({
             phone={phone}
             priceVnd={program.price_vnd}
             onReferralChange={handleReferralChange}
+            onVoucherChange={handleVoucherChange}
           />
         </div>
       </div>
@@ -110,24 +125,29 @@ export function CheckoutContent({
 
           {referralDiscount > 0 && (
             <div className="mt-3 flex items-baseline justify-between text-success">
-              <span>Giảm từ mã giới thiệu</span>
+              <span>{discountLabel}</span>
               <span className="font-medium">-{formatPrice(referralDiscount)}</span>
             </div>
           )}
 
+          {voucherDiscount > 0 && (
+            <div className="mt-3 flex items-baseline justify-between text-success">
+              <span>Voucher</span>
+              <span className="font-medium">-{formatPrice(voucherDiscount)}</span>
+            </div>
+          )}
+
           {cohort && (
-            <>
-              <div className="mt-3 text-sm">
-                <p className="font-medium text-neutral-700">
-                  {cohort.name} — Bắt đầu {formatDate(cohort.start_date)}
-                </p>
-                <p className="mt-1 text-accent">
-                  Số chỗ còn lại:{" "}
-                  {Math.max(0, cohort.max_members - (cohort.current_members ?? 0))}/
-                  {cohort.max_members} chỗ
-                </p>
-              </div>
-            </>
+            <div className="mt-3 text-sm">
+              <p className="font-medium text-neutral-700">
+                {cohort.name} — Bắt đầu {formatDate(cohort.start_date)}
+              </p>
+              <p className="mt-1 text-accent">
+                Số chỗ còn lại:{" "}
+                {Math.max(0, cohort.max_members - (cohort.current_members ?? 0))}/
+                {cohort.max_members} chỗ
+              </p>
+            </div>
           )}
 
           {!cohort && (
@@ -144,10 +164,6 @@ export function CheckoutContent({
               {formatPrice(finalPrice)}
             </span>
           </div>
-
-          <p className="mt-4 flex items-center gap-2 text-xs text-neutral-500">
-            <span>🔒</span> Thanh toán bảo mật
-          </p>
         </div>
       </div>
     </div>

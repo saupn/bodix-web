@@ -70,12 +70,22 @@ export default async function ProfilePage() {
           </div>
         </dl>
       </div>
-      <div className="mt-6">
+      <div className="mt-6 flex flex-wrap gap-3">
         <Link
           href="/app/profile/notifications"
           className="inline-flex items-center rounded-lg border border-neutral-200 bg-white px-4 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:border-primary hover:text-primary"
         >
           Cài đặt thông báo
+        </Link>
+      </div>
+
+      {/* Affiliate link */}
+      <div className="mt-8 border-t border-neutral-200 pt-6">
+        <Link
+          href="/affiliate"
+          className="text-sm text-neutral-500 hover:text-primary transition-colors"
+        >
+          Trở thành đối tác BodiX &rarr;
         </Link>
       </div>
     </div>

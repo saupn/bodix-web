@@ -2,11 +2,11 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { CreditCard, Building2, Smartphone, Wallet } from "lucide-react";
+import { Building2, Wallet, Ticket } from "lucide-react";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
 
-type PaymentMethod = "card" | "bank_transfer" | "momo" | "vnpay";
+type PaymentMethod = "bank_transfer" | "momo";
 
 interface CheckoutFormProps {
   slug: string;
@@ -15,7 +15,8 @@ interface CheckoutFormProps {
   email: string;
   phone: string;
   priceVnd: number;
-  onReferralChange?: (valid: boolean, discount: number, referrerName?: string) => void;
+  onReferralChange?: (valid: boolean, discount: number, codeType?: string, referrerName?: string) => void;
+  onVoucherChange?: (valid: boolean, discount: number) => void;
 }
 
 export function CheckoutForm({
@@ -26,6 +27,7 @@ export function CheckoutForm({
   phone,
   priceVnd,
   onReferralChange,
+  onVoucherChange,
 }: CheckoutFormProps) {
   const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
@@ -33,10 +35,20 @@ export function CheckoutForm({
   const [referralValid, setReferralValid] = useState<{
     valid: boolean;
     referrer_name?: string;
+    code_type?: string;
     discount_percent?: number;
     discount_amount?: number;
   } | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
+
+  // Voucher
+  const [voucherCode, setVoucherCode] = useState("");
+  const [voucherValid, setVoucherValid] = useState<{
+    valid: boolean;
+    remaining_amount?: number;
+  } | null>(null);
+  const [voucherValidating, setVoucherValidating] = useState(false);
+
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -46,6 +58,8 @@ export function CheckoutForm({
       if (stored) setReferralCode(stored);
     } catch {}
   }, []);
+
+  // ── Referral code validation ──────────────────────────────────────────────
 
   useEffect(() => {
     if (!referralCode.trim()) {
@@ -64,20 +78,22 @@ export function CheckoutForm({
           setReferralValid({
             valid: true,
             referrer_name: data.referrer_name,
+            code_type: data.code_type,
             discount_percent: pct,
             discount_amount: discountAmount,
           });
-          onReferralChange?.(true, discountAmount, data.referrer_name);
+          onReferralChange?.(true, discountAmount, data.code_type, data.referrer_name);
         } else if (data.valid && data.referee_reward_type === "discount_fixed" && data.referee_reward_value) {
           const discountAmount = Math.min(data.referee_reward_value, priceVnd);
           setReferralValid({
             valid: true,
             referrer_name: data.referrer_name,
+            code_type: data.code_type,
             discount_amount: discountAmount,
           });
-          onReferralChange?.(true, discountAmount, data.referrer_name);
+          onReferralChange?.(true, discountAmount, data.code_type, data.referrer_name);
         } else if (data.valid) {
-          setReferralValid({ valid: true, referrer_name: data.referrer_name, discount_amount: 0 });
+          setReferralValid({ valid: true, referrer_name: data.referrer_name, code_type: data.code_type, discount_amount: 0 });
           onReferralChange?.(false, 0);
         } else {
           setReferralValid({ valid: false });
@@ -93,6 +109,42 @@ export function CheckoutForm({
     return () => clearTimeout(timer);
   }, [referralCode, priceVnd, onReferralChange]);
 
+  // ── Voucher code validation ───────────────────────────────────────────────
+
+  useEffect(() => {
+    if (!voucherCode.trim()) {
+      setVoucherValid(null);
+      onVoucherChange?.(false, 0);
+      return;
+    }
+    const timer = setTimeout(async () => {
+      setVoucherValidating(true);
+      try {
+        const res = await fetch(`/api/voucher/validate?code=${encodeURIComponent(voucherCode.trim())}`);
+        const data = await res.json();
+        if (data.valid && data.remaining_amount > 0) {
+          // Max voucher deduction = price after referral discount
+          const referralDiscount = referralValid?.valid ? (referralValid.discount_amount ?? 0) : 0;
+          const priceAfterReferral = priceVnd - referralDiscount;
+          const voucherAmount = Math.min(data.remaining_amount, priceAfterReferral);
+          setVoucherValid({ valid: true, remaining_amount: voucherAmount });
+          onVoucherChange?.(true, voucherAmount);
+        } else {
+          setVoucherValid({ valid: false });
+          onVoucherChange?.(false, 0);
+        }
+      } catch {
+        setVoucherValid({ valid: false });
+        onVoucherChange?.(false, 0);
+      } finally {
+        setVoucherValidating(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [voucherCode, priceVnd, referralValid, onVoucherChange]);
+
+  // ── Submit ────────────────────────────────────────────────────────────────
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -103,8 +155,9 @@ export function CheckoutForm({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           slug,
-          payment_method: paymentMethod === "bank_transfer" ? "bank_transfer" : paymentMethod,
+          payment_method: paymentMethod,
           referral_code: referralValid?.valid ? referralCode.trim() : undefined,
+          voucher_code: voucherValid?.valid ? voucherCode.trim() : undefined,
         }),
       });
       const data = await res.json();
@@ -132,12 +185,6 @@ export function CheckoutForm({
     active: boolean;
   }[] = [
     {
-      key: "card",
-      label: "Thẻ quốc tế (Visa, Mastercard) — Stripe",
-      icon: <CreditCard className="h-5 w-5" />,
-      active: false,
-    },
-    {
       key: "bank_transfer",
       label: "Chuyển khoản ngân hàng",
       icon: <Building2 className="h-5 w-5" />,
@@ -149,13 +196,15 @@ export function CheckoutForm({
       icon: <Wallet className="h-5 w-5" />,
       active: false,
     },
-    {
-      key: "vnpay",
-      label: "VNPay",
-      icon: <Smartphone className="h-5 w-5" />,
-      active: false,
-    },
   ];
+
+  // ── Referral discount label ───────────────────────────────────────────────
+
+  const referralLabel = referralValid?.valid
+    ? referralValid.code_type === "affiliate"
+      ? `Giảm ${referralValid.discount_percent ?? 10}% từ đối tác ${referralValid.referrer_name}`
+      : `Giảm ${referralValid.discount_percent ?? 15}% từ mã giới thiệu ${referralValid.referrer_name}`
+    : null;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -203,34 +252,62 @@ export function CheckoutForm({
         </div>
       </div>
 
-          <div>
-            <label className="block text-sm font-medium text-neutral-600">
-              Mã giới thiệu
-            </label>
-            <input
-              type="text"
-              value={referralCode}
-              onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-              placeholder="BODIX-XXXX (nếu có)"
-              className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
-            />
-            {referralValidating && (
-              <p className="mt-1 text-xs text-neutral-500">Đang kiểm tra...</p>
-            )}
-            {!referralValidating && referralValid?.valid && (
-              <p className="mt-1 text-sm text-success">
-                ✓ {referralValid.referrer_name} đã giới thiệu — Giảm {referralValid.discount_amount?.toLocaleString("vi-VN")}đ
-              </p>
-            )}
-            {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (
-              <p className="mt-1 text-xs text-red-600">Mã không hợp lệ</p>
-            )}
-          </div>
+      {/* Referral code */}
+      <div>
+        <label className="block text-sm font-medium text-neutral-600">
+          Mã giới thiệu / đối tác
+        </label>
+        <input
+          type="text"
+          value={referralCode}
+          onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+          placeholder="VD: LAN, BODIX.PT (nếu có)"
+          className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {referralValidating && (
+          <p className="mt-1 text-xs text-neutral-500">Đang kiểm tra...</p>
+        )}
+        {!referralValidating && referralValid?.valid && referralLabel && (
+          <p className="mt-1 text-sm text-success">
+            ✓ {referralLabel} — Giảm {referralValid.discount_amount?.toLocaleString("vi-VN")}đ
+          </p>
+        )}
+        {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (
+          <p className="mt-1 text-xs text-red-600">Mã không hợp lệ</p>
+        )}
+      </div>
 
-          <div>
-            <h2 className="font-heading text-lg font-semibold text-primary">
-              Phương thức thanh toán
-            </h2>
+      {/* Voucher code */}
+      <div>
+        <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-600">
+          <Ticket className="h-4 w-4" />
+          Voucher
+        </label>
+        <input
+          type="text"
+          value={voucherCode}
+          onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
+          placeholder="VD: V-ABC12 (nếu có)"
+          className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+        />
+        {voucherValidating && (
+          <p className="mt-1 text-xs text-neutral-500">Đang kiểm tra...</p>
+        )}
+        {!voucherValidating && voucherValid?.valid && (
+          <p className="mt-1 text-sm text-success">
+            ✓ Voucher hợp lệ — Giảm {voucherValid.remaining_amount?.toLocaleString("vi-VN")}đ
+          </p>
+        )}
+        {!voucherValidating && voucherValid && !voucherValid.valid && voucherCode.trim() && (
+          <p className="mt-1 text-xs text-red-600">Voucher không hợp lệ hoặc đã hết hạn</p>
+        )}
+      </div>
+
+      {/* Payment method */}
+      <div>
+        <h2 className="font-heading text-lg font-semibold text-primary">
+          Phương thức thanh toán
+        </h2>
         <div className="mt-3 space-y-2">
           {paymentOptions.map((opt) => (
             <label
@@ -267,10 +344,6 @@ export function CheckoutForm({
           {error}
         </p>
       )}
-
-      <p className="flex items-center gap-2 text-sm text-neutral-500">
-        <span>🔒</span> Thanh toán bảo mật
-      </p>
 
       <button
         type="submit"

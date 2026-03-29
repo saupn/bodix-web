@@ -8,10 +8,13 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import {
+  REFERRAL_REWARD_AMOUNT,
+  VOUCHER_EXPIRY_MONTHS,
+  DEFAULT_COMMISSION_RATE,
+} from '@/lib/affiliate/config'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-const REFERRAL_REWARD_AMOUNT = 50_000   // credit credited to referrer
 
 /** Trả về YYYY-MM-DD của ngày thứ Hai gần nhất (hoặc hôm nay nếu là thứ Hai). */
 function nextMonday(from: Date = new Date()): string {
@@ -29,6 +32,16 @@ function addDays(dateStr: string, days: number): string {
   return d.toISOString().split('T')[0]
 }
 
+/** Generate random voucher code: V-XXXXX */
+function generateVoucherCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1 for clarity
+  let code = 'V-'
+  for (let i = 0; i < 5; i++) {
+    code += chars[Math.floor(Math.random() * chars.length)]
+  }
+  return code
+}
+
 // ─── Referral conversion — triggered after successful payment ─────────────────
 
 async function triggerReferralConversion(
@@ -39,13 +52,13 @@ async function triggerReferralConversion(
     refereeUserId: string
     programId: string
     enrollmentId: string
-    conversionAmount: number   // actual VND paid (after discount)
+    conversionAmount: number   // actual VND paid (after all discounts)
   }
 ): Promise<void> {
-  // ── Fetch code (referrer + reward config) ─────────────────────────────────
+  // ── Fetch code (referrer + config) ────────────────────────────────────────
   const { data: code } = await service
     .from('referral_codes')
-    .select('id, user_id, reward_type, reward_value')
+    .select('id, user_id, code_type, commission_rate')
     .eq('id', opts.referralCodeId)
     .single()
 
@@ -65,7 +78,6 @@ async function triggerReferralConversion(
   let trackingId: string
 
   if (tracking) {
-    // Update existing record to converted
     await service
       .from('referral_tracking')
       .update({
@@ -78,7 +90,6 @@ async function triggerReferralConversion(
       .eq('id', tracking.id)
     trackingId = tracking.id
   } else {
-    // No prior click/signup tracked (e.g. deep-link skipped click event) — create directly
     const { data: newTracking, error: createErr } = await service
       .from('referral_tracking')
       .insert({
@@ -119,72 +130,108 @@ async function triggerReferralConversion(
       .eq('id', opts.referralCodeId)
   }
 
-  // ── Create referral reward for referrer ───────────────────────────────────
-  const rewardAmount = code.reward_type === 'credit' ? code.reward_value : REFERRAL_REWARD_AMOUNT
-  const { data: reward, error: rewardErr } = await service
-    .from('referral_rewards')
-    .insert({
-      user_id: code.user_id,
-      referral_tracking_id: trackingId,
-      reward_type: 'credit',
-      reward_value: rewardAmount,
-      reward_description: `Giới thiệu thành công → +${(rewardAmount / 1000).toFixed(0)}k credit`,
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single()
+  const isAffiliate = code.code_type === 'affiliate'
 
-  if (rewardErr) {
-    console.error('[checkout/confirm] referral reward insert:', rewardErr)
-    return
-  }
+  if (isAffiliate) {
+    // ── AFFILIATE: cash commission ──────────────────────────────────────────
+    const commissionRate = code.commission_rate ?? DEFAULT_COMMISSION_RATE
+    const commission = Math.round(opts.conversionAmount * (commissionRate / 100))
 
-  // ── Credit referrer wallet ────────────────────────────────────────────────
-  const { data: currentBalance } = await service.rpc('get_credit_balance', { p_user_id: code.user_id })
-  const balanceBefore = (currentBalance as number) ?? 0
+    if (commission > 0) {
+      const { data: affiliateProfile } = await service
+        .from('affiliate_profiles')
+        .select('id, pending_balance, total_earned')
+        .eq('user_id', code.user_id)
+        .maybeSingle()
 
-  const { error: creditErr } = await service
-    .from('user_credits')
-    .insert({
+      if (affiliateProfile) {
+        await service
+          .from('affiliate_profiles')
+          .update({
+            pending_balance: (affiliateProfile.pending_balance ?? 0) + commission,
+            total_earned: (affiliateProfile.total_earned ?? 0) + commission,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', affiliateProfile.id)
+      }
+
+      // Record in referral_rewards
+      await service.from('referral_rewards').insert({
+        user_id: code.user_id,
+        referral_tracking_id: trackingId,
+        reward_type: 'commission',
+        reward_value: commission,
+        reward_description: `Commission ${commissionRate}% × ${(opts.conversionAmount / 1000).toFixed(0)}k = ${(commission / 1000).toFixed(0)}k`,
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+      })
+    }
+  } else {
+    // ── REFERRAL: voucher 100K for referrer ─────────────────────────────────
+    const rewardAmount = REFERRAL_REWARD_AMOUNT
+
+    // Generate unique voucher code
+    let voucherCode = generateVoucherCode()
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const { data: existing } = await service
+        .from('vouchers')
+        .select('id')
+        .eq('code', voucherCode)
+        .maybeSingle()
+      if (!existing) break
+      voucherCode = generateVoucherCode()
+    }
+
+    // Voucher expires in VOUCHER_EXPIRY_MONTHS months
+    const expiresAt = new Date()
+    expiresAt.setMonth(expiresAt.getMonth() + VOUCHER_EXPIRY_MONTHS)
+
+    const { data: voucher, error: voucherErr } = await service
+      .from('vouchers')
+      .insert({
+        user_id: code.user_id,
+        code: voucherCode,
+        amount: rewardAmount,
+        remaining_amount: rewardAmount,
+        status: 'active',
+        expires_at: expiresAt.toISOString(),
+        source_type: 'referral_reward',
+        source_referral_tracking_id: trackingId,
+      })
+      .select('id')
+      .single()
+
+    if (voucherErr) {
+      console.error('[checkout/confirm] voucher create:', voucherErr)
+    }
+
+    // Record in referral_rewards
+    const { data: reward } = await service
+      .from('referral_rewards')
+      .insert({
+        user_id: code.user_id,
+        referral_tracking_id: trackingId,
+        reward_type: 'credit',
+        reward_value: rewardAmount,
+        reward_description: `Voucher ${(rewardAmount / 1000).toFixed(0)}k (${voucherCode})`,
+        status: 'approved',
+        approved_at: new Date().toISOString(),
+      })
+      .select('id')
+      .single()
+
+    // Also credit user_credits ledger for tracking
+    const { data: currentBalance } = await service.rpc('get_credit_balance', { p_user_id: code.user_id })
+    const balanceBefore = (currentBalance as number) ?? 0
+
+    await service.from('user_credits').insert({
       user_id: code.user_id,
       amount: rewardAmount,
       balance_after: balanceBefore + rewardAmount,
       transaction_type: 'referral_reward',
-      reference_id: reward.id,
-      description: `Referral reward: +${(rewardAmount / 1000).toFixed(0)}k credit`,
+      reference_id: reward?.id ?? voucher?.id ?? null,
+      description: `Voucher ${voucherCode}: +${(rewardAmount / 1000).toFixed(0)}k`,
     })
-
-  if (creditErr) {
-    console.error('[checkout/confirm] credit user:', creditErr)
-  }
-
-  // ── Update affiliate pending_balance if affiliate ─────────────────────────
-  const { data: affiliateProfile } = await service
-    .from('affiliate_profiles')
-    .select('id, pending_balance, total_earned')
-    .eq('user_id', code.user_id)
-    .maybeSingle()
-
-  if (affiliateProfile) {
-    const commissionRate = (await service
-      .from('referral_codes')
-      .select('commission_rate')
-      .eq('id', opts.referralCodeId)
-      .single()
-    ).data?.commission_rate ?? 0
-
-    const commission = Math.round(opts.conversionAmount * (commissionRate / 100))
-    if (commission > 0) {
-      await service
-        .from('affiliate_profiles')
-        .update({
-          pending_balance: (affiliateProfile.pending_balance ?? 0) + commission,
-          total_earned: (affiliateProfile.total_earned ?? 0) + commission,
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', affiliateProfile.id)
-    }
   }
 
   // ── In-app notification for referrer ─────────────────────────────────────
@@ -200,6 +247,10 @@ async function triggerReferralConversion(
     ? `${parts[parts.length - 1]} ${parts[0][0].toUpperCase()}.`
     : parts[0] || 'Người dùng'
 
+  const notifContent = isAffiliate
+    ? `Commission đã được cộng vào tài khoản. Tiếp tục giới thiệu để kiếm thêm!`
+    : `Bạn nhận được voucher ${(REFERRAL_REWARD_AMOUNT / 1000).toFixed(0)}k! Dùng khi mua chương trình tiếp theo.`
+
   await service
     .from('notifications')
     .insert({
@@ -207,16 +258,50 @@ async function triggerReferralConversion(
       type: 'referral_conversion',
       channel: 'in_app',
       title: `🎉 ${maskedName} đã đăng ký qua link của bạn!`,
-      content: `Bạn nhận được +${(rewardAmount / 1000).toFixed(0)}k credit. Tiếp tục giới thiệu để kiếm thêm!`,
+      content: notifContent,
       metadata: {
         tracking_id: trackingId,
-        reward_amount: rewardAmount,
-        action_url: '/app/affiliate',
+        reward_amount: REFERRAL_REWARD_AMOUNT,
+        action_url: isAffiliate ? '/app/affiliate' : '/app/referral',
       },
     })
     .then(({ error }: { error: unknown }) => {
       if (error) console.error('[checkout/confirm] referral notify:', error)
     })
+}
+
+// ─── Deduct voucher after payment ─────────────────────────────────────────────
+
+async function deductVoucher(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any,
+  enrollmentId: string
+): Promise<void> {
+  const { data: enrollment } = await service
+    .from('enrollments')
+    .select('voucher_id, voucher_discount_amount')
+    .eq('id', enrollmentId)
+    .single()
+
+  if (!enrollment?.voucher_id || !enrollment.voucher_discount_amount) return
+
+  const { data: voucher } = await service
+    .from('vouchers')
+    .select('id, remaining_amount')
+    .eq('id', enrollment.voucher_id)
+    .single()
+
+  if (!voucher) return
+
+  const newRemaining = Math.max(0, voucher.remaining_amount - enrollment.voucher_discount_amount)
+  await service
+    .from('vouchers')
+    .update({
+      remaining_amount: newRemaining,
+      status: newRemaining <= 0 ? 'used' : 'active',
+      used_at: newRemaining <= 0 ? new Date().toISOString() : null,
+    })
+    .eq('id', voucher.id)
 }
 
 // ─── POST ─────────────────────────────────────────────────────────────────────
@@ -253,10 +338,11 @@ export async function POST(request: NextRequest) {
     .from('enrollments')
     .select(
       `id, user_id, program_id, status, referral_code_id, referral_discount_amount,
+       voucher_id, voucher_discount_amount,
        program:programs (id, name, price_vnd, duration_days)`
     )
     .eq('id', enrollmentId)
-    .eq('user_id', user.id)       // đảm bảo chỉ owner mới confirm được
+    .eq('user_id', user.id)
     .single()
 
   if (enrollmentError || !enrollment) {
@@ -284,17 +370,17 @@ export async function POST(request: NextRequest) {
     duration_days: number
   }
 
-  // ── Compute actual amount paid (after referral discount) ──────────────────
-  const discountAmount = enrollment.referral_discount_amount ?? 0
-  const amountPaid = Math.max(0, program.price_vnd - discountAmount)
+  // ── Compute actual amount paid (after all discounts) ──────────────────────
+  const referralDiscount = enrollment.referral_discount_amount ?? 0
+  const voucherDiscount = enrollment.voucher_discount_amount ?? 0
+  const totalDiscount = referralDiscount + voucherDiscount
+  const amountPaid = Math.max(0, program.price_vnd - totalDiscount)
 
   // --- Service client cho các thao tác cần bypass RLS ---
   const service = createServiceClient()
   const now = new Date().toISOString()
 
   // --- Tìm cohort phù hợp ---
-  // Supabase JS không hỗ trợ column < column filter trực tiếp,
-  // nên lấy nhiều cohort rồi filter ở JS.
   const { data: availableCohort } = await service
     .from('cohorts')
     .select('id, name, start_date, end_date, current_members, max_members')
@@ -315,7 +401,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (cohortWithSlot) {
-    // Tăng current_members (chấp nhận race condition ở scale nhỏ)
     const { error: cohortUpdateError } = await service
       .from('cohorts')
       .update({ current_members: cohortWithSlot.current_members + 1 })
@@ -333,7 +418,6 @@ export async function POST(request: NextRequest) {
       current_members: cohortWithSlot.current_members + 1,
     }
   } else {
-    // Không có cohort → tự động tạo cohort mới
     const startDate = nextMonday()
     const endDate = addDays(startDate, program.duration_days)
     const d = new Date(startDate)
@@ -388,9 +472,15 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // --- Deduct voucher balance (non-fatal) ---
+  if (enrollment.voucher_id) {
+    deductVoucher(service, enrollmentId)
+      .catch(err => console.error('[checkout/confirm] voucher deduct:', err))
+  }
+
   // --- In-app notification for buyer ---
-  const discountNote = discountAmount > 0
-    ? ` (Đã giảm ${discountAmount.toLocaleString('vi-VN')}đ từ referral code)`
+  const discountNote = totalDiscount > 0
+    ? ` (Đã giảm ${totalDiscount.toLocaleString('vi-VN')}đ)`
     : ''
 
   await service.from('notifications').insert({
@@ -404,7 +494,8 @@ export async function POST(request: NextRequest) {
       cohort_id: assignedCohort.id,
       program_name: program.name,
       amount_paid: amountPaid,
-      discount_amount: discountAmount,
+      referral_discount: referralDiscount,
+      voucher_discount: voucherDiscount,
     },
     sent_at: now,
   })
@@ -434,7 +525,8 @@ export async function POST(request: NextRequest) {
     program: { id: program.id, name: program.name },
     pricing: {
       original_price: program.price_vnd,
-      discount_amount: discountAmount,
+      referral_discount: referralDiscount,
+      voucher_discount: voucherDiscount,
       amount_paid: amountPaid,
     },
     message: `Đăng ký ${program.name} thành công! Chương trình bắt đầu ngày ${assignedCohort.start_date}.`,

@@ -48,12 +48,12 @@ export async function GET(request: NextRequest) {
   // ── Fetch affiliate profiles ──────────────────────────────────────────────
   let query = service
     .from('affiliate_profiles')
-    .select('id, user_id, affiliate_tier, social_channels, bank_name, bank_account_number, bank_account_name, total_earned, total_paid, pending_balance, is_approved, approved_at, created_at')
+    .select('id, user_id, affiliate_tier, social_channels, bank_name, bank_account_number, bank_account_name, total_earned, total_paid, pending_balance, is_approved, approved_at, created_at, full_name, phone, email, partner_type, primary_channel, social_link, estimated_audience, application_note, rejected')
     .order('created_at', { ascending: false })
     .range(page * limit, (page + 1) * limit - 1)
 
   if (status === 'pending') {
-    query = query.eq('is_approved', false)
+    query = query.eq('is_approved', false).eq('rejected', false)
   } else if (status === 'approved') {
     query = query.eq('is_approved', true)
   }
@@ -70,11 +70,13 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Batch-fetch profiles ──────────────────────────────────────────────────
-  const userIds = affiliates.map(a => a.user_id)
-  const { data: profiles } = await service
-    .from('profiles')
-    .select('id, full_name, email:id') // Supabase auth email is in auth.users; use profiles only
-    .in('id', userIds)
+  const userIds = affiliates.map(a => a.user_id).filter(Boolean) as string[]
+  const { data: profiles } = userIds.length
+    ? await service
+        .from('profiles')
+        .select('id, full_name')
+        .in('id', userIds)
+    : { data: [] }
 
   // Fetch notification motivation from admin notification metadata
   const affiliateIds = affiliates.map(a => a.id)
@@ -119,8 +121,8 @@ export async function GET(request: NextRequest) {
   }
 
   const rows = affiliates.map(a => {
-    const profile = profileMap.get(a.user_id) as { id: string; full_name: string | null } | undefined
-    const codeInfo = codesMap.get(a.user_id)
+    const profile = a.user_id ? profileMap.get(a.user_id) as { id: string; full_name: string | null } | undefined : null
+    const codeInfo = a.user_id ? codesMap.get(a.user_id) : null
     const maxFollowers = (a.social_channels as SocialChannel[] ?? []).reduce(
       (max: number, ch: SocialChannel) => Math.max(max, ch.followers ?? 0), 0
     )
@@ -128,7 +130,8 @@ export async function GET(request: NextRequest) {
     return {
       affiliate_id: a.id,
       user_id: a.user_id,
-      full_name: profile?.full_name ?? 'Không có tên',
+      // Prefer affiliate_profiles.full_name (public registration), fallback to profiles.full_name
+      full_name: a.full_name ?? profile?.full_name ?? 'Không có tên',
       affiliate_tier: a.affiliate_tier,
       social_channels: a.social_channels,
       max_followers: maxFollowers,
@@ -138,7 +141,14 @@ export async function GET(request: NextRequest) {
       is_approved: a.is_approved,
       approved_at: a.approved_at,
       applied_at: a.created_at,
-      motivation: motivationMap.get(a.id) ?? null,
+      motivation: a.application_note ?? motivationMap.get(a.id) ?? null,
+      // New fields from public registration
+      phone: a.phone ?? null,
+      email: a.email ?? null,
+      partner_type: a.partner_type ?? null,
+      primary_channel: a.primary_channel ?? null,
+      social_link: a.social_link ?? null,
+      estimated_audience: a.estimated_audience ?? null,
       stats: {
         total_earned: a.total_earned,
         total_paid: a.total_paid,
@@ -210,26 +220,32 @@ export async function PUT(request: NextRequest) {
 
     const { error: rejectError } = await service
       .from('affiliate_profiles')
-      .delete()
+      .update({
+        rejected: true,
+        rejected_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      })
       .eq('id', affiliate_id)
 
     if (rejectError) {
       console.error('[admin/affiliate] reject:', rejectError)
-      return NextResponse.json({ error: 'Không thể xóa đơn đăng ký.' }, { status: 500 })
+      return NextResponse.json({ error: 'Không thể từ chối đơn đăng ký.' }, { status: 500 })
     }
 
-    // Notify the user
-    const rejectContent = reason?.trim()
-      ? `Đơn đăng ký affiliate của bạn chưa đáp ứng yêu cầu. Lý do: ${reason.trim()}`
-      : 'Đơn đăng ký affiliate của bạn chưa đáp ứng yêu cầu hiện tại. Bạn có thể đăng ký lại sau khi hoàn thành chương trình BodiX.'
-    await service.from('notifications').insert({
-      user_id: affiliate.user_id,
-      type: 'affiliate_application_rejected',
-      channel: 'in_app',
-      title: 'Đơn đăng ký affiliate không được chấp nhận',
-      content: rejectContent,
-      metadata: { action_url: '/app/profile' },
-    })
+    // Notify the user (only if they have an account)
+    if (affiliate.user_id) {
+      const rejectContent = reason?.trim()
+        ? `Đơn đăng ký affiliate của bạn chưa đáp ứng yêu cầu. Lý do: ${reason.trim()}`
+        : 'Đơn đăng ký affiliate của bạn chưa đáp ứng yêu cầu hiện tại. Bạn có thể đăng ký lại sau.'
+      await service.from('notifications').insert({
+        user_id: affiliate.user_id,
+        type: 'affiliate_application_rejected',
+        channel: 'in_app',
+        title: 'Đơn đăng ký affiliate không được chấp nhận',
+        content: rejectContent,
+        metadata: { action_url: '/app/profile' },
+      })
+    }
 
     return NextResponse.json({ status: 'rejected', affiliate_id })
   }

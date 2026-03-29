@@ -26,11 +26,15 @@ export default async function DashboardLayout({
 
   // Profile check with service client (bypasses RLS — same as complete-onboarding API)
   const service = createServiceClient();
-  const { data: profile } = await service
+  const { data: profile, error: profileError } = await service
     .from("profiles")
     .select("full_name, avatar_url, trial_ends_at, onboarding_completed, payment_status, bodix_program, referral_code, gift_remaining, gift_total")
     .eq("id", user.id)
     .single();
+
+  if (profileError) {
+    console.error("[dashboard/layout] profile query error:", profileError.message, profileError.code);
+  }
 
   // Fetch enrollments (keep using session client for RLS-protected data)
   const { data: enrollmentsRaw } = await supabase
@@ -46,16 +50,22 @@ export default async function DashboardLayout({
 
   const enrollments = (enrollmentsRaw ?? []) as unknown as StatusEnrollment[];
 
+  // Safeguard: profile row missing → redirect login (NOT onboarding)
+  if (!profile) {
+    console.error("[dashboard/layout] profile is null for user:", user.id);
+    redirect("/login");
+  }
+
   // Xác định trạng thái user
   const { status: userStatus } = getUserStatus(
     {
-      onboarding_completed: profile?.onboarding_completed ?? false,
-      trial_ends_at: profile?.trial_ends_at ?? null,
+      onboarding_completed: profile.onboarding_completed ?? false,
+      trial_ends_at: profile.trial_ends_at ?? null,
     },
     enrollments
   );
 
-  console.log("[dashboard/layout] user:", user.id, "onboarding_completed:", profile?.onboarding_completed, "status:", userStatus);
+  console.log("[dashboard/layout] user:", user.id, "onboarding_completed:", profile.onboarding_completed, "status:", userStatus);
 
   // Chưa onboard → redirect /onboarding
   if (!canAccessDashboard(userStatus)) {

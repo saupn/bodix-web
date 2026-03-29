@@ -28,7 +28,7 @@ export default async function DashboardLayout({
   const service = createServiceClient();
   const { data: profile, error: profileError } = await service
     .from("profiles")
-    .select("full_name, avatar_url, trial_ends_at, onboarding_completed, payment_status, bodix_program, referral_code, gift_remaining, gift_total")
+    .select("full_name, trial_ends_at, onboarding_completed, payment_status, bodix_program, referral_code, gift_remaining, gift_total")
     .eq("id", user.id)
     .single();
 
@@ -50,10 +50,21 @@ export default async function DashboardLayout({
 
   const enrollments = (enrollmentsRaw ?? []) as unknown as StatusEnrollment[];
 
-  // Safeguard: profile row missing → redirect login (NOT onboarding)
+  // Debug: profile query failed — show error instead of redirecting (prevents loop)
   if (!profile) {
-    console.error("[dashboard/layout] profile is null for user:", user.id);
-    redirect("/login");
+    return (
+      <html><body>
+        <div style={{padding: '2rem', fontFamily: 'monospace'}}>
+          <h1>Debug: Profile not found</h1>
+          <p>User ID: {user.id}</p>
+          <p>Profile Error: {profileError?.message || 'No error but data is null'}</p>
+          <p>Profile Error Code: {profileError?.code || 'N/A'}</p>
+          <p>This means the Supabase query to profiles table returned null.</p>
+          <p>Check: does a row exist in profiles with id = {user.id}?</p>
+          <p><a href="/login">Go to login</a></p>
+        </div>
+      </body></html>
+    );
   }
 
   // Xác định trạng thái user
@@ -110,7 +121,7 @@ export default async function DashboardLayout({
       }
       profile={{
         full_name: profile?.full_name ?? null,
-        avatar_url: profile?.avatar_url ?? null,
+        avatar_url: null,
         trial_ends_at: profile?.trial_ends_at ?? null,
       }}
       userEmail={user.email ?? ""}

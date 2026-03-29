@@ -140,7 +140,7 @@ async function handleUserMessage(payload: any) {
         .eq('id', verification.user_id);
 
       await sendZaloMessage(zaloUserId,
-        'Xác minh thành công! ✅\n\nChào mừng bạn đến với BodiX. Bạn sẽ nhận được nhắc tập luyện mỗi ngày qua Zalo.'
+        'Xác minh thành công! ✅\n\nChào mừng bạn đến với BodiX. Khi tham gia chương trình tập luyện, bạn sẽ nhận được tin nhắn nhắc tập và hỗ trợ qua Zalo.'
       );
       return;
     }

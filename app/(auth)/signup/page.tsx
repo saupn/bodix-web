@@ -213,7 +213,7 @@ export default function SignupPage() {
               htmlFor="fullName"
               className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
-              Họ tên
+              Họ tên <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               id="fullName"
@@ -233,7 +233,7 @@ export default function SignupPage() {
               htmlFor="email"
               className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
-              Email
+              Email <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               id="email"
@@ -253,7 +253,7 @@ export default function SignupPage() {
               htmlFor="password"
               className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
-              Mật khẩu
+              Mật khẩu <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               id="password"
@@ -274,7 +274,7 @@ export default function SignupPage() {
               htmlFor="confirmPassword"
               className="mb-1.5 block text-sm font-medium text-neutral-700"
             >
-              Xác nhận mật khẩu
+              Xác nhận mật khẩu <span className="text-red-500 ml-1">*</span>
             </label>
             <input
               id="confirmPassword"
@@ -356,6 +356,8 @@ export default function SignupPage() {
               "Đăng ký"
             )}
           </button>
+
+          <p className="text-sm text-gray-500 mt-4">(<span className="text-red-500">*</span>) Bắt buộc</p>
         </form>
 
         <div className="mt-6 flex items-center gap-4">

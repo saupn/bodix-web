@@ -84,7 +84,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       const [{ data: profile }, { data: referralCodes }] = await Promise.all([
         supabase
           .from("profiles")
-          .select("gender, fitness_goal, phone_verified")
+          .select("full_name, date_of_birth, gender, fitness_goal, phone, phone_verified")
           .eq("id", user.id)
           .single(),
         supabase
@@ -96,6 +96,14 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
       if (!profile) { setStep(1); setInitializing(false); return; }
 
+      // Populate form state from existing profile data
+      if (profile.full_name) setFullName(profile.full_name);
+      if (profile.date_of_birth) setDateOfBirth(profile.date_of_birth);
+      if (profile.gender) setGender(profile.gender as "female" | "male" | "other");
+      if (Array.isArray(profile.fitness_goal) && profile.fitness_goal.length > 0) {
+        setGoals(profile.fitness_goal as string[]);
+      }
+      if (profile.phone) setPhone(profile.phone);
       if (profile.phone_verified) setPhoneVerified(true);
 
       // Determine first incomplete step
@@ -827,12 +835,12 @@ function ReferralStep({
 
   const handleSaveAndComplete = async () => {
     if (!referralCode) {
-      onComplete();
+      await onComplete();
       return;
     }
 
     if (codeSaved) {
-      onComplete();
+      await onComplete();
       return;
     }
 
@@ -850,13 +858,13 @@ function ReferralStep({
       // Non-fatal — proceed anyway
     } finally {
       setSaving(false);
-      onComplete();
     }
+    await onComplete();
   };
 
   const referralLink = referralCode ? `${REFERRAL_BASE}/r/${referralCode}` : "";
   const shareText = referralCode
-    ? `Mình đang tập BodiX - app fitness tại nhà, rất hiệu quả! Bạn dùng mã ${referralCode} để được giảm 15%: ${referralLink}`
+    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! Bạn dùng mã ${referralCode} để được giảm 15%: ${referralLink}`
     : "";
 
   const handleCopyCode = () => {
@@ -884,10 +892,10 @@ function ReferralStep({
     >
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Chia se BodiX, nhan qua
+          Chia sẻ BodiX, nhận quà
         </h1>
         <p className="mt-1 text-sm text-neutral-600">
-          Moi ban be tap cung va nhan thuong cho moi nguoi dang ky thanh cong
+          Mời bạn bè tập cùng và nhận thưởng cho mỗi người đăng ký thành công
         </p>
       </div>
 
@@ -895,20 +903,20 @@ function ReferralStep({
       <div className="grid grid-cols-2 gap-3">
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">
           <Gift className="mx-auto h-8 w-8 text-primary mb-2" />
-          <p className="text-sm font-semibold text-primary">Voucher 100,000d</p>
-          <p className="mt-1 text-xs text-neutral-600">Cho moi nguoi dang ky thanh cong</p>
+          <p className="text-sm font-semibold text-primary">Voucher 100.000đ</p>
+          <p className="mt-1 text-xs text-neutral-600">Cho mỗi người đăng ký thành công</p>
         </div>
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">
           <Percent className="mx-auto h-8 w-8 text-primary mb-2" />
-          <p className="text-sm font-semibold text-primary">Ban be giam 15%</p>
-          <p className="mt-1 text-xs text-neutral-600">Khi dang ky qua ma cua ban</p>
+          <p className="text-sm font-semibold text-primary">Bạn bè giảm 15%</p>
+          <p className="mt-1 text-xs text-neutral-600">Khi đăng ký qua mã của bạn</p>
         </div>
       </div>
 
       {/* Referral code display */}
       {referralCode && (
         <div className="rounded-xl border-2 border-primary/30 bg-white p-4">
-          <p className="text-xs font-medium text-neutral-500 mb-2">Ma gioi thieu cua ban</p>
+          <p className="text-xs font-medium text-neutral-500 mb-2">Mã giới thiệu của bạn</p>
           <div className="flex items-center gap-3">
             <span className="flex-1 text-center font-mono text-2xl font-bold tracking-widest text-primary select-all">
               {referralCode}
@@ -924,7 +932,7 @@ function ReferralStep({
 
           {/* Share link */}
           <div className="mt-3 pt-3 border-t border-neutral-100">
-            <p className="text-xs text-neutral-500 mb-1.5">Link chia se</p>
+            <p className="text-xs text-neutral-500 mb-1.5">Link chia sẻ</p>
             <div className="flex items-center gap-2">
               <p className="flex-1 text-xs font-mono text-neutral-600 truncate">{referralLink}</p>
               <button
@@ -932,19 +940,19 @@ function ReferralStep({
                 onClick={handleCopyLink}
                 className="shrink-0 rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
               >
-                {linkCopied ? "Da copy!" : "Copy link"}
+                {linkCopied ? "Đã copy!" : "Copy link"}
               </button>
             </div>
           </div>
 
           {/* Zalo share */}
           <a
-            href={`https://zalo.me/share/inline?u=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareText)}`}
+            href={`https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent('Tham gia BodiX - Giảm 15% với mã giới thiệu của tôi')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0068FF] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
           >
-            Chia se qua Zalo
+            Chia sẻ qua Zalo
             <ExternalLink className="w-4 h-4" />
           </a>
         </div>
@@ -952,7 +960,7 @@ function ReferralStep({
 
       {/* Fine print */}
       <p className="text-xs text-neutral-400 text-center">
-        Voucher duoc kich hoat khi ban be hoan tat thanh toan. Ban co the xem va quan ly voucher trong phan Ho so.
+        Voucher được kích hoạt khi bạn bè hoàn tất thanh toán. Bạn có thể xem và quản lý voucher trong phần Hồ sơ.
       </p>
 
       {/* Continue button */}
@@ -966,7 +974,7 @@ function ReferralStep({
         {saving || parentLoading ? (
           <Loader2 className="w-5 h-5 animate-spin" />
         ) : (
-          "Tiep tuc"
+          "Tiếp tục"
         )}
       </button>
     </motion.div>

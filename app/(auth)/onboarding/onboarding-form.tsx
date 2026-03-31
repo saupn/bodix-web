@@ -59,6 +59,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [copied, setCopied] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [manualChecking, setManualChecking] = useState(false);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -242,19 +243,33 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   // ── Step 3: Polling for verification ──
 
   const checkVerified = useCallback(async () => {
-    const supabase = createClient();
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return;
+    try {
+      const supabase = createClient();
+      const { data: { user }, error: authError } = await supabase.auth.getUser();
+      if (authError || !user) {
+        console.warn("[zalo-poll] auth failed:", authError?.message || "no user");
+        return;
+      }
 
-    const { data } = await supabase
-      .from("profiles")
-      .select("phone_verified")
-      .eq("id", user.id)
-      .single();
+      const { data, error: queryError } = await supabase
+        .from("profiles")
+        .select("phone_verified")
+        .eq("id", user.id)
+        .single();
 
-    if (data?.phone_verified) {
-      setPhoneVerified(true);
-      setVerifyStage("success");
+      if (queryError) {
+        console.warn("[zalo-poll] query failed:", queryError.message);
+        return;
+      }
+
+      console.log("[zalo-poll] phone_verified =", data?.phone_verified);
+
+      if (data?.phone_verified) {
+        setPhoneVerified(true);
+        setVerifyStage("success");
+      }
+    } catch (err) {
+      console.warn("[zalo-poll] unexpected error:", err);
     }
   }, []);
 
@@ -267,6 +282,12 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       if (pollingRef.current) clearInterval(pollingRef.current);
     };
   }, [verifyStage, checkVerified]);
+
+  const handleManualCheck = useCallback(async () => {
+    setManualChecking(true);
+    await checkVerified();
+    setManualChecking(false);
+  }, [checkVerified]);
 
   // ── Step 3: Success auto-advance ──
 
@@ -639,6 +660,23 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       {error}
                     </div>
                   )}
+
+                  {/* Manual check fallback */}
+                  <button
+                    type="button"
+                    onClick={handleManualCheck}
+                    disabled={manualChecking}
+                    className="w-full rounded-lg border-2 border-primary/30 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
+                  >
+                    {manualChecking ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        Đang kiểm tra...
+                      </span>
+                    ) : (
+                      "Tôi đã gửi mã"
+                    )}
+                  </button>
 
                   {/* Resend */}
                   {showResend && (

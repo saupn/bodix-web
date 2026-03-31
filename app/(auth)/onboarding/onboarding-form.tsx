@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Copy, Check, CheckCircle, Loader2, ExternalLink, Gift, Percent } from "lucide-react";
 import { PROGRAMS, REFERRAL_BASE } from "@/lib/constants";
@@ -59,8 +59,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [copied, setCopied] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
-  const [manualChecking, setManualChecking] = useState(false);
-  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -240,65 +238,66 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     };
   }, [verifyStage]);
 
-  // ── Step 3: Polling for verification ──
-
-  const checkVerified = useCallback(async () => {
-    try {
-      const supabase = createClient();
-      const { data: { user }, error: authError } = await supabase.auth.getUser();
-      if (authError || !user) {
-        console.warn("[zalo-poll] auth failed:", authError?.message || "no user");
-        return;
-      }
-
-      // Bypass browser/PostgREST cache with direct fetch + no-store
-      const session = (await supabase.auth.getSession()).data.session;
-      const res = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=phone_verified`,
-        {
-          headers: {
-            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-            "Authorization": `Bearer ${session?.access_token}`,
-            "Accept": "application/vnd.pgrst.object+json",
-          },
-          cache: "no-store",
-        }
-      );
-
-      if (!res.ok) {
-        console.warn("[zalo-poll] fetch failed:", res.status, await res.text());
-        return;
-      }
-
-      const data = await res.json();
-      console.log("[zalo-poll] fresh result:", data?.phone_verified);
-
-      if (data?.phone_verified) {
-        setPhoneVerified(true);
-        setVerifyStage("success");
-      }
-    } catch (err) {
-      console.warn("[zalo-poll] unexpected error:", err);
-    }
-  }, []);
+  // ── Step 3: Realtime + API fallback (server reads DB, no stale client cache) ──
 
   useEffect(() => {
-    if (verifyStage !== "waiting") return;
+    if (verifyStage !== "waiting" || step !== 3) return;
 
-    pollingRef.current = setInterval(checkVerified, 3000);
+    const supabase = createClient();
+
+    const channel = supabase
+      .channel("phone-verify")
+      .on(
+        "postgres_changes",
+        {
+          event: "UPDATE",
+          schema: "public",
+          table: "profiles",
+          filter: `id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as { phone_verified?: boolean };
+          console.log("[zalo-realtime] profile updated:", row);
+          if (row.phone_verified === true) {
+            setPhoneVerified(true);
+            setVerifyStage("success");
+          }
+        }
+      )
+      .subscribe();
 
     return () => {
-      if (pollingRef.current) clearInterval(pollingRef.current);
+      supabase.removeChannel(channel);
     };
-  }, [verifyStage, checkVerified]);
+  }, [verifyStage, step, userId]);
 
-  const handleManualCheck = useCallback(async () => {
-    setManualChecking(true);
-    await checkVerified();
-    setManualChecking(false);
-  }, [checkVerified]);
+  useEffect(() => {
+    if (verifyStage !== "waiting" || step !== 3) return;
 
-  // ── Step 3: Success auto-advance ──
+    const check = async () => {
+      try {
+        const res = await fetch("/api/auth/check-phone-verified", {
+          cache: "no-store",
+        });
+        if (!res.ok) return;
+        const data = (await res.json()) as { verified?: boolean };
+        console.log("[zalo-poll] verified:", data.verified);
+        if (data.verified === true) {
+          setPhoneVerified(true);
+          setVerifyStage("success");
+        }
+      } catch (e) {
+        console.warn("[zalo-poll] error:", e);
+      }
+    };
+
+    void check();
+    const interval = setInterval(check, 3000);
+
+    return () => clearInterval(interval);
+  }, [verifyStage, step]);
+
+  // ── Step 3: Success — checkmark 1.5s then next step ──
 
   useEffect(() => {
     if (verifyStage !== "success") return;
@@ -670,23 +669,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   )}
 
-                  {/* Manual check fallback */}
-                  <button
-                    type="button"
-                    onClick={handleManualCheck}
-                    disabled={manualChecking}
-                    className="w-full rounded-lg border-2 border-primary/30 px-4 py-3 text-sm font-medium text-primary hover:bg-primary/5 transition-colors disabled:opacity-50"
-                  >
-                    {manualChecking ? (
-                      <span className="flex items-center justify-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Đang kiểm tra...
-                      </span>
-                    ) : (
-                      "Tôi đã gửi mã"
-                    )}
-                  </button>
-
                   {/* Resend */}
                   {showResend && (
                     <div className="flex justify-center pt-1">
@@ -702,6 +684,16 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       </button>
                     </div>
                   )}
+
+                  <div className="flex justify-center pt-2 border-t border-neutral-100">
+                    <button
+                      type="button"
+                      onClick={() => goNext(4)}
+                      className="text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
+                    >
+                      Bỏ qua, xác minh sau
+                    </button>
+                  </div>
                 </>
               ) : (
                 /* ── Trạng thái 1: Nhập SĐT ── */

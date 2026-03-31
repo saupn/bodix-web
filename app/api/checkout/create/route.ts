@@ -138,19 +138,34 @@ export async function POST(request: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  // ── Duplicate enrollment guard ────────────────────────────────────────────
-  const { data: existing } = await supabase
+  // ── Chỉ cho phép checkout khi đã ở pending_payment (admin đã chọn) ──────
+  const { data: pendingEnrollment } = await supabase
     .from("enrollments")
     .select("id")
     .eq("user_id", user.id)
     .eq("program_id", program.id)
-    .in("status", ["pending_payment", "active"])
+    .eq("status", "pending_payment")
     .maybeSingle();
 
-  if (existing) {
+  if (!pendingEnrollment) {
+    const { data: existingOther } = await supabase
+      .from("enrollments")
+      .select("id, status")
+      .eq("user_id", user.id)
+      .eq("program_id", program.id)
+      .in("status", ["paid_waiting_cohort", "active"])
+      .maybeSingle();
+
+    if (existingOther) {
+      return NextResponse.json(
+        { error: "Bạn đã thanh toán chương trình này rồi.", redirect: "/app" },
+        { status: 409 }
+      );
+    }
+
     return NextResponse.json(
-      { error: "Bạn đã ��ăng ký chương trình này.", redirect: "/app/checkout/success?slug=" + slug },
-      { status: 409 }
+      { error: "Bạn chưa được chọn tham gia. Vui lòng chờ thông báo từ BodiX." },
+      { status: 403 }
     );
   }
 
@@ -191,35 +206,29 @@ export async function POST(request: NextRequest) {
 
   const finalPrice = Math.max(0, priceAfterCodeDiscount - voucherDiscountAmount);
 
-  // ── Insert enrollment ─────────────────────────────────────────────────────
-  const { data: enrollment, error } = await service
+  // ── Update existing pending_payment enrollment with discount info ────────
+  const { error } = await service
     .from("enrollments")
-    .insert({
-      user_id: user.id,
-      program_id: program.id,
-      cohort_id: cohort?.id ?? null,
-      status: "pending_payment",
+    .update({
       payment_method: paymentMethod,
-      amount_paid: 0,
       referral_code_id: referralCodeId,
       referral_discount_amount: referralDiscountAmount,
       voucher_id: voucherId,
       voucher_discount_amount: voucherDiscountAmount,
     })
-    .select("id")
-    .single();
+    .eq("id", pendingEnrollment.id);
 
-  if (error || !enrollment) {
-    console.error("[checkout/create] insert failed:", error);
+  if (error) {
+    console.error("[checkout/create] update failed:", error);
     return NextResponse.json(
-      { error: "Không thể tạo ��ơn đăng ký. Vui lòng thử lại." },
+      { error: "Không thể cập nhật đơn đăng ký. Vui lòng thử lại." },
       { status: 500 }
     );
   }
 
   return NextResponse.json({
     success: true,
-    enrollment_id: enrollment.id,
+    enrollment_id: pendingEnrollment.id,
     pricing: {
       original_price: program.price_vnd,
       referral_discount_amount: referralDiscountAmount,

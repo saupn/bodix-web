@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
+import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 
 function formatCountdown(trialEndsAt: string): string {
   const end = new Date(trialEndsAt);
@@ -165,7 +166,7 @@ export default async function AppPage() {
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, trial_ends_at")
+    .select("full_name, trial_ends_at, phone_verified")
     .eq("id", user.id)
     .single();
 
@@ -174,28 +175,110 @@ export default async function AppPage() {
   // Fetch all enrollments to determine state
   const { data: enrollments } = await supabase
     .from("enrollments")
-    .select("id, status, program_id, programs(slug)")
+    .select("id, status, program_id, cohort_id, programs(slug, name)")
     .eq("user_id", user.id)
     .order("enrolled_at", { ascending: false });
 
   const allEnrollments = enrollments ?? [];
   const activeEnrollment = allEnrollments.find((e) => e.status === "active");
   const trialEnrollment = allEnrollments.find((e) => e.status === "trial");
+  const trialCompletedEnrollment = allEnrollments.find((e) => e.status === "trial_completed");
+  const pendingPaymentEnrollment = allEnrollments.find((e) => e.status === "pending_payment");
+  const paidWaitingEnrollment = allEnrollments.find((e) => e.status === "paid_waiting_cohort");
   const completedEnrollments = allEnrollments.filter((e) => e.status === "completed");
+  const hasEverTrialed = allEnrollments.some((e) =>
+    ["trial", "trial_completed", "pending_payment", "paid_waiting_cohort", "active", "completed"].includes(e.status)
+  );
 
   // --- State 1: Active enrollment → show dashboard ---
   if (activeEnrollment) {
-    return <DashboardHomeContent displayName={displayName} />;
+    return <DashboardHomeContent displayName={displayName} phoneVerified={profile?.phone_verified ?? false} />;
   }
 
-  // --- State 2: Trial enrollment exists ---
+  // --- State 2: Paid, waiting for cohort to start ---
+  if (paidWaitingEnrollment) {
+    // Fetch cohort start_date
+    let cohortStartDate: string | null = null;
+    if (paidWaitingEnrollment.cohort_id) {
+      const { data: cohort } = await supabase
+        .from("cohorts")
+        .select("start_date, name")
+        .eq("id", paidWaitingEnrollment.cohort_id)
+        .single();
+      cohortStartDate = cohort?.start_date ?? null;
+    }
+
+    return (
+      <div className="space-y-8">
+        <div className="rounded-xl border-2 border-success/30 bg-success/5 p-6 sm:p-8 text-center">
+          <div className="text-4xl mb-4">✅</div>
+          <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
+            Thanh toán xác nhận!
+          </h2>
+          <p className="mt-3 text-neutral-600">
+            Bạn sẽ được thông báo ngày bắt đầu.
+            {cohortStartDate && (
+              <> Dự kiến: <span className="font-semibold text-primary">{cohortStartDate}</span>.</>
+            )}
+          </p>
+          <p className="mt-2 text-neutral-600">
+            Tất cả thành viên sẽ bắt đầu Ngày 1 cùng nhau!
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- State 3: Selected by admin, pending payment ---
+  if (pendingPaymentEnrollment) {
+    const prog = pendingPaymentEnrollment.programs as unknown as { slug: string; name: string } | null;
+    const slug = prog?.slug ?? "bodix-21";
+
+    return (
+      <div className="space-y-8">
+        <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-8 text-center">
+          <div className="text-4xl mb-4">🎉</div>
+          <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
+            Bạn đã được chọn!
+          </h2>
+          <p className="mt-3 text-neutral-600">
+            Thanh toán để giữ chỗ trong đợt tập sắp tới.
+          </p>
+          <Link
+            href={`/app/checkout/${slug}`}
+            className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
+          >
+            Thanh toán ngay
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
+  // --- State 4: Trial completed, waiting to be selected ---
+  if (trialCompletedEnrollment) {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6 sm:p-8 text-center">
+          <div className="text-4xl mb-4">🎯</div>
+          <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
+            Tập thử hoàn thành!
+          </h2>
+          <p className="mt-3 text-neutral-600">
+            Chờ thông báo từ BodiX. Bạn sẽ nhận tin nhắn khi đợt tiếp theo mở.
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // --- State 5: Trial enrollment exists ---
   if (trialEnrollment) {
     const trialEndsAt = profile?.trial_ends_at;
     const now = new Date();
     const trialActive = trialEndsAt && new Date(trialEndsAt) > now;
 
     if (trialActive) {
-      // Trial active — show trial content with countdown
       return (
         <div className="space-y-8">
           <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
@@ -219,7 +302,7 @@ export default async function AppPage() {
       );
     }
 
-    // Trial expired — show CTA to buy
+    // Trial expired
     return (
       <div className="space-y-8">
         <div className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 sm:p-6">
@@ -227,43 +310,14 @@ export default async function AppPage() {
             Thời gian trải nghiệm đã hết
           </h2>
           <p className="mt-2 text-neutral-600">
-            Chọn chương trình để bắt đầu hành trình thay đổi!
-          </p>
-        </div>
-
-        {/* Upgrade banner if applicable */}
-        {(() => {
-          const completedSlugs = completedEnrollments
-            .map((e) => {
-              const prog = e.programs as unknown as { slug: string } | null;
-              return prog?.slug;
-            })
-            .filter(Boolean) as string[];
-          const banner =
-            UPGRADE_BANNERS[completedSlugs.includes("bodix-6w") ? "bodix-6w" : ""]
-            ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
-            ?? null;
-          return banner ? <UpgradeBanner upgradeBanner={banner} /> : null;
-        })()}
-
-        <div>
-          <h2 className="font-heading text-xl font-bold text-primary mb-6">
-            Chọn hành trình của bạn
-          </h2>
-          <ProgramCardGrid
-            cta="Đăng ký ngay"
-            ctaHref={(slug) => `/app/checkout/${slug}`}
-          />
-          <p className="mt-6 text-center text-sm text-neutral-500">
-            Thanh toán 1 lần. Không subscription. Không phí ẩn.
+            Chờ thông báo từ BodiX khi đợt tiếp theo mở.
           </p>
         </div>
       </div>
     );
   }
 
-  // --- State 3: No enrollment at all → program selection ---
-  // Check for upgrade banner from completed enrollments
+  // --- State 6: No enrollment at all ---
   const completedSlugs = completedEnrollments
     .map((e) => {
       const prog = e.programs as unknown as { slug: string } | null;
@@ -275,6 +329,65 @@ export default async function AppPage() {
     ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
     ?? null;
 
+  // If user has completed programs → show upgrade path
+  if (completedEnrollments.length > 0) {
+    return (
+      <div className="space-y-8">
+        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+          <h2 className="font-heading text-lg font-semibold text-primary">
+            Chào mừng {displayName}!
+          </h2>
+          <p className="mt-2 text-neutral-600">
+            Chọn chương trình tiếp theo để tiếp tục hành trình.
+          </p>
+        </div>
+        {upgradeBanner && <UpgradeBanner upgradeBanner={upgradeBanner} />}
+        <div>
+          <h2 className="font-heading text-xl font-bold text-primary mb-6">
+            Chọn hành trình của bạn
+          </h2>
+          <ProgramCardGrid
+            cta="Đăng ký ngay"
+            ctaHref={(slug) => `/app/checkout/${slug}`}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // Brand new user — show trial signup card
+  // Fetch next cohort to check if trial timing is feasible
+  const { data: nextCohort } = await supabase
+    .from("cohorts")
+    .select("id, start_date, name")
+    .eq("status", "upcoming")
+    .order("start_date", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+
+  // Fetch bodix-21 program id for trial start
+  const { data: bodix21 } = await supabase
+    .from("programs")
+    .select("id")
+    .eq("slug", "bodix-21")
+    .eq("is_active", true)
+    .maybeSingle();
+
+  // Need at least 4 days before cohort starts (3 trial + 1 buffer)
+  let canTrial = false;
+  let nextCohortDate: string | null = null;
+
+  if (nextCohort) {
+    const cohortStart = new Date(nextCohort.start_date + "T00:00:00Z");
+    const now = new Date();
+    const daysUntilCohort = Math.floor((cohortStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+    canTrial = daysUntilCohort >= 4 && !hasEverTrialed;
+    nextCohortDate = nextCohort.start_date;
+  } else {
+    // No upcoming cohort — allow trial (admin will create cohort later)
+    canTrial = !hasEverTrialed;
+  }
+
   return (
     <div className="space-y-8">
       <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
@@ -282,24 +395,16 @@ export default async function AppPage() {
           Chào mừng {displayName}!
         </h2>
         <p className="mt-2 text-neutral-600">
-          Chọn chương trình để bắt đầu 3 ngày trải nghiệm miễn phí.
+          Bắt đầu hành trình 21 ngày thay đổi thật sự.
         </p>
       </div>
 
-      {upgradeBanner && <UpgradeBanner upgradeBanner={upgradeBanner} />}
-
-      <div>
-        <h2 className="font-heading text-xl font-bold text-primary mb-6">
-          Chọn hành trình của bạn
-        </h2>
-        <ProgramCardGrid
-          cta="Thử nghiệm miễn phí 3 ngày"
-          ctaHref={() => "/app/programs"}
-        />
-        <p className="mt-6 text-center text-sm text-neutral-500">
-          Thanh toán 1 lần. Không subscription. Không phí ẩn.
-        </p>
-      </div>
+      <TrialSignupCard
+        canTrial={canTrial}
+        hasEverTrialed={hasEverTrialed}
+        programId={bodix21?.id ?? null}
+        nextCohortDate={nextCohortDate}
+      />
     </div>
   );
 }

@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift } from "lucide-react";
+import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
 import { StreakBadge } from "@/components/completion/StreakBadge";
@@ -14,7 +14,7 @@ const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
   { href: "/app/programs", label: "Chương trình", icon: Dumbbell },
   { href: "/app/review/history", label: "📝 Review", icon: FileText },
-  { href: "/app/referral", label: "🎁 Giới thiệu", icon: Gift },
+  { href: "/app/referral", label: "🎁 Giới thiệu bạn bè", icon: Gift },
   { href: "/app/community", label: "👥 Cộng đồng", icon: Users, badgeKey: "community" },
   { href: "/app/progress", label: "📊 Tiến độ", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
@@ -49,6 +49,7 @@ interface DashboardShellProps {
     recoveryDuration: number;
     interventionId: string;
   } | null;
+  isAffiliate?: boolean;
 }
 
 function getTrialDaysLeft(trialEndsAt: string | null): number | null {
@@ -70,7 +71,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, giftSection, unpaidBanner, profile, userEmail, userId, hasActiveProgram, streak, rescue }: DashboardShellProps) {
+export function DashboardShell({ children, giftSection, unpaidBanner, profile, userEmail, userId, hasActiveProgram, streak, rescue, isAffiliate }: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [communityBadge, setCommunityBadge] = useState(0);
@@ -200,6 +201,9 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
             {NAV_LINKS_BASE.map((link) => (
               <NavLink key={link.href} {...link} />
             ))}
+            {isAffiliate && (
+              <NavLink href="/app/affiliate" label="Đối tác" icon={Handshake} />
+            )}
           </nav>
 
           <div className="border-t border-neutral-200 pt-4">

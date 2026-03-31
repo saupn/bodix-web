@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Play } from "lucide-react";
+import { Toast } from "@/components/ui/Toast";
 
 type Exercise = {
   name: string;
@@ -29,27 +30,6 @@ interface Workout {
   recovery_version: VersionData | null;
 }
 
-function Confetti() {
-  const colors = ["#2D4A3E", "#C4785A", "#7CB083", "#E8DFD0"];
-  return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {Array.from({ length: 24 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute h-2 w-2 animate-confetti-fall rounded-full opacity-80"
-          style={{
-            left: `${(i * 4) % 100}%`,
-            top: "-10px",
-            backgroundColor: colors[i % colors.length],
-            animationDelay: `${i * 50}ms`,
-            transform: `rotate(${i * 15}deg)`,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
   main: "Chính",
   recovery: "Phục hồi",
@@ -57,12 +37,15 @@ const WORKOUT_TYPE_LABEL: Record<string, string> = {
   flexible: "Linh hoạt",
 };
 
+const MODE_DESCRIPTIONS: Record<string, string> = {
+  hard: "Đầy đủ cường độ — cho ngày bạn tràn đầy năng lượng",
+  light: "Giảm cường độ — cho ngày bạn cần nhẹ nhàng hơn",
+  recovery: "Phục hồi — stretching và thư giãn",
+};
+
 type TabMode = "hard" | "light" | "recovery";
 
-function getExercises(
-  workout: Workout,
-  mode: TabMode
-): Exercise[] {
+function getExercises(workout: Workout, mode: TabMode): Exercise[] {
   const v =
     mode === "hard"
       ? workout.hard_version
@@ -82,7 +65,7 @@ function hasVersion(workout: Workout, mode: TabMode): boolean {
   return !!v?.exercises?.length;
 }
 
-export default function WorkoutDetailPage() {
+export default function TrialWorkoutPage() {
   const params = useParams();
   const router = useRouter();
   const day = Number(params.day);
@@ -92,7 +75,7 @@ export default function WorkoutDetailPage() {
   const [loading, setLoading] = useState(true);
   const [mode, setMode] = useState<TabMode>("hard");
   const [completing, setCompleting] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  const [toast, setToast] = useState<string | null>(null);
 
   useEffect(() => {
     if (![1, 2, 3].includes(day)) {
@@ -154,8 +137,10 @@ export default function WorkoutDetailPage() {
       });
       if (res.ok) {
         setIsCompleted(true);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
+        setToast("Tuyệt vời! Bạn đã hoàn thành ngày " + day);
+        setTimeout(() => router.push("/app/trial"), 1500);
+      } else {
+        setToast("Có lỗi xảy ra. Vui lòng thử lại.");
       }
     } finally {
       setCompleting(false);
@@ -187,33 +172,39 @@ export default function WorkoutDetailPage() {
   const typeLabel =
     WORKOUT_TYPE_LABEL[workout.workout_type] ?? workout.workout_type;
   const exercises = getExercises(workout, mode);
-  const tabs: { key: TabMode; label: string }[] = [];
-  if (hasVersion(workout, "hard")) tabs.push({ key: "hard", label: "Hard" });
-  if (hasVersion(workout, "light")) tabs.push({ key: "light", label: "Light" });
+  const modeOptions: { key: TabMode; label: string }[] = [];
+  if (hasVersion(workout, "hard")) modeOptions.push({ key: "hard", label: "HARD" });
+  if (hasVersion(workout, "light")) modeOptions.push({ key: "light", label: "LIGHT" });
   if (hasVersion(workout, "recovery"))
-    tabs.push({ key: "recovery", label: "Recovery" });
-
-  if (tabs.length === 0) tabs.push({ key: "hard", label: "Hard" });
+    modeOptions.push({ key: "recovery", label: "RECOVERY" });
+  if (modeOptions.length === 0) modeOptions.push({ key: "hard", label: "HARD" });
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-36">
       <Link
         href="/app/trial"
         className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
       >
-        ← Quay lại
+        ← Quay lại trải nghiệm
       </Link>
 
+      {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
           Ngày {day} — {workout.title}
         </h1>
+        {workout.description && (
+          <p className="mt-1 text-sm text-neutral-400">{workout.description}</p>
+        )}
         <div className="mt-2 flex flex-wrap gap-2">
           <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-primary">
             {workout.duration_minutes} phút
           </span>
           <span className="rounded-full bg-neutral-200 px-2.5 py-0.5 text-xs font-medium text-neutral-700">
             {typeLabel}
+          </span>
+          <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
+            Trial
           </span>
           {isCompleted && (
             <span className="rounded-full bg-success/20 px-2.5 py-0.5 text-xs font-medium text-success">
@@ -223,58 +214,71 @@ export default function WorkoutDetailPage() {
         </div>
       </div>
 
-      {/* Video area */}
-      <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
+      {/* Mode buttons */}
+      <div className="space-y-2">
+        <div className="flex flex-col gap-2 sm:flex-row">
+          {modeOptions.map((opt) => {
+            const rounds = opt.key === "hard" ? 3 : opt.key === "light" ? 2 : 1;
+            const perRound = workout.duration_minutes > 0
+              ? Math.round(workout.duration_minutes / 3)
+              : 7;
+            const dur = rounds * perRound;
+            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "🧘";
+            return (
+              <button
+                key={opt.key}
+                type="button"
+                onClick={() => setMode(opt.key)}
+                className={`flex-1 rounded-xl px-4 py-3 text-sm font-bold transition-all ${
+                  mode === opt.key
+                    ? "border-2 border-primary bg-primary text-secondary-light shadow-md"
+                    : "border-2 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                }`}
+              >
+                {emoji} {opt.label} — {rounds} lượt (~{dur} phút)
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-sm text-neutral-600">
+          {MODE_DESCRIPTIONS[mode]}
+        </p>
+      </div>
+
+      {/* Video area — Vimeo embed */}
+      <div className="relative overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100" style={{ padding: "56.25% 0 0 0" }}>
         {(() => {
           const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
           const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
           if (videoUrl && videoUrl.includes("vimeo.com")) {
             const vimeoMatch = videoUrl.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
             if (vimeoMatch) {
-              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}` : ""}`;
+              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}&` : "?"}badge=0&autopause=0&player_id=0&app_id=58479`;
               return (
                 <iframe
                   src={src}
-                  className="h-full w-full"
-                  allow="autoplay; fullscreen; picture-in-picture"
+                  frameBorder="0"
+                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+                  referrerPolicy="strict-origin-when-cross-origin"
                   allowFullScreen
                   title={workout.title}
+                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
                 />
               );
             }
           }
           return (
-            <div className="flex h-full w-full items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center">
               <div className="flex flex-col items-center gap-2 text-neutral-400">
-                <Play className="h-12 w-12" strokeWidth={1.5} />
-                <span className="text-sm">Video sẽ được cập nhật</span>
+                <Play className="h-14 w-14" strokeWidth={1.5} />
+                <span className="text-sm">Video bài tập sẽ được cập nhật</span>
               </div>
             </div>
           );
         })()}
       </div>
 
-      {/* Mode tabs */}
-      {tabs.length > 1 && (
-        <div className="flex gap-2 rounded-lg bg-neutral-100 p-1">
-          {tabs.map((t) => (
-            <button
-              key={t.key}
-              type="button"
-              onClick={() => setMode(t.key)}
-              className={`flex-1 rounded-md px-3 py-2 text-sm font-medium transition-colors ${
-                mode === t.key
-                  ? "bg-white text-primary shadow-sm"
-                  : "text-neutral-600 hover:text-primary"
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </div>
-      )}
-
-      {/* Exercises */}
+      {/* Exercise list */}
       <div>
         <h2 className="font-heading text-lg font-semibold text-primary">
           Danh sách bài tập
@@ -284,63 +288,72 @@ export default function WorkoutDetailPage() {
             exercises.map((ex, i) => (
               <li
                 key={i}
-                className="flex items-center justify-between rounded-lg border border-neutral-200 bg-white px-4 py-3"
+                className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4"
               >
-                <span className="font-medium text-neutral-800">{ex.name}</span>
-                <span className="text-sm text-neutral-500">
-                  {ex.reps != null
-                    ? `${ex.sets ?? 1} x ${ex.reps} reps`
-                    : ex.duration_seconds != null
-                    ? `${ex.sets ?? 1} x ${ex.duration_seconds}s`
-                    : ex.sets != null
-                    ? `${ex.sets} sets`
-                    : "—"}
-                </span>
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-neutral-100 text-2xl">
+                  💪
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="font-medium text-neutral-800">{ex.name}</span>
+                  <p className="mt-0.5 text-sm text-neutral-500">
+                    {ex.reps != null
+                      ? `${ex.sets ?? 1} × ${ex.reps} reps`
+                      : ex.duration_seconds != null
+                      ? `${ex.sets ?? 1} × ${ex.duration_seconds}s`
+                      : ex.sets != null
+                      ? `${ex.sets} sets`
+                      : "—"}
+                  </p>
+                </div>
               </li>
             ))
           ) : (
-            <li className="rounded-lg border border-neutral-200 bg-neutral-50 px-4 py-6 text-center text-sm text-neutral-500">
+            <li className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-500">
               Chưa có bài tập cho chế độ này
             </li>
           )}
         </ul>
       </div>
 
-      {/* Complete button */}
-      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 p-4 backdrop-blur sm:static sm:border-0 sm:bg-transparent sm:p-0">
-        <button
-          type="button"
-          onClick={handleComplete}
-          disabled={completing || isCompleted}
-          className="w-full rounded-lg bg-primary px-4 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60 sm:w-auto sm:min-w-[200px]"
-        >
-          {completing
-            ? "Đang xử lý..."
-            : isCompleted
-            ? "Đã hoàn thành ✓"
-            : "Hoàn thành ngày"}
-        </button>
+      {/* Zalo note */}
+      <div className="rounded-lg bg-primary/5 px-4 py-3 text-sm text-neutral-600">
+        <span className="font-medium text-primary">Lưu ý:</span> Check-in chính thức qua Zalo OA (reply 1/2/3). Nút bên dưới là backup.
       </div>
 
-      {/* Success overlay with confetti */}
-      {showSuccess && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm"
-          role="alert"
-          aria-live="polite"
-        >
-          <Confetti />
-          <div className="relative mx-4 rounded-xl bg-white p-8 text-center shadow-xl">
-            <div className="mb-4 text-4xl">🎉</div>
-            <p className="font-heading text-xl font-bold text-primary">
-              Tuyệt vời! Bạn đã hoàn thành ngày {day}
-            </p>
-            <p className="mt-2 text-neutral-600">
-              Tiếp tục với các bài tập khác nhé!
-            </p>
+      {/* Footer sticky */}
+      <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur">
+        {!isCompleted ? (
+          <div className="mx-auto max-w-lg">
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={completing}
+              className="w-full rounded-xl bg-primary px-4 py-4 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60"
+            >
+              {completing ? "Đang xử lý..." : "Hoàn thành ngày"}
+            </button>
           </div>
-        </div>
-      )}
+        ) : (
+          <div className="mx-auto max-w-lg space-y-3">
+            <div className="flex flex-wrap items-center gap-2 rounded-lg bg-success/10 px-4 py-3">
+              <span className="font-medium text-success">✓ Đã hoàn thành</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+              className="block w-full rounded-xl border-2 border-primary px-4 py-3 text-center font-medium text-primary transition-colors hover:bg-primary/5"
+            >
+              Xem lại bài tập
+            </button>
+          </div>
+        )}
+      </div>
+
+      <Toast
+        message={toast ?? ""}
+        open={!!toast}
+        onClose={() => setToast(null)}
+      />
     </div>
   );
 }

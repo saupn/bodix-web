@@ -4,7 +4,6 @@ import { useEffect, useState, useCallback, useRef } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
-import { StreakBadge } from "@/components/completion/StreakBadge";
 import { Camera } from "lucide-react";
 
 const MODE_EMOJI: Record<string, string> = {
@@ -385,12 +384,31 @@ export default function CommunityPage() {
   }
 
   if (error || !boardData) {
+    const noCohort = error === "Bạn chưa có chương trình đang hoạt động." || error === "Bạn chưa được gán cohort.";
     return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
-        <p className="text-neutral-600">{error ?? "Không tải được dữ liệu."}</p>
-        <Link href="/app" className="mt-4 inline-block text-primary hover:underline">
-          Về trang chủ
-        </Link>
+      <div className="rounded-xl border border-neutral-200 bg-white p-8 text-center">
+        {noCohort ? (
+          <>
+            <p className="text-4xl mb-4">👥</p>
+            <h2 className="font-heading text-xl font-bold text-primary">Cộng đồng BodiX</h2>
+            <p className="mt-3 text-neutral-600">
+              Tham gia chương trình để xem cộng đồng và tập cùng mọi người!
+            </p>
+            <Link
+              href="/app/programs"
+              className="mt-6 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-medium text-secondary-light hover:bg-primary-dark"
+            >
+              Xem chương trình
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="text-neutral-600">{error ?? "Không tải được dữ liệu."}</p>
+            <Link href="/app" className="mt-4 inline-block text-primary hover:underline">
+              Về trang chủ
+            </Link>
+          </>
+        )}
       </div>
     );
   }
@@ -398,9 +416,6 @@ export default function CommunityPage() {
   const sortedMembers = sortCompletedByMode(boardData.members);
   const completed = sortedMembers.filter((m) => m.checked_in_today);
   const pending = sortedMembers.filter((m) => !m.checked_in_today);
-  const highlightMember = boardData.members.reduce((best, m) =>
-    m.current_streak > (best?.current_streak ?? 0) ? m : best
-  );
   const { stats } = boardData;
   const progressPct = stats.total_members > 0 ? (stats.completed_today / stats.total_members) * 100 : 0;
   const programDay = programData?.program_day ?? 0;
@@ -438,8 +453,9 @@ export default function CommunityPage() {
         <>
           <div>
             <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-              Bảng hoàn thành — {boardData.cohort_name}
+              Hôm nay ai đã tập?
             </h1>
+            <p className="mt-1 text-sm text-neutral-500">{boardData.cohort_name}</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-neutral-600">
@@ -559,37 +575,51 @@ export default function CommunityPage() {
               </section>
             </div>
 
-            <aside className="lg:w-56">
-              <div className="sticky top-24 rounded-xl border border-amber-200 bg-amber-50/50 p-4 shadow-sm">
+            <aside className="lg:w-64">
+              <div className="sticky top-24 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <h3 className="mb-3 font-heading text-sm font-semibold text-primary">
-                  ⭐ Ngôi sao tuần này
+                  🔥 Streak Leaderboard
                 </h3>
-                {highlightMember && highlightMember.current_streak > 0 ? (
-                  <div className="flex flex-col items-center text-center">
-                    <div className="mb-2 flex h-14 w-14 items-center justify-center overflow-hidden rounded-full bg-primary/15 text-lg font-semibold text-primary">
-                      {highlightMember.avatar_url ? (
-                        <img src={highlightMember.avatar_url} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        getInitials(highlightMember.display_name)
-                      )}
-                    </div>
-                    <p className="font-medium text-neutral-800">{highlightMember.display_name}</p>
-                    <div className="mt-2">
-                      <StreakBadge
-                        currentStreak={highlightMember.current_streak}
-                        longestStreak={highlightMember.current_streak}
-                        compact
-                      />
-                    </div>
-                    <p className="mt-2 text-xs text-neutral-600">
-                      {highlightMember.completion_rate}% hoàn thành
-                    </p>
-                  </div>
-                ) : (
-                  <p className="py-4 text-center text-sm text-neutral-500">
-                    Chưa có streak nào. Hãy bắt đầu!
-                  </p>
-                )}
+                {(() => {
+                  const top10 = [...boardData.members]
+                    .sort((a, b) => b.current_streak - a.current_streak)
+                    .slice(0, 10)
+                    .filter(m => m.current_streak > 0);
+
+                  if (top10.length === 0) {
+                    return (
+                      <p className="py-4 text-center text-sm text-neutral-500">
+                        Chưa có streak nào. Hãy bắt đầu!
+                      </p>
+                    );
+                  }
+
+                  return (
+                    <ol className="space-y-2">
+                      {top10.map((m, i) => {
+                        const isMe = m.user_id === currentUserIdRef.current;
+                        const medal = i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`;
+                        return (
+                          <li
+                            key={m.user_id}
+                            className={`flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm ${
+                              isMe ? "bg-primary/5 font-medium" : ""
+                            }`}
+                          >
+                            <span className="w-6 shrink-0 text-center">{medal}</span>
+                            <span className="min-w-0 flex-1 truncate text-neutral-700">
+                              {m.display_name}
+                              {isMe && <span className="text-xs text-primary ml-1">(Bạn)</span>}
+                            </span>
+                            <span className="shrink-0 font-mono text-xs text-neutral-500">
+                              🔥{m.current_streak}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ol>
+                  );
+                })()}
               </div>
             </aside>
           </div>
@@ -601,7 +631,7 @@ export default function CommunityPage() {
                   href={`/app/program/workout/${programDay}`}
                   className="block w-full rounded-xl bg-primary px-4 py-4 text-center text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
                 >
-                  Hoàn thành ngày →
+                  Tập ngay →
                 </Link>
               </div>
             </div>

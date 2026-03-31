@@ -53,9 +53,13 @@ export function CheckoutForm({
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    // Read from cookie first, then localStorage fallback
     try {
-      const stored = localStorage.getItem(REFERRAL_STORAGE_KEY);
-      if (stored) setReferralCode(stored);
+      const cookieMatch = document.cookie.match(/(?:^|;\s*)bodix_ref=([^;]*)/);
+      const fromCookie = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
+      const fromStorage = localStorage.getItem(REFERRAL_STORAGE_KEY);
+      const code = fromCookie || fromStorage;
+      if (code) setReferralCode(code);
     } catch {}
   }, []);
 
@@ -203,7 +207,7 @@ export function CheckoutForm({
   const referralLabel = referralValid?.valid
     ? referralValid.code_type === "affiliate"
       ? `Giảm ${referralValid.discount_percent ?? 10}% từ đối tác ${referralValid.referrer_name}`
-      : `Giảm ${referralValid.discount_percent ?? 15}% từ mã giới thiệu ${referralValid.referrer_name}`
+      : `Giảm ${referralValid.discount_percent ?? 10}% từ mã giới thiệu ${referralValid.referrer_name}`
     : null;
 
   return (

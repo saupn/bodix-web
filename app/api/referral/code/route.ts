@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { normalizeForCode } from '@/lib/referral/utils'
 
-const REFERRAL_LINK_BASE = 'https://bodix.vn/ref'
 import { REFERRAL_REWARD_AMOUNT, REFERRAL_DISCOUNT_PERCENT } from '@/lib/affiliate/config'
 
 const DEFAULT_REWARD_VALUE = REFERRAL_REWARD_AMOUNT
@@ -10,13 +10,54 @@ const DEFAULT_REFEREE_REWARD_VALUE = REFERRAL_DISCOUNT_PERCENT
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function generateCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no 0/O/1/I to avoid confusion
-  let suffix = ''
-  for (let i = 0; i < 4; i++) {
-    suffix += chars[Math.floor(Math.random() * chars.length)]
+/** Generate referral code from full name: bỏ dấu → uppercase → bỏ spaces.
+ *  "Nguyễn Lan" → "NGUYENLAN". Trùng → thêm số. */
+async function generateCodeFromName(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any,
+  fullName: string
+): Promise<string | null> {
+  const base = normalizeForCode(fullName)
+  if (base.length < 3) return null
+
+  // Try base code first
+  const candidates = [base]
+  for (let i = 1; i <= 9; i++) {
+    candidates.push(`${base}${i}`)
   }
-  return `BODIX-${suffix}`
+
+  for (const code of candidates) {
+    const { data: existing } = await service
+      .from('referral_codes')
+      .select('id')
+      .eq('code', code)
+      .maybeSingle()
+
+    if (!existing) {
+      // Also check profiles.referral_code
+      const { data: profileTaken } = await service
+        .from('profiles')
+        .select('id')
+        .eq('referral_code', code)
+        .maybeSingle()
+
+      if (!profileTaken) return code
+    }
+  }
+
+  // Fallback: base + random 2 digits
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const suffix = Math.floor(10 + Math.random() * 90) // 10-99
+    const code = `${base}${suffix}`
+    const { data: existing } = await service
+      .from('referral_codes')
+      .select('id')
+      .eq('code', code)
+      .maybeSingle()
+    if (!existing) return code
+  }
+
+  return null
 }
 
 function validateCustomCode(code: string): string | null {
@@ -56,38 +97,46 @@ export async function GET() {
     return buildCodeResponse(existing)
   }
 
-  // ── Auto-create referral code ─────────────────────────────────────────────
+  // ── Auto-create referral code from user's name ───────────────────────────
   const service = createServiceClient()
 
-  // Try up to 5 times to avoid collision (very unlikely with 32^4 = 1M combinations)
-  let created = null
-  for (let attempt = 0; attempt < 5; attempt++) {
-    const code = generateCode()
-    const { data, error } = await service
-      .from('referral_codes')
-      .insert({
-        user_id: user.id,
-        code,
-        code_type: 'referral',
-        reward_type: 'credit',
-        reward_value: DEFAULT_REWARD_VALUE,
-        referee_reward_type: 'discount_percent',
-        referee_reward_value: DEFAULT_REFEREE_REWARD_VALUE,
-      })
-      .select()
-      .single()
+  const { data: profile } = await service
+    .from('profiles')
+    .select('full_name')
+    .eq('id', user.id)
+    .single()
 
-    if (!error) { created = data; break }
-    if (error.code !== '23505') {
-      // Not a uniqueness conflict — bail out
-      console.error('[referral/code] GET create:', error)
-      return NextResponse.json({ error: 'Không thể tạo referral code.' }, { status: 500 })
-    }
+  const fullName = profile?.full_name?.trim() || ''
+  const code = await generateCodeFromName(service, fullName)
+
+  if (!code) {
+    return NextResponse.json({ error: 'Không thể tạo referral code.' }, { status: 500 })
   }
 
-  if (!created) {
-    return NextResponse.json({ error: 'Không thể tạo referral code sau nhiều lần thử.' }, { status: 500 })
+  const { data: created, error: insertError } = await service
+    .from('referral_codes')
+    .insert({
+      user_id: user.id,
+      code,
+      code_type: 'referral',
+      reward_type: 'credit',
+      reward_value: DEFAULT_REWARD_VALUE,
+      referee_reward_type: 'discount_percent',
+      referee_reward_value: DEFAULT_REFEREE_REWARD_VALUE,
+    })
+    .select()
+    .single()
+
+  if (insertError || !created) {
+    console.error('[referral/code] GET create:', insertError)
+    return NextResponse.json({ error: 'Không thể tạo referral code.' }, { status: 500 })
   }
+
+  // Also update profile.referral_code
+  await service
+    .from('profiles')
+    .update({ referral_code: code })
+    .eq('id', user.id)
 
   return buildCodeResponse(created, 201)
 }
@@ -169,6 +218,8 @@ export async function POST(request: NextRequest) {
 
 // ─── Response builder ─────────────────────────────────────────────────────────
 
+const REFERRAL_LINK_BASE = process.env.NEXT_PUBLIC_APP_URL || 'https://bodix.fit'
+
 function buildCodeResponse(
   code: {
     id: string
@@ -189,7 +240,7 @@ function buildCodeResponse(
   status = 200
 ) {
   const rewardDesc = code.reward_type === 'credit'
-    ? `+${(code.reward_value / 1000).toFixed(0)}k credit mỗi người chuyển đổi`
+    ? `Voucher ${(code.reward_value / 1000).toFixed(0)}k cho mỗi người đăng ký thành công`
     : `+${code.reward_value}% cho mỗi người chuyển đổi`
 
   const refereeDesc = code.referee_reward_type === 'discount_percent'
@@ -199,7 +250,7 @@ function buildCodeResponse(
   return NextResponse.json({
     code: code.code,
     code_type: code.code_type,
-    referral_link: `${REFERRAL_LINK_BASE}/${code.code}`,
+    referral_link: `${REFERRAL_LINK_BASE}?ref=${code.code}`,
     reward_description: rewardDesc,
     referee_reward_description: refereeDesc,
     is_active: code.is_active,

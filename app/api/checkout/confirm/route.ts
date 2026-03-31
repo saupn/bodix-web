@@ -166,12 +166,18 @@ async function triggerReferralConversion(
         approved_at: new Date().toISOString(),
       })
     }
-  } else {
+  }
+
+  // Track voucher code for Zalo notification
+  let createdVoucherCode: string | null = null
+
+  if (!isAffiliate) {
     // ── REFERRAL: voucher 100K for referrer ─────────────────────────────────
     const rewardAmount = REFERRAL_REWARD_AMOUNT
 
     // Generate unique voucher code
     let voucherCode = generateVoucherCode()
+    createdVoucherCode = voucherCode
     for (let attempt = 0; attempt < 5; attempt++) {
       const { data: existing } = await service
         .from('vouchers')
@@ -181,6 +187,7 @@ async function triggerReferralConversion(
       if (!existing) break
       voucherCode = generateVoucherCode()
     }
+    createdVoucherCode = voucherCode
 
     // Voucher expires in VOUCHER_EXPIRY_MONTHS months
     const expiresAt = new Date()
@@ -268,6 +275,27 @@ async function triggerReferralConversion(
     .then(({ error }: { error: unknown }) => {
       if (error) console.error('[checkout/confirm] referral notify:', error)
     })
+
+  // ── Gửi Zalo cho referrer (chỉ referral, không affiliate) ────────────────
+  if (!isAffiliate && createdVoucherCode) {
+    const { data: referrerProfile } = await service
+      .from('profiles')
+      .select('channel_user_id')
+      .eq('id', code.user_id)
+      .single()
+
+    if (referrerProfile?.channel_user_id) {
+      const { sendViaZalo } = await import('@/lib/messaging/adapters/zalo')
+      const expiryDate = new Date()
+      expiryDate.setMonth(expiryDate.getMonth() + VOUCHER_EXPIRY_MONTHS)
+      const expiryStr = expiryDate.toLocaleDateString('vi-VN')
+
+      sendViaZalo(
+        referrerProfile.channel_user_id,
+        `🎁 Bạn bè vừa đăng ký qua link của bạn! Voucher 100.000đ: ${createdVoucherCode}. Hạn: ${expiryStr}.`
+      ).catch(err => console.error('[checkout/confirm] referrer zalo:', err))
+    }
+  }
 }
 
 // ─── Deduct voucher after payment ─────────────────────────────────────────────
@@ -363,6 +391,9 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  // Import sendViaZalo for Zalo notification
+  const { sendViaZalo } = await import('@/lib/messaging/adapters/zalo')
+
   const program = enrollment.program as unknown as {
     id: string
     name: string
@@ -380,94 +411,24 @@ export async function POST(request: NextRequest) {
   const service = createServiceClient()
   const now = new Date().toISOString()
 
-  // --- Tìm cohort phù hợp ---
-  const { data: availableCohort } = await service
-    .from('cohorts')
-    .select('id, name, start_date, end_date, current_members, max_members')
-    .eq('program_id', enrollment.program_id)
-    .eq('status', 'upcoming')
-    .order('start_date', { ascending: true })
-    .limit(20)
-
-  const cohortWithSlot =
-    (availableCohort ?? []).find((c) => c.current_members < c.max_members) ?? null
-
-  let assignedCohort: {
-    id: string
-    name: string
-    start_date: string
-    end_date: string
-    current_members: number
-  }
-
-  if (cohortWithSlot) {
-    const { error: cohortUpdateError } = await service
-      .from('cohorts')
-      .update({ current_members: cohortWithSlot.current_members + 1 })
-      .eq('id', cohortWithSlot.id)
-
-    if (cohortUpdateError) {
-      console.error('[checkout/confirm] cohort update failed:', cohortUpdateError)
-    }
-
-    assignedCohort = {
-      id: cohortWithSlot.id,
-      name: cohortWithSlot.name,
-      start_date: cohortWithSlot.start_date,
-      end_date: cohortWithSlot.end_date,
-      current_members: cohortWithSlot.current_members + 1,
-    }
-  } else {
-    const startDate = nextMonday()
-    const endDate = addDays(startDate, program.duration_days)
-    const d = new Date(startDate)
-    const cohortName = `${program.name} - Tháng ${d.getMonth() + 1}/${d.getFullYear()} (Tự đăng ký)`
-
-    const { data: newCohort, error: cohortCreateError } = await service
-      .from('cohorts')
-      .insert({
-        program_id: enrollment.program_id,
-        name: cohortName,
-        start_date: startDate,
-        end_date: endDate,
-        max_members: 20,
-        current_members: 1,
-        status: 'upcoming',
-      })
-      .select('id, name, start_date, end_date, current_members')
-      .single()
-
-    if (cohortCreateError || !newCohort) {
-      console.error('[checkout/confirm] cohort create failed:', cohortCreateError)
-      return NextResponse.json(
-        { error: 'Không thể tạo cohort. Vui lòng liên hệ hỗ trợ.' },
-        { status: 500 }
-      )
-    }
-
-    assignedCohort = newCohort
-  }
-
-  // --- Activate enrollment ---
-  const { data: activatedEnrollment, error: activateError } = await service
+  // --- Set enrollment to paid_waiting_cohort (admin sẽ activate cohort sau) ---
+  const { data: paidEnrollment, error: updateError } = await service
     .from('enrollments')
     .update({
-      status: 'active',
+      status: 'paid_waiting_cohort',
       paid_at: now,
-      started_at: assignedCohort.start_date,
-      cohort_id: assignedCohort.id,
       amount_paid: amountPaid,
       payment_method: 'manual',
       payment_reference: paymentReference,
     })
     .eq('id', enrollmentId)
-    .select('id, status, paid_at, started_at, cohort_id, amount_paid')
+    .select('id, status, paid_at, cohort_id, amount_paid')
     .single()
 
-  if (activateError || !activatedEnrollment) {
-    console.error('[checkout/confirm] enrollment activate failed:', activateError)
+  if (updateError || !paidEnrollment) {
+    console.error('[checkout/confirm] enrollment update failed:', updateError)
     return NextResponse.json(
-      { error: 'Không thể kích hoạt enrollment. Vui lòng liên hệ hỗ trợ.' },
+      { error: 'Không thể xác nhận thanh toán. Vui lòng liên hệ hỗ trợ.' },
       { status: 500 }
     )
   }
@@ -487,11 +448,10 @@ export async function POST(request: NextRequest) {
     user_id: user.id,
     type: 'payment_confirmed',
     channel: 'in_app',
-    title: `Đăng ký ${program.name} thành công!`,
-    content: `Bạn đã đăng ký ${program.name}${discountNote}. Chương trình bắt đầu ngày ${assignedCohort.start_date}.`,
+    title: `Thanh toán ${program.name} thành công!`,
+    content: `Bạn đã thanh toán ${program.name}${discountNote}. Bạn sẽ được thông báo ngày bắt đầu.`,
     metadata: {
       enrollment_id: enrollmentId,
-      cohort_id: assignedCohort.id,
       program_name: program.name,
       amount_paid: amountPaid,
       referral_discount: referralDiscount,
@@ -499,6 +459,20 @@ export async function POST(request: NextRequest) {
     },
     sent_at: now,
   })
+
+  // --- Gửi Zalo xác nhận thanh toán ---
+  const { data: profileData } = await service
+    .from('profiles')
+    .select('channel_user_id')
+    .eq('id', user.id)
+    .single()
+
+  if (profileData?.channel_user_id) {
+    sendViaZalo(
+      profileData.channel_user_id,
+      '✅ Thanh toán xác nhận! Bạn sẽ được thông báo ngày bắt đầu. Tất cả thành viên sẽ bắt đầu Ngày 1 cùng nhau!'
+    ).catch(err => console.error('[checkout/confirm] zalo send:', err))
+  }
 
   // --- Trigger referral conversion reward (non-fatal) ----------------------
   if (enrollment.referral_code_id) {
@@ -520,8 +494,7 @@ export async function POST(request: NextRequest) {
 
   return NextResponse.json({
     success: true,
-    enrollment: activatedEnrollment,
-    cohort: assignedCohort,
+    enrollment: paidEnrollment,
     program: { id: program.id, name: program.name },
     pricing: {
       original_price: program.price_vnd,
@@ -529,6 +502,6 @@ export async function POST(request: NextRequest) {
       voucher_discount: voucherDiscount,
       amount_paid: amountPaid,
     },
-    message: `Đăng ký ${program.name} thành công! Chương trình bắt đầu ngày ${assignedCohort.start_date}.`,
+    message: `Thanh toán ${program.name} thành công! Bạn sẽ được thông báo ngày bắt đầu.`,
   })
 }

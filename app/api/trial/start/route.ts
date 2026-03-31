@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { TRIAL_DAYS } from '@/lib/trial/utils'
+import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -42,21 +43,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Chương trình không tồn tại hoặc đã đóng.' }, { status: 404 })
   }
 
-  // --- Kiểm tra user đã có trial đang active chưa ---
-  const { data: existingTrial } = await supabase
+  // --- Kiểm tra user đã từng trial chưa (bất kỳ status nào) ---
+  const { data: existingEnrollments } = await supabase
     .from('enrollments')
-    .select('id, program_id, status, enrolled_at')
+    .select('id, status')
     .eq('user_id', user.id)
-    .eq('status', 'trial')
+    .in('status', ['trial', 'trial_completed', 'pending_payment', 'paid_waiting_cohort', 'active', 'completed'])
     .limit(1)
-    .maybeSingle()
 
-  if (existingTrial) {
+  if (existingEnrollments && existingEnrollments.length > 0) {
     return NextResponse.json(
-      {
-        error: 'Bạn đang có một trial đang hoạt động. Hoàn thành hoặc kết thúc trial hiện tại trước.',
-        enrollment: existingTrial,
-      },
+      { error: 'Bạn đã tập thử rồi.' },
       { status: 409 }
     )
   }
@@ -78,7 +75,6 @@ export async function POST(request: NextRequest) {
   }
 
   // --- Cập nhật profile: trial_started_at và trial_ends_at ---
-  // Dùng service client để bypass RLS trên profiles
   const trialStartedAt = new Date().toISOString()
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
@@ -90,7 +86,21 @@ export async function POST(request: NextRequest) {
 
   if (profileError) {
     console.error('[trial/start] profile update failed:', profileError)
-    // Không roll back enrollment — trial vẫn hoạt động, chỉ thiếu timestamps trên profile
+  }
+
+  // --- Gửi Zalo thông báo ---
+  const { data: profileData } = await service
+    .from('profiles')
+    .select('channel_user_id, full_name')
+    .eq('id', user.id)
+    .single()
+
+  if (profileData?.channel_user_id) {
+    const name = profileData.full_name?.split(' ').pop() || profileData.full_name || 'bạn'
+    sendViaZalo(
+      profileData.channel_user_id,
+      `🎉 ${name} đã đăng ký tập thử 3 ngày! Sáng mai 6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên.`
+    ).catch(err => console.error('[trial/start] zalo send:', err))
   }
 
   return NextResponse.json({

@@ -640,9 +640,9 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   )}
 
-                  {/* Resend / Skip */}
-                  <div className="flex flex-col items-center gap-2 pt-1">
-                    {showResend && (
+                  {/* Resend */}
+                  {showResend && (
+                    <div className="flex justify-center pt-1">
                       <button
                         type="button"
                         onClick={() => {
@@ -653,16 +653,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       >
                         Gửi lại mã
                       </button>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => goNext(4)}
-                      className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
-                      suppressHydrationWarning
-                    >
-                      Bỏ qua, kết nối sau →
-                    </button>
-                  </div>
+                    </div>
+                  )}
                 </>
               ) : (
                 /* ── Trạng thái 1: Nhập SĐT ── */
@@ -725,14 +717,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => goNext(4)}
-                    className="w-full text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
-                    suppressHydrationWarning
-                  >
-                    Bỏ qua, kết nối sau →
-                  </button>
                 </>
               )}
             </motion.div>
@@ -890,9 +874,9 @@ function ReferralStep({
     await onComplete();
   };
 
-  const referralLink = referralCode ? `${REFERRAL_BASE}/r/${referralCode}` : "";
+  const referralLink = referralCode ? `${REFERRAL_BASE}?ref=${referralCode}` : "";
   const shareText = referralCode
-    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! Bạn dùng mã ${referralCode} để được giảm 15%: ${referralLink}`
+    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! Bạn dùng mã ${referralCode} để được giảm 10%: ${referralLink}`
     : "";
 
   const handleCopyCode = () => {
@@ -936,7 +920,7 @@ function ReferralStep({
         </div>
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">
           <Percent className="mx-auto h-8 w-8 text-primary mb-2" />
-          <p className="text-sm font-semibold text-primary">Bạn bè giảm 15%</p>
+          <p className="text-sm font-semibold text-primary">Bạn bè giảm 10%</p>
           <p className="mt-1 text-xs text-neutral-600">Khi đăng ký qua mã của bạn</p>
         </div>
       </div>
@@ -975,7 +959,7 @@ function ReferralStep({
 
           {/* Zalo share */}
           <a
-            href={`https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent('Tham gia BodiX - Giảm 15% với mã giới thiệu của tôi')}`}
+            href={`https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent('Tham gia BodiX - Giảm 10% với mã giới thiệu của tôi')}`}
             target="_blank"
             rel="noopener noreferrer"
             className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0068FF] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"

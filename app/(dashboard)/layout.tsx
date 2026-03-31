@@ -88,6 +88,15 @@ export default async function DashboardLayout({
   const myStats = hasActiveProgram ? await getMyStats(supabase) : null;
   const rescueStatus = hasActiveProgram ? await getRescueStatus(supabase) : null;
 
+  // Check if user is an affiliate (for nav menu)
+  const { data: affiliateProfile } = await service
+    .from("affiliate_profiles")
+    .select("id, is_approved")
+    .eq("user_id", user.id)
+    .eq("is_approved", true)
+    .maybeSingle();
+  const isAffiliate = !!affiliateProfile;
+
   const showUnpaidBanner =
     profile?.onboarding_completed === true &&
     profile?.payment_status !== "paid";
@@ -148,6 +157,7 @@ export default async function DashboardLayout({
             }
           : null
       }
+      isAffiliate={isAffiliate}
     >
       {children}
     </DashboardShell>

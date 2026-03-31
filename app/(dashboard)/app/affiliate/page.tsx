@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
-import { Copy } from "lucide-react";
+import { Copy, Check } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -14,14 +14,14 @@ import {
   ResponsiveContainer,
 } from "recharts";
 
-const PARTNER_BASE = "https://bodix.vn/p";
+const REFERRAL_BASE = "https://bodix.fit";
 const COMMISSION_RATE = 40;
 const MIN_WITHDRAWAL = 500_000;
 const TIER_LABEL: Record<string, string> = {
-  basic: "🥉 Basic",
-  silver: "🥈 Silver",
-  gold: "🥇 Gold",
-  platinum: "💎 Platinum",
+  basic: "Basic",
+  silver: "Silver",
+  gold: "Gold",
+  platinum: "Platinum",
 };
 
 interface StatusData {
@@ -72,12 +72,28 @@ function formatDate(dateStr: string): string {
   });
 }
 
+const TIPS = [
+  "Chia sẻ link kèm trải nghiệm cá nhân — người thật, kết quả thật.",
+  "Post vào nhóm Facebook/Zalo fitness, gym, chạy bộ.",
+  "Kể câu chuyện 21 ngày của bạn trên story — chân thực hơn quảng cáo.",
+  "Gửi link trực tiếp cho bạn bè bạn nghĩ sẽ phù hợp.",
+  "Ghim link BodiX trong bio TikTok, Instagram.",
+  "Mỗi tuần chia sẻ 1 bài tập ngắn + link — đều đặn hơn viral.",
+];
+
 export default function AffiliatePage() {
   const [status, setStatus] = useState<StatusData | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
+
+  // Registration form
+  const [bankName, setBankName] = useState("");
+  const [bankAccount, setBankAccount] = useState("");
+  const [bankHolder, setBankHolder] = useState("");
+  const [registering, setRegistering] = useState(false);
+  const [regError, setRegError] = useState<string | null>(null);
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState("");
@@ -86,14 +102,13 @@ export default function AffiliatePage() {
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
-  // Chart year
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
 
   const partnerLink = dashboard?.code
-    ? `${PARTNER_BASE}/${dashboard.code.code}`
+    ? `${REFERRAL_BASE}?ref=${dashboard.code.code}`
     : "";
   const shareMessage = dashboard?.code
-    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! 💪\nDùng link của mình để giảm 10% chương trình đầu tiên.\n👉 ${partnerLink}`
+    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! 💪\nDùng link của mình để giảm 10%.\n👉 ${partnerLink}`
     : "";
 
   useEffect(() => {
@@ -141,6 +156,34 @@ export default function AffiliatePage() {
     a.click();
   };
 
+  const handleRegister = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setRegistering(true);
+    setRegError(null);
+    try {
+      const res = await fetch("/api/affiliate/apply", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bank_name: bankName,
+          bank_account_number: bankAccount,
+          bank_account_name: bankHolder,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok || data.status === "approved") {
+        setStatus({ has_profile: true, is_approved: true });
+        // Reload dashboard
+        const dashRes = await fetch(`/api/affiliate/dashboard?year=${chartYear}`);
+        if (dashRes.ok) setDashboard(await dashRes.json());
+      } else {
+        setRegError(data.error ?? "Có lỗi xảy ra.");
+      }
+    } finally {
+      setRegistering(false);
+    }
+  };
+
   const handleUpdateBank = async () => {
     const res = await fetch("/api/affiliate/profile", {
       method: "PATCH",
@@ -148,10 +191,7 @@ export default function AffiliatePage() {
       body: JSON.stringify(editBank),
     });
     if (res.ok && dashboard) {
-      setDashboard({
-        ...dashboard,
-        bank_info: { ...editBank },
-      });
+      setDashboard({ ...dashboard, bank_info: { ...editBank } });
     }
   };
 
@@ -193,63 +233,98 @@ export default function AffiliatePage() {
     );
   }
 
-  // ── Chưa có affiliate: trang giới thiệu + link đăng ký ───────────────────
-  if (!status?.has_profile) {
+  // ── Chưa đăng ký: thông tin + form đăng ký inline ─────────────────────────
+  if (!status?.has_profile || !status?.is_approved) {
     return (
       <div className="mx-auto max-w-2xl space-y-8 pb-16">
         <div>
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-            Chương trình Đối tác BodiX
+            Trở thành Đối tác — Nhận {COMMISSION_RATE}% hoa hồng
           </h1>
           <p className="mt-2 text-neutral-600">
-            Dành cho KOL, PT, và content creator muốn cùng BodiX lan tỏa lối sống khỏe mạnh.
+            Chia sẻ BodiX, nhận {COMMISSION_RATE}% tiền mặt cho mỗi đơn hàng qua link của bạn.
+            Người mua luôn được giảm 10%.
           </p>
         </div>
 
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div className="rounded-xl border border-neutral-200 bg-white p-5">
-            <p className="text-2xl font-bold text-primary">{COMMISSION_RATE}%</p>
-            <p className="mt-1 text-sm text-neutral-600">Hoa hồng trên mỗi đơn hàng thực tế</p>
-          </div>
-          <div className="rounded-xl border border-neutral-200 bg-white p-5">
-            <p className="text-2xl font-bold text-primary">10%</p>
-            <p className="mt-1 text-sm text-neutral-600">Giảm giá cho người dùng qua link của bạn</p>
-          </div>
-        </div>
-
+        {/* Bảng hoa hồng */}
         <div className="rounded-xl border border-neutral-200 bg-white p-6">
-          <h2 className="font-heading font-semibold text-primary">Cách tham gia</h2>
-          <ol className="mt-3 list-inside list-decimal space-y-2 text-neutral-600">
-            <li>Đăng ký tại trang đối tác</li>
-            <li>Admin xem xét và phản hồi trong 1-2 ngày</li>
-            <li>Nhận link giới thiệu riêng và bắt đầu kiếm hoa hồng</li>
-          </ol>
+          <h2 className="font-heading font-semibold text-primary mb-4">Bảng hoa hồng</h2>
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-neutral-200 text-left">
+                <th className="pb-2 font-medium">Chương trình</th>
+                <th className="pb-2 font-medium text-right">Giá</th>
+                <th className="pb-2 font-medium text-right">Hoa hồng ({COMMISSION_RATE}%)</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="border-b border-neutral-100">
+                <td className="py-2.5">BodiX 21</td>
+                <td className="py-2.5 text-right">499.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">~200.000đ</td>
+              </tr>
+              <tr className="border-b border-neutral-100">
+                <td className="py-2.5">BodiX 6W</td>
+                <td className="py-2.5 text-right">1.199.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">~480.000đ</td>
+              </tr>
+              <tr>
+                <td className="py-2.5">BodiX 12W</td>
+                <td className="py-2.5 text-right">1.999.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">~800.000đ</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
 
-        <a
-          href="/affiliate"
-          className="block w-full rounded-lg bg-primary px-4 py-3 text-center font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
-        >
-          Đăng ký làm Đối tác
-        </a>
-
-        <p className="text-center text-sm text-neutral-400">
-          Có câu hỏi? Liên hệ <a href="mailto:partner@bodix.vn" className="text-primary hover:underline">partner@bodix.vn</a>
-        </p>
-      </div>
-    );
-  }
-
-  // ── Đã đăng ký nhưng chưa duyệt ─────────────────────────────────────────
-  if (!status?.is_approved) {
-    return (
-      <div className="mx-auto max-w-lg rounded-xl border-2 border-amber-200 bg-amber-50 p-8 text-center">
-        <h1 className="font-heading text-xl font-bold text-amber-900">
-          Đơn đăng ký đang chờ duyệt
-        </h1>
-        <p className="mt-4 text-amber-800">
-          Chúng tôi sẽ xem xét và phản hồi trong 24h. Vui lòng kiểm tra email hoặc thông báo.
-        </p>
+        {/* Form đăng ký */}
+        <form onSubmit={handleRegister} className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6 space-y-4">
+          <h2 className="font-heading font-semibold text-primary">Thông tin nhận hoa hồng</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Tên ngân hàng</label>
+              <input
+                type="text"
+                required
+                value={bankName}
+                onChange={(e) => setBankName(e.target.value)}
+                placeholder="VD: Vietcombank"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Số tài khoản</label>
+              <input
+                type="text"
+                required
+                value={bankAccount}
+                onChange={(e) => setBankAccount(e.target.value)}
+                placeholder="VD: 1234567890"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-neutral-700 mb-1">Tên chủ tài khoản</label>
+              <input
+                type="text"
+                required
+                value={bankHolder}
+                onChange={(e) => setBankHolder(e.target.value)}
+                placeholder="VD: NGUYEN VAN A"
+                className="w-full rounded-lg border border-neutral-300 px-3 py-2.5 text-sm"
+              />
+            </div>
+          </div>
+          {regError && <p className="text-sm text-red-600">{regError}</p>}
+          <button
+            type="submit"
+            disabled={registering}
+            className="w-full rounded-xl bg-primary px-4 py-3.5 font-semibold text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60"
+          >
+            {registering ? "Đang xử lý..." : "Trở thành Đối tác ngay"}
+          </button>
+        </form>
       </div>
     );
   }
@@ -266,46 +341,46 @@ export default function AffiliatePage() {
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <span className="rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
-            {TIER_LABEL[dashboard?.profile?.tier ?? "basic"] ?? dashboard?.profile?.tier}
+            {TIER_LABEL[dashboard?.profile?.tier ?? "basic"]}
           </span>
           <span className="text-sm text-neutral-600">
-            Commission: {dashboard?.profile?.commission_rate ?? 40}%
+            Hoa hồng: {dashboard?.profile?.commission_rate ?? COMMISSION_RATE}%
           </span>
         </div>
       </div>
 
-      {/* Section 1 — Overview Cards */}
+      {/* Overview Cards */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
-          <p className="text-sm text-neutral-600">Doanh thu tạo ra (tháng này)</p>
+          <p className="text-sm text-neutral-600">Doanh thu tháng này</p>
           <p className="mt-1 text-xl font-bold text-primary">
-            {(dashboard?.stats.this_month_revenue ?? 0).toLocaleString("vi-VN")} đ
+            {(dashboard?.stats.this_month_revenue ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
-          <p className="text-sm text-neutral-600">Commission kiếm được (tháng này)</p>
+          <p className="text-sm text-neutral-600">Hoa hồng tháng này</p>
           <p className="mt-1 text-xl font-bold text-success">
-            {(dashboard?.stats.this_month_commission ?? 0).toLocaleString("vi-VN")} đ
+            {(dashboard?.stats.this_month_commission ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
-          <p className="text-sm text-neutral-600">Số dư chờ thanh toán</p>
+          <p className="text-sm text-neutral-600">Chờ thanh toán</p>
           <p className="mt-1 text-xl font-bold text-primary">
-            {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")} đ
+            {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
           <p className="text-sm text-neutral-600">Đã thanh toán</p>
           <p className="mt-1 text-xl font-bold text-neutral-700">
-            {(dashboard?.stats.paid_total ?? 0).toLocaleString("vi-VN")} đ
+            {(dashboard?.stats.paid_total ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
       </div>
 
-      {/* Section 2 — Mã affiliate + Chia sẻ */}
+      {/* Mã + Chia sẻ */}
       {dashboard?.code && (
         <section className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6">
-          <h2 className="mb-4 font-heading font-semibold text-primary">Mã affiliate & Chia sẻ</h2>
+          <h2 className="mb-4 font-heading font-semibold text-primary">Link giới thiệu</h2>
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
             <div>
               <p className="text-sm text-neutral-600">Mã</p>
@@ -316,7 +391,8 @@ export default function AffiliatePage() {
               onClick={() => copyToClipboard(dashboard.code!.code, "code")}
               className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-white px-4 py-2 font-medium text-primary"
             >
-              <Copy className="h-4 w-4" /> {copied === "code" ? "Đã copy!" : "Copy mã"}
+              {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied === "code" ? "Đã copy!" : "Copy mã"}
             </button>
           </div>
           <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -329,7 +405,8 @@ export default function AffiliatePage() {
               onClick={() => copyToClipboard(partnerLink, "link")}
               className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-white px-4 py-2 font-medium text-primary"
             >
-              <Copy className="h-4 w-4" /> {copied === "link" ? "Đã copy!" : "Copy link"}
+              {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+              {copied === "link" ? "Đã copy!" : "Copy link"}
             </button>
           </div>
           <div ref={qrRef} className="mt-4 flex justify-center">
@@ -342,7 +419,7 @@ export default function AffiliatePage() {
               rel="noopener noreferrer"
               className="rounded-lg bg-[#0068FF] px-4 py-2.5 text-sm font-medium text-white"
             >
-              📱 Zalo
+              Zalo
             </a>
             <a
               href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(partnerLink)}`}
@@ -350,27 +427,27 @@ export default function AffiliatePage() {
               rel="noopener noreferrer"
               className="rounded-lg bg-[#1877F2] px-4 py-2.5 text-sm font-medium text-white"
             >
-              📘 Facebook
+              Facebook
             </a>
             <button
               type="button"
               onClick={() => copyToClipboard(partnerLink, "link")}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium"
             >
-              🔗 Copy link
+              Copy link
             </button>
             <button
               type="button"
               onClick={downloadQR}
               className="rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium"
             >
-              📷 QR Code
+              QR Code
             </button>
           </div>
         </section>
       )}
 
-      {/* Section 3 — Monthly Chart */}
+      {/* Monthly Chart */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
           <h2 className="font-heading font-semibold text-primary">Biểu đồ theo tháng</h2>
@@ -379,7 +456,7 @@ export default function AffiliatePage() {
             onChange={(e) => setChartYear(parseInt(e.target.value, 10))}
             className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
           >
-            {[new Date().getFullYear(), new Date().getFullYear() - 1, new Date().getFullYear() - 2].map((y) => (
+            {[new Date().getFullYear(), new Date().getFullYear() - 1].map((y) => (
               <option key={y} value={y}>{y}</option>
             ))}
           </select>
@@ -392,17 +469,16 @@ export default function AffiliatePage() {
               <YAxis tick={{ fontSize: 11 }} />
               <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString("vi-VN") : v} />
               <Legend />
-              <Bar dataKey="conversions" name="Đơn hàng" fill="#3b82f6" />
-              <Bar dataKey="revenue" name="Doanh thu (đ)" fill="#22c55e" />
-              <Bar dataKey="commission" name="Commission (đ)" fill="#f59e0b" />
+              <Bar dataKey="conversions" name="Đơn" fill="#3b82f6" />
+              <Bar dataKey="commission" name="Hoa hồng (đ)" fill="#22c55e" />
             </BarChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      {/* Section 4 — Recent Conversions */}
+      {/* Recent Conversions */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-4 font-heading font-semibold text-primary">Đơn hàng gần đây</h2>
+        <h2 className="mb-4 font-heading font-semibold text-primary">Lịch sử đơn hàng</h2>
         {!dashboard?.recent_conversions?.length ? (
           <p className="py-8 text-center text-neutral-500">Chưa có đơn hàng</p>
         ) : (
@@ -414,8 +490,7 @@ export default function AffiliatePage() {
                   <th className="pb-2 font-medium">Người mua</th>
                   <th className="pb-2 font-medium">Chương trình</th>
                   <th className="pb-2 font-medium text-right">Doanh thu</th>
-                  <th className="pb-2 font-medium text-right">Commission</th>
-                  <th className="pb-2 font-medium">Trạng thái</th>
+                  <th className="pb-2 font-medium text-right">Hoa hồng</th>
                 </tr>
               </thead>
               <tbody>
@@ -424,13 +499,8 @@ export default function AffiliatePage() {
                     <td className="py-3">{formatDate(row.date)}</td>
                     <td className="py-3">{row.referee_name}</td>
                     <td className="py-3">{row.program}</td>
-                    <td className="py-3 text-right">{row.amount.toLocaleString("vi-VN")} đ</td>
-                    <td className="py-3 text-right font-medium">{row.commission.toLocaleString("vi-VN")} đ</td>
-                    <td className="py-3">
-                      <span className="rounded-full bg-green-100 px-2.5 py-0.5 text-xs font-medium text-green-800">
-                        {row.status === "approved" ? "Approved" : row.status}
-                      </span>
-                    </td>
+                    <td className="py-3 text-right">{row.amount.toLocaleString("vi-VN")}đ</td>
+                    <td className="py-3 text-right font-medium text-success">{row.commission.toLocaleString("vi-VN")}đ</td>
                   </tr>
                 ))}
               </tbody>
@@ -439,11 +509,11 @@ export default function AffiliatePage() {
         )}
       </section>
 
-      {/* Section 5 — Rút tiền */}
+      {/* Rút tiền */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 font-heading font-semibold text-primary">Rút tiền</h2>
         <p className="text-lg font-bold text-primary">
-          Số dư: {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")} đ
+          Số dư: {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")}đ
         </p>
 
         <div className="mt-4 space-y-4">
@@ -483,12 +553,12 @@ export default function AffiliatePage() {
 
           <form onSubmit={handleWithdraw} className="flex flex-wrap items-end gap-4">
             <div>
-              <label className="block text-sm font-medium">Số tiền muốn rút (tối thiểu 200.000đ)</label>
+              <label className="block text-sm font-medium">Số tiền (tối thiểu {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ)</label>
               <input
                 type="text"
                 value={withdrawAmount}
                 onChange={(e) => setWithdrawAmount(e.target.value.replace(/\D/g, ""))}
-                placeholder="200000"
+                placeholder={MIN_WITHDRAWAL.toLocaleString("vi-VN")}
                 className="mt-1 w-40 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
               />
             </div>
@@ -515,7 +585,7 @@ export default function AffiliatePage() {
                   className="flex items-center justify-between rounded-lg border border-neutral-100 px-3 py-2 text-sm"
                 >
                   <span>{formatDate(w.created_at)}</span>
-                  <span className="font-medium">-{w.amount.toLocaleString("vi-VN")} đ</span>
+                  <span className="font-medium">-{w.amount.toLocaleString("vi-VN")}đ</span>
                 </li>
               ))}
             </ul>
@@ -523,35 +593,19 @@ export default function AffiliatePage() {
         ) : null}
       </section>
 
-      {/* Section 6 — Tài nguyên */}
+      {/* 6 Mẹo */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-4 font-heading font-semibold text-primary">Tài nguyên</h2>
-        <ul className="space-y-3">
-          <li>
-            <a
-              href="#"
-              className="font-medium text-primary hover:underline"
-            >
-              📄 Tài liệu tiếp thị BodiX
-            </a>
-          </li>
-          <li>
-            <a
-              href="#"
-              className="font-medium text-primary hover:underline"
-            >
-              🖼️ Banner images, copy templates, FAQ
-            </a>
-          </li>
-          <li>
-            <a
-              href="#"
-              className="font-medium text-primary hover:underline"
-            >
-              📖 Hướng dẫn affiliate BodiX
-            </a>
-          </li>
-        </ul>
+        <h2 className="mb-4 font-heading font-semibold text-primary">6 mẹo tăng đơn hàng</h2>
+        <ol className="space-y-3">
+          {TIPS.map((tip, i) => (
+            <li key={i} className="flex gap-3 text-sm text-neutral-700">
+              <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                {i + 1}
+              </span>
+              {tip}
+            </li>
+          ))}
+        </ol>
       </section>
     </div>
   );

@@ -118,7 +118,7 @@ export async function POST(request: NextRequest) {
 
   const base =
     process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit";
-  const referralLink = `${base}/r/${rawCode}`;
+  const referralLink = `${base}?ref=${rawCode}`;
 
   return NextResponse.json({
     success: true,

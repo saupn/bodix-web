@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Montserrat, Playfair_Display } from "next/font/google";
 import "./globals.css";
+import { Suspense } from "react";
 import { ToastProvider } from "@/components/ui/Toast";
+import { RefCookieSetter } from "@/components/referral/RefCookieSetter";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -36,6 +38,9 @@ export default function RootLayout({
         <a href="#main-content" className="sr-only">
           Bỏ qua đến nội dung chính
         </a>
+        <Suspense>
+          <RefCookieSetter />
+        </Suspense>
         <ToastProvider>{children}</ToastProvider>
         <Analytics />
         <SpeedInsights />

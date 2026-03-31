@@ -115,7 +115,7 @@ export function buildShareMessage(opts: ShareMessageOptions): string {
   const { program_name, total_days, total_hard, code } = opts
   return (
     `Mình vừa hoàn thành ${program_name}! ${total_days} ngày, ${total_hard} buổi Hard.\n` +
-    `Nếu bạn cũng muốn thay đổi, thử BodiX: bodix.vn/r/${code}\n` +
+    `Nếu bạn cũng muốn thay đổi, thử BodiX: bodix.fit?ref=${code}\n` +
     `Giảm 10% cho bạn! 💪`
   )
 }

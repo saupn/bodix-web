@@ -83,39 +83,37 @@ export async function POST(request: NextRequest) {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PARSE TIN NHẮN CHECK-IN
-// Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)
-// Cả 3 đều = Done → streak +1
+// Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt) / Recovery
+// Cả 3+ đều = Done → streak +1
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | null {
+function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | 'recovery' | null {
   const t = text.trim().toUpperCase();
 
   const hard = ['HARD', 'H', '3', 'FULL', 'DONE', 'XONG', '✅', 'DA TAP'];
   const light = ['LIGHT', 'L', '2', 'NHE'];
   const easy = ['EASY', 'E', '1', 'DE', 'OK'];
+  const recovery = ['REC', 'RECOVERY', 'R'];
 
   if (hard.some(k => t === k || t.startsWith(k + ' '))) return 'hard';
   if (light.some(k => t === k || t.startsWith(k + ' '))) return 'light';
   if (easy.some(k => t === k || t.startsWith(k + ' '))) return 'easy';
+  if (recovery.some(k => t === k || t.startsWith(k + ' '))) return 'recovery';
 
   if (hard.some(k => t.includes(k))) return 'hard';
   if (light.some(k => t.includes(k))) return 'light';
   if (easy.some(k => t.includes(k))) return 'easy';
+  if (recovery.some(k => t.includes(k))) return 'recovery';
 
   return null;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// XỬ LÝ CHECK-IN
+// XỬ LÝ TIN NHẮN
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function handleUserMessage(payload: any) {
   const zaloUserId = payload.sender.id;
   const messageText = payload.message?.text || '';
-
-  console.log('=== DEBUG handleUserMessage ===');
-  console.log('Raw message text:', payload.message?.text);
-  console.log('Trimmed + uppercase:', payload.message?.text?.trim().toUpperCase());
-  console.log('Regex match:', /^[A-Z0-9]{5}$/.test(payload.message?.text?.trim().toUpperCase() || ''));
 
   // ── Verify code check (phone verification via Zalo OA) ──
   const codeCandidate = messageText.trim().toUpperCase();
@@ -166,7 +164,7 @@ async function handleUserMessage(payload: any) {
   // 2. Tìm enrollment active hoặc trial
   const { data: enrollment, error: enrollmentError } = await supabase
     .from('enrollments')
-    .select('id, user_id, cohort_id, current_day, program_id, programs(duration_days)')
+    .select('id, user_id, cohort_id, current_day, program_id, status, programs(name, duration_days)')
     .eq('user_id', profile.id)
     .in('status', ['active', 'trial'])
     .order('created_at', { ascending: false })
@@ -174,14 +172,28 @@ async function handleUserMessage(payload: any) {
     .single();
 
   if (enrollmentError || !enrollment) {
-    await sendZaloMessage(zaloUserId,
-      'Bạn chưa đăng ký chương trình. Vui lòng đăng ký tại bodix.fit nhé!'
-    );
+    // Kiểm tra trial hết hạn
+    const { data: expiredTrial } = await supabase
+      .from('enrollments')
+      .select('id')
+      .eq('user_id', profile.id)
+      .eq('status', 'pending_payment')
+      .limit(1)
+      .maybeSingle();
+
+    if (expiredTrial) {
+      await sendZaloMessage(zaloUserId,
+        '⏰ 3 ngày tập thử đã kết thúc. Thanh toán tại bodix.fit/checkout'
+      );
+    } else {
+      await sendZaloMessage(zaloUserId,
+        'Bạn chưa đăng ký chương trình. Vui lòng đăng ký tại bodix.fit nhé!'
+      );
+    }
     return;
   }
 
   // ── Kiểm tra: reply feeling (1-5) cho weekly review? ──
-  // Nếu tin nhắn là số 1-5 và user có weekly_review chưa reply feeling
   if (feelingScore !== null) {
     const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
     const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore);
@@ -189,13 +201,22 @@ async function handleUserMessage(payload: any) {
     // Nếu không phải context review → tiếp tục xử lý check-in (1/2/3 overlap)
   }
 
-  // ── Check-in (HARD/LIGHT/EASY hoặc 1/2/3) ──
+  // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
   if (checkinType) {
     await handleCheckin(zaloUserId, profile, enrollment, checkinType);
     return;
   }
 
-  // ── Không phải check-in → lưu là câu hỏi/vấn đề ──
+  // ── Không phải check-in hay feeling → kiểm tra có phải text không hợp lệ ──
+  // Nếu tin nhắn ngắn (< 20 ký tự) và không match → hướng dẫn check-in
+  if (messageText.trim().length < 20) {
+    await sendZaloMessage(zaloUserId,
+      'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nCả 3 đều tính hoàn thành!'
+    );
+    return;
+  }
+
+  // ── Tin nhắn dài → lưu là câu hỏi/vấn đề ──
   await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload);
 }
 
@@ -271,7 +292,7 @@ async function saveUserQuestion(zaloUserId: string, profile: any, enrollment: an
   const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
 
   let messageType: 'text' | 'image' | 'video' | 'voice' = 'text';
-  let content: string | null = messageText;
+  const content: string | null = messageText;
   let mediaUrl: string | null = null;
 
   if (payload.message?.attachments) {
@@ -333,19 +354,17 @@ async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: 
     .eq('id', review.id);
 
   // Phản hồi theo score
-  let response = '';
-  if (score === 5) response = 'Tuyệt vời! Năng lượng cao — tuần tới sẽ còn tốt hơn.';
-  else if (score === 4) response = 'Tốt lắm! Giữ nhịp này nhé.';
-  else if (score === 3) response = 'Ổn rồi. Nếu tuần tới mệt hơn, 1 lượt cũng là hoàn thành.';
-  else if (score === 2) response = 'Mình hiểu. Tuần tới cứ chọn 1 lượt nếu cần. Quan trọng là không dừng lại.';
-  else response = 'Cảm ơn bạn đã chia sẻ. Nghỉ ngơi đủ giấc, ăn đủ chất nhé.';
+  const FEELING_RESPONSES: Record<number, string> = {
+    5: 'Tuyệt vời! Tuần tới sẽ còn tốt hơn nữa.',
+    4: 'Tốt lắm! Giữ nhịp này nha.',
+    3: 'Ổn rồi. Tuần tới mệt thì cứ chọn 1 lượt nha.',
+    2: 'Mình hiểu. Cứ 1 lượt nếu cần. Quan trọng là không dừng lại.',
+    1: 'Cảm ơn bạn. Nghỉ ngơi đủ giấc, ăn đủ chất nha.',
+  };
 
-  const nextWeek = review.week_number + 1;
-  response += `\n\nTuần ${nextWeek}:\nHẹn sáng thứ Hai nhé!`;
+  await sendZaloMessage(zaloUserId, FEELING_RESPONSES[score]);
 
-  await sendZaloMessage(zaloUserId, response);
-
-  // Nếu feeling <= 2 liên tiếp 2 tuần → flag rescue
+  // Nếu feeling <= 2 liên tiếp 2 tuần → insert dropout_signals
   if (score <= 2) {
     const { data: prevReview } = await service
       .from('weekly_reviews')
@@ -355,12 +374,13 @@ async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: 
       .single();
 
     if (prevReview && prevReview.feeling_score !== null && prevReview.feeling_score <= 2) {
-      await service.from('rescue_interventions').insert({
+      await service.from('dropout_signals').insert({
         enrollment_id: enrollment.id,
         user_id: profile.id,
-        trigger_reason: 'low_feeling_sustained',
-        action_taken: `Feeling score <= 2 cho 2 tuần liên tiếp (tuần ${review.week_number - 1}: ${prevReview.feeling_score}, tuần ${review.week_number}: ${score})`,
-        outcome: 'pending',
+        signal_type: 'low_feeling_trend',
+        risk_score: 70,
+        details: `Feeling ≤ 2 hai tuần liên tiếp (tuần ${review.week_number - 1}: ${prevReview.feeling_score}, tuần ${review.week_number}: ${score})`,
+        resolved: false,
       });
     }
   }
@@ -372,20 +392,23 @@ async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: 
 // XỬ LÝ CHECK-IN
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, checkinType: 'hard' | 'light' | 'easy') {
+async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, checkinType: 'hard' | 'light' | 'easy' | 'recovery') {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const programDays = ((enrollment as any).programs?.duration_days) ?? ((enrollment as any).programs?.[0]?.duration_days) ?? 21;
+  const program = Array.isArray((enrollment as any).programs) ? (enrollment as any).programs[0] : (enrollment as any).programs;
+  const programDays: number = program?.duration_days ?? 21;
+  const programName: string = program?.name ?? 'BodiX 21';
   const dayNumber = (enrollment.current_day ?? 0) + 1;
+  const enrollmentStatus: string = enrollment.status;
 
   if (dayNumber > programDays) {
     await sendZaloMessage(zaloUserId,
-      'Bạn đã hoàn thành chương trình rồi! Chúc mừng! 🏆'
+      `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`
     );
     return;
   }
 
-  // 3. Kiểm tra đã check-in ngày này chưa
+  // Kiểm tra đã check-in ngày này chưa
   const { data: existing } = await supabase
     .from('daily_checkins')
     .select('id')
@@ -395,14 +418,14 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
 
   if (existing && existing.length > 0) {
     await sendZaloMessage(zaloUserId,
-      `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé 💪`
+      `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé.`
     );
     return;
   }
 
   const workoutDate = new Date().toISOString().split('T')[0];
 
-  // 4. Ghi check-in
+  // Ghi check-in
   const { error: checkinError } = await service
     .from('daily_checkins')
     .insert({
@@ -418,7 +441,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
   if (checkinError) {
     if (checkinError.code === '23505') {
       await sendZaloMessage(zaloUserId,
-        `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé 💪`
+        `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé.`
       );
       return;
     }
@@ -427,7 +450,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     return;
   }
 
-  // 5. Cập nhật streak (giống checkin API)
+  // Cập nhật streak
   const { data: existingStreak } = await service
     .from('streaks')
     .select('*')
@@ -473,7 +496,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     total_completed_days: prev.total_completed_days + 1,
     total_hard_days: checkinType === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
     total_light_days: checkinType === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
-    total_recovery_days: prev.total_recovery_days, // Zalo chỉ reply HARD/LIGHT/EASY
+    total_recovery_days: checkinType === 'recovery' ? prev.total_recovery_days + 1 : prev.total_recovery_days,
     total_easy_days: checkinType === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
     total_skip_days: prev.total_skip_days,
     last_checkin_date: workoutDate,
@@ -485,37 +508,45 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     .from('streaks')
     .upsert(streakUpsert, { onConflict: 'enrollment_id' });
 
-  // 6. Cập nhật enrollment
-  const isComplete = dayNumber >= programDays;
-  await service
-    .from('enrollments')
-    .update({
-      current_day: dayNumber,
-      ...(isComplete ? { status: 'completed', completed_at: new Date().toISOString() } : {}),
-    })
-    .eq('id', enrollment.id);
+  // Cập nhật enrollment
+  const isLastDay = dayNumber >= programDays;
+  const isTrialLastDay = enrollmentStatus === 'trial' && dayNumber >= 3;
 
-  // 7. Phản hồi
-  const emojis: Record<string, string> = { hard: '🔥', light: '💪', easy: '✅' };
-  const labels: Record<string, string> = { hard: '3 lượt', light: '2 lượt', easy: '1 lượt' };
-  const displayName = profile.full_name || 'Bạn';
-
-  await sendZaloMessage(zaloUserId,
-    `${emojis[checkinType]} Ngày ${dayNumber}/${programDays} hoàn thành (${labels[checkinType]})! Streak: ${newCurrentStreak} ngày`
-  );
-
-  if (isComplete) {
-    const totalDone = streakUpsert.total_completed_days;
-    const totalHard = streakUpsert.total_hard_days;
-    const totalLight = streakUpsert.total_light_days;
-    const totalEasy = streakUpsert.total_easy_days;
-    const totalRecovery = streakUpsert.total_recovery_days;
-    await sendZaloMessage(zaloUserId,
-      `🏆 CHÚC MỪNG ${displayName}! Bạn đã hoàn thành BodiX 21!\n` +
-      `Tổng ${totalDone} buổi: ${totalHard} Hard + ${totalLight} Light + ${totalEasy} Easy + ${totalRecovery} Recovery\n` +
-      `Bạn là người hoàn thành. Tự hào về bản thân!`
-    );
+  if (isTrialLastDay && !isLastDay) {
+    // Trial D3 hoàn thành → trial_completed (chờ admin chọn)
+    await service
+      .from('enrollments')
+      .update({ current_day: dayNumber, status: 'trial_completed' })
+      .eq('id', enrollment.id);
+  } else {
+    await service
+      .from('enrollments')
+      .update({
+        current_day: dayNumber,
+        ...(isLastDay ? { status: 'completed', completed_at: new Date().toISOString() } : {}),
+      })
+      .eq('id', enrollment.id);
   }
+
+  // ── Phản hồi: chỉ gửi trong 3 ngoại lệ, im lặng khi thành công bình thường ──
+
+  // Ngoại lệ b: Ngày cuối trial (D3, status='trial')
+  if (isTrialLastDay && !isLastDay) {
+    await sendZaloMessage(zaloUserId,
+      '🎯 3 ngày tập thử hoàn thành! Bạn sẽ được thông báo khi đợt tiếp theo mở.'
+    );
+    return;
+  }
+
+  // Ngoại lệ c: Ngày cuối chương trình
+  if (isLastDay) {
+    await sendZaloMessage(zaloUserId,
+      `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`
+    );
+    return;
+  }
+
+  // Check-in thành công bình thường → im lặng, không gửi tin phản hồi
 }
 
 function shiftDate(dateStr: string, days: number): string {

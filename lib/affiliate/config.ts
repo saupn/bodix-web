@@ -26,7 +26,7 @@ export const DEFAULT_COMMISSION_RATE = TIER_COMMISSION.basic; // 40%
 export const REFERRAL_REWARD_AMOUNT = 100_000;
 
 /** Discount (%) given to the referred user on their first purchase (referral) */
-export const REFERRAL_DISCOUNT_PERCENT = 15;
+export const REFERRAL_DISCOUNT_PERCENT = 10;
 
 /** Discount (%) given to the referred user via affiliate link */
 export const AFFILIATE_DISCOUNT_PERCENT = 10;

@@ -8,6 +8,8 @@ import { WeeklyCalendar } from "@/components/completion/WeeklyCalendar";
 import type { CheckinData } from "@/components/completion/WeeklyCalendar";
 import { MILESTONE_CONFIG } from "@/lib/completion/milestones";
 import { ComebackCard } from "@/components/rescue/ComebackCard";
+import { BuddyCard } from "@/components/dashboard/BuddyCard";
+import { ZaloConnectBanner } from "@/components/dashboard/ZaloConnectBanner";
 
 const COMEBACK_DISMISSED_KEY = "comeback-dismissed";
 
@@ -59,8 +61,10 @@ interface HistoryData {
 
 export function DashboardHomeContent({
   displayName,
+  phoneVerified = true,
 }: {
   displayName: string;
+  phoneVerified?: boolean;
 }) {
   const [program, setProgram] = useState<ProgramActive | null>(null);
   const [stats, setStats] = useState<MyStats | null>(null);
@@ -182,6 +186,9 @@ export function DashboardHomeContent({
 
   return (
     <div className="space-y-6">
+      {/* Zalo connect banner */}
+      <ZaloConnectBanner phoneVerified={phoneVerified} />
+
       {/* Header + StreakBadge compact */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
@@ -261,6 +268,9 @@ export function DashboardHomeContent({
           )}
         </Link>
       )}
+
+      {/* Buddy card */}
+      <BuddyCard />
 
       {/* ProgressRing + WeeklyCalendar row */}
       <div className="grid gap-6 sm:grid-cols-[auto_1fr]">

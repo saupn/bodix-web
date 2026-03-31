@@ -251,18 +251,27 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         return;
       }
 
-      const { data, error: queryError } = await supabase
-        .from("profiles")
-        .select("phone_verified")
-        .eq("id", user.id)
-        .single();
+      // Bypass browser/PostgREST cache with direct fetch + no-store
+      const session = (await supabase.auth.getSession()).data.session;
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/profiles?id=eq.${user.id}&select=phone_verified`,
+        {
+          headers: {
+            "apikey": process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+            "Authorization": `Bearer ${session?.access_token}`,
+            "Accept": "application/vnd.pgrst.object+json",
+          },
+          cache: "no-store",
+        }
+      );
 
-      if (queryError) {
-        console.warn("[zalo-poll] query failed:", queryError.message);
+      if (!res.ok) {
+        console.warn("[zalo-poll] fetch failed:", res.status, await res.text());
         return;
       }
 
-      console.log("[zalo-poll] phone_verified =", data?.phone_verified);
+      const data = await res.json();
+      console.log("[zalo-poll] fresh result:", data?.phone_verified);
 
       if (data?.phone_verified) {
         setPhoneVerified(true);

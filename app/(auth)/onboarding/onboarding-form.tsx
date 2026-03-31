@@ -59,6 +59,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [copied, setCopied] = useState(false);
   const [showResend, setShowResend] = useState(false);
   const [phoneVerified, setPhoneVerified] = useState(false);
+  const [checking, setChecking] = useState(false);
+  const [checkNotVerified, setCheckNotVerified] = useState(false);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const resendTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -238,64 +240,34 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     };
   }, [verifyStage]);
 
-  // ── Step 3: Realtime + API fallback (server reads DB, no stale client cache) ──
+  // ── Step 3: Manual server-side check (no polling, no cache issues) ──
 
-  useEffect(() => {
-    if (verifyStage !== "waiting" || step !== 3) return;
-
-    const supabase = createClient();
-
-    const channel = supabase
-      .channel("phone-verify")
-      .on(
-        "postgres_changes",
-        {
-          event: "UPDATE",
-          schema: "public",
-          table: "profiles",
-          filter: `id=eq.${userId}`,
-        },
-        (payload) => {
-          const row = payload.new as { phone_verified?: boolean };
-          console.log("[zalo-realtime] profile updated:", row);
-          if (row.phone_verified === true) {
-            setPhoneVerified(true);
-            setVerifyStage("success");
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [verifyStage, step, userId]);
-
-  useEffect(() => {
-    if (verifyStage !== "waiting" || step !== 3) return;
-
-    const check = async () => {
-      try {
-        const res = await fetch("/api/auth/check-phone-verified", {
-          cache: "no-store",
-        });
-        if (!res.ok) return;
-        const data = (await res.json()) as { verified?: boolean };
-        console.log("[zalo-poll] verified:", data.verified);
-        if (data.verified === true) {
-          setPhoneVerified(true);
-          setVerifyStage("success");
-        }
-      } catch (e) {
-        console.warn("[zalo-poll] error:", e);
+  async function handleCheckVerified() {
+    setChecking(true);
+    setCheckNotVerified(false);
+    try {
+      const res = await fetch("/api/auth/check-phone-verified", {
+        cache: "no-store",
+      });
+      if (!res.ok) {
+        setCheckNotVerified(true);
+        return;
       }
-    };
-
-    void check();
-    const interval = setInterval(check, 3000);
-
-    return () => clearInterval(interval);
-  }, [verifyStage, step]);
+      const data = (await res.json()) as { verified?: boolean };
+      console.log("[zalo-check] verified:", data.verified);
+      if (data.verified === true) {
+        setPhoneVerified(true);
+        setVerifyStage("success");
+      } else {
+        setCheckNotVerified(true);
+      }
+    } catch (e) {
+      console.warn("[zalo-check] error:", e);
+      setCheckNotVerified(true);
+    } finally {
+      setChecking(false);
+    }
+  }
 
   // ── Step 3: Success — checkmark 1.5s then next step ──
 
@@ -650,10 +622,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   </div>
 
-                  <p className="text-xs text-neutral-400 text-center mt-1">
-                    Sau khi gửi tin nhắn, trang này sẽ tự động cập nhật
-                  </p>
-
                   {/* Countdown */}
                   <p className="text-center text-sm text-neutral-500">
                     Mã có hiệu lực trong{" "}
@@ -661,6 +629,32 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       {formatTime(secondsLeft)}
                     </span>
                   </p>
+
+                  {/* Check button */}
+                  <button
+                    type="button"
+                    onClick={handleCheckVerified}
+                    disabled={checking}
+                    className={btnPrimary}
+                  >
+                    {checking ? (
+                      <span className="flex items-center justify-center gap-2">
+                        <Loader2 className="w-5 h-5 animate-spin" />
+                        Đang kiểm tra...
+                      </span>
+                    ) : (
+                      "Đã gửi, kiểm tra"
+                    )}
+                  </button>
+
+                  {/* Not verified yet message */}
+                  {checkNotVerified && (
+                    <p className="text-sm text-amber-600 text-center">
+                      Chưa nhận được. Hãy chắc chắn bạn đã gửi đúng mã{" "}
+                      <span className="font-mono font-bold">{verifyCode}</span>{" "}
+                      đến OA BodiX trên Zalo.
+                    </p>
+                  )}
 
                   {/* Error */}
                   {error && (

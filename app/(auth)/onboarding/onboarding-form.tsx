@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Copy, Check, CheckCircle, Loader2, ExternalLink, Gift, Percent } from "lucide-react";
-import { PROGRAMS, REFERRAL_BASE } from "@/lib/constants";
-import { suggestReferralCodes } from "@/lib/referral/utils";
+import { Copy, Check, CheckCircle, Loader2, ExternalLink } from "lucide-react";
+import { PROGRAMS } from "@/lib/constants";
+import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
 import { createClient } from "@/lib/supabase/client";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
@@ -35,10 +35,9 @@ interface Props {
 }
 
 export default function OnboardingForm({ userId, initialName }: Props) {
-  const [step, setStep] = useState(0); // 0 = loading
+  const [step, setStep] = useState(1);
   const [direction, setDirection] = useState(0);
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Step 1
@@ -74,80 +73,18 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     } catch {}
   }, []);
 
-  // On mount: check profile completion and skip to first incomplete step
+  // Check if phone already verified on mount
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data: { user } } = await supabase.auth.getUser();
-      if (!user) { setStep(1); setInitializing(false); return; }
-
-      const [{ data: profile }, { data: referralCodes }] = await Promise.all([
-        supabase
-          .from("profiles")
-          .select("full_name, date_of_birth, gender, fitness_goal, phone, phone_verified, onboarding_completed")
-          .eq("id", user.id)
-          .single(),
-        supabase
-          .from("referral_codes")
-          .select("id")
-          .eq("user_id", user.id)
-          .limit(1),
-      ]);
-
-      if (!profile) { setStep(1); setInitializing(false); return; }
-
-      // Already completed onboarding — redirect immediately
-      if (profile.onboarding_completed === true) {
-        console.log("[onboarding-form] Already completed, redirecting to /app");
-        window.location.href = "/app";
-        return;
-      }
-
-      // Populate form state from existing profile data
-      if (profile.full_name) setFullName(profile.full_name);
-      if (profile.date_of_birth) setDateOfBirth(profile.date_of_birth);
-      if (profile.gender) setGender(profile.gender as "female" | "male" | "other");
-      if (Array.isArray(profile.fitness_goal) && profile.fitness_goal.length > 0) {
-        setGoals(profile.fitness_goal as string[]);
-      }
-      if (profile.phone) setPhone(profile.phone);
-      if (profile.phone_verified) setPhoneVerified(true);
-
-      // Determine first incomplete step
-      const step1Done = profile.gender != null;
-      const step2Done = profile.fitness_goal != null &&
-        (Array.isArray(profile.fitness_goal) ? profile.fitness_goal.length > 0 : true);
-      const step3Done = profile.phone_verified === true;
-      const step4Done = true; // info-only step, skip if prior steps done
-      const step5Done = (referralCodes?.length ?? 0) > 0;
-
-      if (step1Done && step2Done && step3Done && step4Done && step5Done) {
-        // All steps done but onboarding_completed not set — set it now and redirect
-        console.log("[onboarding-form] All steps done, completing onboarding");
-        await fetch("/api/auth/complete-onboarding", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            full_name: profile.full_name,
-            date_of_birth: profile.date_of_birth,
-            gender: profile.gender,
-            fitness_goal: profile.fitness_goal,
-            phone: profile.phone,
-            phone_verified: profile.phone_verified,
-          }),
-        });
-        window.location.href = "/app";
-        return;
-      }
-
-      const firstIncomplete = !step1Done ? 1
-        : !step2Done ? 2
-        : !step3Done ? 3
-        : !step4Done ? 4
-        : 5;
-
-      setStep(firstIncomplete);
-      setInitializing(false);
+      if (!user) return;
+      const { data } = await supabase
+        .from("profiles")
+        .select("phone_verified")
+        .eq("id", user.id)
+        .single();
+      if (data?.phone_verified) setPhoneVerified(true);
     })();
   }, []);
 
@@ -298,26 +235,21 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
     try {
       const referredBy = referralCodeFromStorage || undefined;
-      const payload = {
-        full_name: fullName.trim() || null,
-        date_of_birth: dateOfBirth || null,
-        gender: gender || null,
-        fitness_goal: goals.length > 0 ? goals : null,
-        phone: phone.trim() || null,
-        phone_verified: phoneVerified,
-        referred_by: referredBy,
-      };
-
-      console.log("[onboarding] handleComplete payload:", payload);
-
       const res = await fetch("/api/auth/complete-onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body: JSON.stringify({
+          full_name: fullName.trim(),
+          date_of_birth: dateOfBirth || null,
+          gender,
+          fitness_goal: goals,
+          phone: phone.trim() || null,
+          phone_verified: phoneVerified,
+          referred_by: referredBy,
+        }),
       });
 
       const data = await res.json();
-      console.log("[onboarding] handleComplete response:", res.status, data);
 
       if (!res.ok) {
         setError(data.error || "Đã xảy ra lỗi. Vui lòng thử lại.");
@@ -329,10 +261,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
         localStorage.removeItem(REFERRAL_STORAGE_KEY);
       } catch {}
 
-      // Full page reload to ensure Server Components read fresh data
       window.location.href = "/app";
-    } catch (err) {
-      console.error("[onboarding] handleComplete error:", err);
+    } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);
     }
@@ -342,23 +272,6 @@ export default function OnboardingForm({ userId, initialName }: Props) {
     "w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50";
   const btnPrimary =
     "flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-3 font-semibold text-secondary-light transition-colors hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50";
-
-  if (initializing) {
-    return (
-      <div className="relative w-full max-w-lg mx-auto">
-        <div className="mb-8">
-          <div className="h-4 w-24 rounded bg-neutral-200 animate-pulse mb-2" />
-          <div className="h-1.5 w-full rounded-full bg-neutral-200" />
-        </div>
-        <div className="rounded-2xl border border-white/10 bg-white/95 p-6 shadow-xl backdrop-blur-sm sm:p-8 space-y-4">
-          <div className="h-8 w-48 rounded bg-neutral-200 animate-pulse" />
-          <div className="h-4 w-64 rounded bg-neutral-200 animate-pulse" />
-          <div className="h-12 w-full rounded-lg bg-neutral-200 animate-pulse" />
-          <div className="h-12 w-full rounded-lg bg-neutral-200 animate-pulse" />
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="relative w-full max-w-lg mx-auto">
@@ -640,9 +553,9 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   )}
 
-                  {/* Resend */}
-                  {showResend && (
-                    <div className="flex justify-center pt-1">
+                  {/* Resend / Skip */}
+                  <div className="flex flex-col items-center gap-2 pt-1">
+                    {showResend && (
                       <button
                         type="button"
                         onClick={() => {
@@ -653,8 +566,16 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                       >
                         Gửi lại mã
                       </button>
-                    </div>
-                  )}
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => goNext(4)}
+                      className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                      suppressHydrationWarning
+                    >
+                      Bỏ qua, kết nối sau →
+                    </button>
+                  </div>
                 </>
               ) : (
                 /* ── Trạng thái 1: Nhập SĐT ── */
@@ -717,6 +638,14 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </button>
                   </div>
 
+                  <button
+                    type="button"
+                    onClick={() => goNext(4)}
+                    className="w-full text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                    suppressHydrationWarning
+                  >
+                    Bỏ qua, kết nối sau →
+                  </button>
                 </>
               )}
             </motion.div>
@@ -769,226 +698,35 @@ export default function OnboardingForm({ userId, initialName }: Props) {
             </motion.div>
           )}
 
-          {/* Step 5: Chia sẻ BodiX, nhận quà */}
+          {/* Step 5: Mã giới thiệu */}
           {step === 5 && (
-            <ReferralStep
-              fullName={fullName}
-              direction={direction}
-              slideVariants={slideVariants}
-              btnPrimary={btnPrimary}
-              onComplete={handleComplete}
-              loading={loading}
-            />
+            <motion.div
+              key="5"
+              custom={direction}
+              variants={slideVariants}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={{ duration: 0.2 }}
+              className="space-y-6"
+            >
+              <ReferralCodeSelector
+                fullName={fullName}
+                onCodeSet={() => handleComplete()}
+                onSkip={() => handleComplete()}
+              />
+              <button
+                type="button"
+                onClick={goBack}
+                className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
+                suppressHydrationWarning
+              >
+                Quay lại
+              </button>
+            </motion.div>
           )}
         </AnimatePresence>
       </div>
     </div>
-  );
-}
-
-// ─── Step 5: Referral benefits & code ─────────────────────────────────────────
-
-function ReferralStep({
-  fullName,
-  direction,
-  slideVariants: variants,
-  btnPrimary,
-  onComplete,
-  loading: parentLoading,
-}: {
-  fullName: string;
-  direction: number;
-  slideVariants: typeof slideVariants;
-  btnPrimary: string;
-  onComplete: () => void;
-  loading: boolean;
-}) {
-  const [referralCode, setReferralCode] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [codeSaved, setCodeSaved] = useState(false);
-  const [copied, setCopied] = useState(false);
-  const [linkCopied, setLinkCopied] = useState(false);
-
-  // Auto-generate code from name on mount
-  useEffect(() => {
-    (async () => {
-      const supabase = createClient();
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      // Check if user already has a referral code
-      const { data: profile } = await supabase
-        .from("profiles")
-        .select("referral_code")
-        .eq("id", user.id)
-        .single();
-
-      if (profile?.referral_code) {
-        setReferralCode(profile.referral_code);
-        setCodeSaved(true);
-        return;
-      }
-
-      // Auto-generate from name
-      const suggestions = suggestReferralCodes(fullName);
-      if (suggestions.length === 0) return;
-
-      // Find the first available code
-      for (const code of suggestions) {
-        const res = await fetch(`/api/referral/check?code=${encodeURIComponent(code)}`);
-        const data = await res.json();
-        if (data.available) {
-          setReferralCode(code);
-          break;
-        }
-      }
-    })();
-  }, [fullName]);
-
-  const handleSaveAndComplete = async () => {
-    if (!referralCode) {
-      await onComplete();
-      return;
-    }
-
-    if (codeSaved) {
-      await onComplete();
-      return;
-    }
-
-    setSaving(true);
-    try {
-      const res = await fetch("/api/referral/set", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ code: referralCode }),
-      });
-      if (res.ok) {
-        setCodeSaved(true);
-      }
-    } catch {
-      // Non-fatal — proceed anyway
-    } finally {
-      setSaving(false);
-    }
-    await onComplete();
-  };
-
-  const referralLink = referralCode ? `${REFERRAL_BASE}?ref=${referralCode}` : "";
-  const shareText = referralCode
-    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! Bạn dùng mã ${referralCode} để được giảm 10%: ${referralLink}`
-    : "";
-
-  const handleCopyCode = () => {
-    navigator.clipboard.writeText(referralCode);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
-
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(referralLink);
-    setLinkCopied(true);
-    setTimeout(() => setLinkCopied(false), 2000);
-  };
-
-  return (
-    <motion.div
-      key="5"
-      custom={direction}
-      variants={variants}
-      initial="enter"
-      animate="center"
-      exit="exit"
-      transition={{ duration: 0.2 }}
-      className="space-y-5"
-    >
-      <div>
-        <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Chia sẻ BodiX, nhận quà
-        </h1>
-        <p className="mt-1 text-sm text-neutral-600">
-          Mời bạn bè tập cùng và nhận thưởng cho mỗi người đăng ký thành công
-        </p>
-      </div>
-
-      {/* Benefit cards */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">
-          <Gift className="mx-auto h-8 w-8 text-primary mb-2" />
-          <p className="text-sm font-semibold text-primary">Voucher 100.000đ</p>
-          <p className="mt-1 text-xs text-neutral-600">Cho mỗi người đăng ký thành công</p>
-        </div>
-        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 text-center">
-          <Percent className="mx-auto h-8 w-8 text-primary mb-2" />
-          <p className="text-sm font-semibold text-primary">Bạn bè giảm 10%</p>
-          <p className="mt-1 text-xs text-neutral-600">Khi đăng ký qua mã của bạn</p>
-        </div>
-      </div>
-
-      {/* Referral code display */}
-      {referralCode && (
-        <div className="rounded-xl border-2 border-primary/30 bg-white p-4">
-          <p className="text-xs font-medium text-neutral-500 mb-2">Mã giới thiệu của bạn</p>
-          <div className="flex items-center gap-3">
-            <span className="flex-1 text-center font-mono text-2xl font-bold tracking-widest text-primary select-all">
-              {referralCode}
-            </span>
-            <button
-              type="button"
-              onClick={handleCopyCode}
-              className="rounded-lg border border-neutral-200 p-2.5 hover:bg-neutral-50 transition-colors"
-            >
-              {copied ? <Check className="w-5 h-5 text-green-500" /> : <Copy className="w-5 h-5 text-neutral-500" />}
-            </button>
-          </div>
-
-          {/* Share link */}
-          <div className="mt-3 pt-3 border-t border-neutral-100">
-            <p className="text-xs text-neutral-500 mb-1.5">Link chia sẻ</p>
-            <div className="flex items-center gap-2">
-              <p className="flex-1 text-xs font-mono text-neutral-600 truncate">{referralLink}</p>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="shrink-0 rounded-md border border-primary/30 px-3 py-1.5 text-xs font-medium text-primary hover:bg-primary/5 transition-colors"
-              >
-                {linkCopied ? "Đã copy!" : "Copy link"}
-              </button>
-            </div>
-          </div>
-
-          {/* Zalo share */}
-          <a
-            href={`https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent('Tham gia BodiX - Giảm 10% với mã giới thiệu của tôi')}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-[#0068FF] px-4 py-2.5 text-sm font-medium text-white hover:opacity-90 transition-opacity"
-          >
-            Chia sẻ qua Zalo
-            <ExternalLink className="w-4 h-4" />
-          </a>
-        </div>
-      )}
-
-      {/* Fine print */}
-      <p className="text-xs text-neutral-400 text-center">
-        Voucher được kích hoạt khi bạn bè hoàn tất thanh toán. Bạn có thể xem và quản lý voucher trong phần Hồ sơ.
-      </p>
-
-      {/* Continue button */}
-      <button
-        type="button"
-        onClick={handleSaveAndComplete}
-        disabled={saving || parentLoading}
-        className={btnPrimary}
-        suppressHydrationWarning
-      >
-        {saving || parentLoading ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
-        ) : (
-          "Tiếp tục"
-        )}
-      </button>
-    </motion.div>
   );
 }

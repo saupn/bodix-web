@@ -40,7 +40,7 @@ async function getToken(): Promise<string> {
   if (error || !data?.access_token) {
     throw new Error(`Cannot read zalo_tokens: ${error?.message ?? "no row"}`);
   }
-  cachedToken = data.access_token;
+  cachedToken = data.access_token as string;
   return cachedToken;
 }
 

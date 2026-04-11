@@ -26,13 +26,27 @@ function CheckoutContent() {
   const program = PROGRAMS[programSlug];
   const [orderCode, setOrderCode] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"momo" | "bank">("momo");
-  const [submitted, setSubmitted] = useState(false);
+  const [registered, setRegistered] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const storageKey = `bodix_checkout_registered_${programSlug}`;
 
   useEffect(() => {
     setOrderCode(generateOrderCode());
   }, []);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(storageKey);
+      if (saved) {
+        setOrderCode(saved);
+        setRegistered(true);
+      }
+    } catch {
+      /* ignore */
+    }
+  }, [storageKey]);
 
   const copyOrderCode = () => {
     if (orderCode) {
@@ -70,7 +84,12 @@ Nội dung: ${orderCode}`;
         return;
       }
 
-      setSubmitted(true);
+      setRegistered(true);
+      try {
+        localStorage.setItem(storageKey, orderCode);
+      } catch {
+        /* ignore */
+      }
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
     } finally {
@@ -78,35 +97,20 @@ Nội dung: ${orderCode}`;
     }
   };
 
-  if (submitted) {
+  if (registered) {
     return (
       <div className="mx-auto max-w-md rounded-2xl border-2 border-[#2D4A3E]/20 bg-white p-8 text-center">
-        <div className="flex justify-center">
-          <svg
-            className="h-16 w-16 text-amber-500"
-            fill="none"
-            stroke="currentColor"
-            viewBox="0 0 24 24"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-            />
-          </svg>
-        </div>
-        <h2 className="mt-6 font-heading text-xl font-bold text-[#2D4A3E]">
-          Cảm ơn! Đang xác nhận thanh toán.
+        <h2 className="font-heading text-xl font-bold text-[#2D4A3E]">
+          ✅ Đã đăng ký — Chờ xác nhận
         </h2>
-        <p className="mt-3 text-neutral-600">
-          Thường trong 5–15 phút (giờ hành chính)
+        <p className="mt-4 text-neutral-600">
+          Cảm ơn! Đăng ký của bạn đã được ghi nhận.
         </p>
-        <p className="mt-1 text-sm text-neutral-500">
-          Bạn sẽ nhận thông báo qua Zalo khi kích hoạt
+        <p className="mt-2 text-sm text-neutral-600">
+          Chúng tôi sẽ gửi thông báo qua Zalo khi bạn được tham gia.
         </p>
-        <p className="mt-6 font-mono text-sm font-medium text-neutral-700">
-          Mã đơn: {orderCode}
+        <p className="mt-6 font-mono text-sm font-medium text-neutral-800">
+          Mã đăng ký: {orderCode}
         </p>
         <Link
           href="/app"
@@ -157,6 +161,17 @@ Nội dung: ${orderCode}`;
             Giới thiệu bởi: <span className="font-medium">{refParam}</span>
           </p>
         )}
+      </div>
+
+      <div className="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-neutral-700">
+        <p className="font-medium text-blue-900">ℹ️ Bạn chưa cần thanh toán ngay.</p>
+        <p className="mt-2">
+          Hiện có nhiều người đang đăng ký. Chúng tôi sẽ xác nhận và gửi thông báo cho bạn khi bạn
+          được tham gia đợt tập tiếp theo.
+        </p>
+        <p className="mt-2">
+          Vui lòng xác nhận đăng ký bên dưới để giữ chỗ.
+        </p>
       </div>
 
       {/* Tabs thanh toán */}
@@ -271,7 +286,7 @@ Nội dung: ${orderCode}`;
           disabled={loading || !orderCode}
           className="w-full rounded-xl bg-[#2D4A3E] py-4 font-semibold text-white hover:bg-[#243d32] disabled:opacity-50"
         >
-          {loading ? "Đang xử lý..." : "Tôi đã thanh toán"}
+          {loading ? "Đang xử lý..." : "Xác nhận đăng ký"}
         </button>
       </div>
     </div>

@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { canAccessTrialContent } from "@/lib/trial/utils";
 import { isWithinTrialContentLimit } from "@/lib/trial/utils";
+import { getTrialExperienceDay } from "@/lib/trial/calendar";
 
 export async function GET(
   _request: Request,
@@ -25,7 +26,7 @@ export async function GET(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("trial_ends_at")
+    .select("trial_ends_at, bodix_start_date")
     .eq("id", user.id)
     .single();
 
@@ -53,6 +54,20 @@ export async function GET(
   if (!isWithinTrialContentLimit(day)) {
     return NextResponse.json(
       { error: "Ngày không nằm trong phạm vi trial." },
+      { status: 403 }
+    );
+  }
+
+  const trialExpDay = getTrialExperienceDay(profile?.bodix_start_date ?? null);
+  if (trialExpDay === 0) {
+    return NextResponse.json(
+      { error: "Chương trình tập thử chưa bắt đầu. Vui lòng quay lại vào ngày bắt đầu." },
+      { status: 403 }
+    );
+  }
+  if (day > trialExpDay) {
+    return NextResponse.json(
+      { error: "Ngày này chưa mở khóa." },
       { status: 403 }
     );
   }

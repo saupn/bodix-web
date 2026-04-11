@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
+import { getVietnamDateString } from '@/lib/date/vietnam';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Session metadata (source: lib/workout/video-config.ts)
@@ -124,7 +125,7 @@ function buildRecoveryMessage(
 // ROUTE HANDLER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-export async function GET(request: NextRequest) {
+async function handleMorningMessages(request: NextRequest): Promise<NextResponse> {
   const authHeader = request.headers.get('authorization');
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -142,6 +143,105 @@ export async function GET(request: NextRequest) {
 
   if (!program) {
     return NextResponse.json({ sent: 0, skipped: 0, errors: 0, message: 'Program bodix-21 not found' });
+  }
+
+  const todayVN = getVietnamDateString();
+  let sentCount = 0;
+  let skippedCount = 0;
+  let errorCount = 0;
+
+  // ── Trial: current_day = 0 → 1 khi đến bodix_start_date, gửi tin ngày 1 ──
+  const { data: trialEnrollments, error: trialErr } = await supabase
+    .from('enrollments')
+    .select(`
+      id,
+      user_id,
+      program_id,
+      profiles!inner (
+        id,
+        full_name,
+        channel_user_id,
+        bodix_start_date
+      )
+    `)
+    .eq('status', 'trial')
+    .eq('current_day', 0)
+    .eq('program_id', program.id);
+
+  if (trialErr) {
+    console.error('[morning-messages] trial enrollments:', trialErr);
+  } else if (trialEnrollments?.length) {
+    for (const row of trialEnrollments) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const en = row as any;
+      const profile = Array.isArray(en.profiles) ? en.profiles[0] : en.profiles;
+      const bodixStart: string | undefined = profile?.bodix_start_date;
+      const channelUserId: string | null = profile?.channel_user_id;
+
+      if (!bodixStart || bodixStart > todayVN) {
+        skippedCount++;
+        continue;
+      }
+      if (!channelUserId) {
+        skippedCount++;
+        continue;
+      }
+
+      const { data: workout } = await supabase
+        .from('workout_templates')
+        .select('day_number, title, workout_type')
+        .eq('program_id', en.program_id)
+        .eq('day_number', 1)
+        .maybeSingle();
+
+      if (!workout || workout.workout_type === 'review') {
+        errorCount++;
+        continue;
+      }
+
+      const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
+      const isWeekStart = true;
+      const dayNumber = 1;
+      let message: string;
+
+      if (workout.workout_type === 'recovery') {
+        message = buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart);
+      } else {
+        const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
+        const session = sessionCode ? SESSIONS[sessionCode] : null;
+        if (!session) {
+          console.error(`[morning-messages] trial: unknown title "${workout.title}"`);
+          errorCount++;
+          continue;
+        }
+        message = buildMainMessage(displayName, dayNumber, config.totalDays, session, isWeekStart);
+      }
+
+      try {
+        const result = await sendViaZalo(channelUserId, message);
+        if (result.success) {
+          sentCount++;
+          await supabase.from('enrollments').update({ current_day: 1 }).eq('id', en.id);
+          await supabase.from('profiles').update({ bodix_current_day: 1 }).eq('id', profile.id);
+          await supabase.from('nudge_logs').insert({
+            user_id: profile.id,
+            enrollment_id: en.id,
+            nudge_type: 'morning_reminder',
+            channel: 'zalo',
+            content_template: workout.workout_type === 'recovery' ? 'morning_recovery' : 'morning_main',
+            content_variables: { day_number: dayNumber, workout_type: workout.workout_type, trial: true },
+            delivered: true,
+          });
+        } else {
+          console.error(`[morning-messages] trial zalo failed:`, result.error);
+          errorCount++;
+        }
+      } catch (err) {
+        console.error('[morning-messages] trial send:', err);
+        errorCount++;
+      }
+      await new Promise((r) => setTimeout(r, 100));
+    }
   }
 
   // Lấy enrollments active + profile + cohort
@@ -164,17 +264,23 @@ export async function GET(request: NextRequest) {
 
   if (enrollError) {
     console.error('[morning-messages] enrollments query:', enrollError);
-    return NextResponse.json({ sent: 0, skipped: 0, errors: 1, message: enrollError.message }, { status: 500 });
+    return NextResponse.json(
+      { sent: sentCount, skipped: skippedCount, errors: errorCount + 1, message: enrollError.message },
+      { status: 500 }
+    );
   }
 
   if (!enrollments || enrollments.length === 0) {
-    return NextResponse.json({ sent: 0, skipped: 0, errors: 0, message: 'No active enrollments' });
+    return NextResponse.json({
+      sent: sentCount,
+      skipped: skippedCount,
+      errors: errorCount,
+      message: 'No active enrollments',
+      trial_processed: true,
+    });
   }
 
   const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD (UTC)
-  let sentCount = 0;
-  let skippedCount = 0;
-  let errorCount = 0;
 
   for (const row of enrollments) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -275,4 +381,12 @@ export async function GET(request: NextRequest) {
     errors: errorCount,
     total: enrollments.length,
   });
+}
+
+export async function GET(request: NextRequest) {
+  return handleMorningMessages(request);
+}
+
+export async function POST(request: NextRequest) {
+  return handleMorningMessages(request);
 }

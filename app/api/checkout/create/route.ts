@@ -96,6 +96,7 @@ export async function POST(request: NextRequest) {
     payment_method?: string;
     referral_code?: string;
     voucher_code?: string;
+    voucher_codes?: string[];
   };
   try {
     body = await request.json();
@@ -187,21 +188,28 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // ── Resolve voucher (soft-fail) ───────────���───────────────────────────────
+  // ── Resolve voucher(s) (soft-fail), cộng dồn giảm ─────────────────────────
   let voucherId: string | null = null;
   let voucherDiscountAmount = 0;
 
   const priceAfterCodeDiscount = program.price_vnd - referralDiscountAmount;
 
-  if (body.voucher_code?.trim()) {
-    const vResult = await resolveVoucher(service, body.voucher_code, user.id);
-    if (vResult.valid) {
-      // Voucher can cover up to the remaining price after % discount
-      voucherDiscountAmount = Math.min(vResult.voucher.remaining_amount, priceAfterCodeDiscount);
-      if (voucherDiscountAmount > 0) {
-        voucherId = vResult.voucher.id;
-      }
-    }
+  const rawCodes: string[] = Array.isArray(body.voucher_codes) && body.voucher_codes.length > 0
+    ? body.voucher_codes.map((c) => String(c).trim()).filter(Boolean)
+    : body.voucher_code?.trim()
+      ? body.voucher_code.split(",").map((c) => c.trim()).filter(Boolean)
+      : [];
+
+  let priceLeft = priceAfterCodeDiscount;
+  for (const code of rawCodes) {
+    if (priceLeft <= 0) break;
+    const vResult = await resolveVoucher(service, code, user.id);
+    if (!vResult.valid) continue;
+    const take = Math.min(vResult.voucher.remaining_amount, priceLeft);
+    if (take <= 0) continue;
+    voucherDiscountAmount += take;
+    priceLeft -= take;
+    if (!voucherId) voucherId = vResult.voucher.id;
   }
 
   const finalPrice = Math.max(0, priceAfterCodeDiscount - voucherDiscountAmount);

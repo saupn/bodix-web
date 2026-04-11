@@ -3,6 +3,7 @@ import { createHash } from "crypto";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { formatPhoneVN } from "@/lib/messaging";
+import { sendViaZalo } from "@/lib/messaging/adapters/zalo";
 
 function hashOtp(otp: string): string {
   return createHash("sha256").update(otp).digest("hex");
@@ -93,6 +94,21 @@ export async function POST(request: NextRequest) {
     .update({ used: true })
     .eq("id", row.id);
 
+  const { data: profileBefore } = await service
+    .from("profiles")
+    .select("channel_user_id")
+    .eq("id", user.id)
+    .single();
+
+  const zaloUid = profileBefore?.channel_user_id?.trim();
+  if (zaloUid) {
+    const text =
+      "Xác minh thành công! ✅\nChào mừng bạn đến với BodiX. Vui lòng quay lại trang đăng ký để tiếp tục.";
+    sendViaZalo(zaloUid, text).catch((err) =>
+      console.error("[verify-zalo-otp] zalo send:", err)
+    );
+  }
+
   await service
     .from("profiles")
     .update({
@@ -101,7 +117,6 @@ export async function POST(request: NextRequest) {
       zalo_phone: formattedPhone,
       zalo_verified: true,
       preferred_channel: "zalo",
-      channel_user_id: null,
     })
     .eq("id", user.id);
 

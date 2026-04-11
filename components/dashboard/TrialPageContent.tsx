@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { getTrialExperienceDay } from "@/lib/trial/calendar";
 
 interface Workout {
   id: string;
@@ -23,6 +24,8 @@ interface TrialData {
   is_trial: boolean;
   is_expired: boolean;
   trial_ends_at: string | null;
+  bodix_start_date?: string | null;
+  bodix_current_day?: number | null;
   days_remaining: number;
   hours_remaining: number;
   can_access_content: boolean;
@@ -46,11 +49,10 @@ function formatPrice(vnd: number): string {
   return new Intl.NumberFormat("vi-VN").format(vnd) + "₫";
 }
 
-function getTrialDay(enrolledAt: string): number {
-  const enrolled = new Date(enrolledAt).getTime();
-  const now = Date.now();
-  const daysSince = Math.floor((now - enrolled) / (1000 * 60 * 60 * 24));
-  return Math.min(3, Math.max(1, daysSince + 1));
+function formatVnYmd(ymd: string): string {
+  const [y, m, d] = ymd.split("T")[0].split("-");
+  if (!y || !m || !d) return ymd;
+  return `${d}/${m}/${y}`;
 }
 
 function useCountdown(trialEndsAt: string | null) {
@@ -147,9 +149,7 @@ export function TrialPageContent() {
     );
   }
 
-  const trialDay = data.enrollment
-    ? getTrialDay(data.enrollment.enrolled_at)
-    : 1;
+  const trialExp = getTrialExperienceDay(data.bodix_start_date ?? null);
   const program = data.program;
   const tryCount =
     (data.activity_summary?.try_workout ?? 0) +
@@ -205,15 +205,29 @@ export function TrialPageContent() {
             </span>
           )}
           <p className="mt-2 text-neutral-600">
-            Ngày {trialDay}/3 trải nghiệm
+            {trialExp > 0
+              ? `Ngày ${Math.min(trialExp, 3)}/3 trải nghiệm`
+              : "Chương trình tập thử chưa bắt đầu"}
           </p>
         </div>
+
+        {data.bodix_start_date && trialExp === 0 && (
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-center text-neutral-700">
+            <p className="font-medium">
+              Chương trình tập thử bắt đầu vào ngày{" "}
+              {formatVnYmd(data.bodix_start_date)}.
+            </p>
+            <p className="mt-2 text-sm text-neutral-600">
+              Sáng ngày đó ~6:30 bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo!
+            </p>
+          </div>
+        )}
 
         <div className="grid gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((day) => {
             const workout = workoutsByDay[day];
-            const isUnlocked = day <= trialDay;
-            const isPast = day < trialDay;
+            const isUnlocked = trialExp > 0 && day <= trialExp;
+            const isPast = trialExp > 0 && day < trialExp;
 
             return (
               <WorkoutCard
@@ -328,7 +342,7 @@ function WorkoutCard({
           {loading ? "Đang chuyển..." : isPast ? "Xem lại" : "Bắt đầu tập"}
         </p>
       ) : (
-        <p className="mt-4 text-sm text-neutral-400">Mở khóa ngày mai</p>
+        <p className="mt-4 text-sm text-neutral-600">Mở khóa theo từng ngày</p>
       )}
     </div>
   );

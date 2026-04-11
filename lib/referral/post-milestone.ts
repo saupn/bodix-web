@@ -134,8 +134,9 @@ export const SHARE_PLATFORMS: SharePlatform[] = [
     id: 'zalo',
     label: 'Chia sẻ Zalo',
     buildUrl: (_message, referralLink) =>
-      // Zalo share uses the link param; the message appears as the og:description
-      `https://zalo.me/share?u=${encodeURIComponent(referralLink)}`,
+      `https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent(
+        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+      )}`,
   },
   {
     id: 'facebook',

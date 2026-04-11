@@ -419,7 +419,7 @@ export default function WeeklyReviewPage() {
               {/* 4. Cơ thể */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Cơ thể thay đổi gì tuần này? <span className="text-neutral-400">(tùy chọn)</span>
+                  Cơ thể thay đổi gì tuần này? <span className="text-neutral-500">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={bodyChanges}
@@ -433,7 +433,7 @@ export default function WeeklyReviewPage() {
               {/* 5. Thử thách */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Thử thách lớn nhất? <span className="text-neutral-400">(tùy chọn)</span>
+                  Thử thách lớn nhất? <span className="text-neutral-500">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={biggestChallenge}
@@ -447,7 +447,7 @@ export default function WeeklyReviewPage() {
               {/* 6. Mục tiêu */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Mục tiêu tuần tới? <span className="text-neutral-400">(tùy chọn)</span>
+                  Mục tiêu tuần tới? <span className="text-neutral-500">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={nextWeekGoal}

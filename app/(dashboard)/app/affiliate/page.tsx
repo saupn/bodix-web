@@ -414,7 +414,9 @@ export default function AffiliatePage() {
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <a
-              href={`https://zalo.me/share?text=${encodeURIComponent(shareMessage)}`}
+              href={`https://zalo.me/share?url=${encodeURIComponent(partnerLink)}&title=${encodeURIComponent(
+                "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+              )}`}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-lg bg-[#0068FF] px-4 py-2.5 text-sm font-medium text-white"

@@ -215,7 +215,7 @@ export default function PhoneVerify({ onVerified, onSkip }: Props) {
 
               <button
                 onClick={onSkip}
-                className="w-full text-sm text-gray-400 hover:text-gray-600 transition-colors pt-2"
+                className="w-full text-sm text-gray-600 hover:text-gray-600 transition-colors pt-2"
               >
                 Bỏ qua →
               </button>
@@ -292,7 +292,7 @@ export default function PhoneVerify({ onVerified, onSkip }: Props) {
             </div>
 
             {/* Countdown */}
-            <p className="text-center text-sm text-gray-400 mb-4">
+            <p className="text-center text-sm text-gray-600 mb-4">
               Mã hết hạn sau{" "}
               <span className="font-mono font-medium text-gray-600">
                 {formatTime(secondsLeft)}
@@ -311,7 +311,7 @@ export default function PhoneVerify({ onVerified, onSkip }: Props) {
               )}
               <button
                 onClick={onSkip}
-                className="text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                className="text-sm text-gray-600 hover:text-gray-600 transition-colors"
               >
                 Bỏ qua →
               </button>

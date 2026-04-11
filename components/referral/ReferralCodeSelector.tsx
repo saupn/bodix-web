@@ -30,6 +30,7 @@ export function ReferralCodeSelector({
   const [availability, setAvailability] = useState<"idle" | "checking" | "ok" | "taken">("idle");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPromoModal, setShowPromoModal] = useState(false);
 
   // Gợi ý từ tên
   useEffect(() => {
@@ -125,19 +126,90 @@ export function ReferralCodeSelector({
   const canCopy = displayCode && isValidReferralCode(displayCode);
   const showResult = selectedCode && !error;
 
-  const shareZaloText = displayCode
-    ? `Mình đang tập BodiX - app fitness tại nhà, rất hiệu quả! Bạn thử nhé: ${referralLink}`
+  const shareZaloUrl = displayCode
+    ? `https://zalo.me/share?url=${encodeURIComponent(
+        `${REFERRAL_BASE}?ref=${encodeURIComponent(displayCode)}`
+      )}&title=${encodeURIComponent(
+        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+      )}`
     : "";
 
   return (
     <div className="space-y-6">
+      {showPromoModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="promo-modal-title"
+        >
+          <div className="relative max-h-[90vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <button
+              type="button"
+              onClick={() => setShowPromoModal(false)}
+              className="absolute right-4 top-4 rounded-lg p-1 text-neutral-500 hover:bg-neutral-100 hover:text-neutral-800"
+              aria-label="Đóng"
+            >
+              ✕
+            </button>
+            <h2 id="promo-modal-title" className="pr-8 text-xl font-bold text-gray-900">
+              Chương trình ưu đãi BodiX
+            </h2>
+            <div className="mt-4 space-y-4 text-sm text-neutral-700">
+              <div>
+                <p className="font-semibold text-neutral-900">🎁 Giới thiệu bạn bè</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>Mỗi bạn bè đăng ký qua link → bạn nhận voucher 100.000đ</li>
+                  <li>Bạn bè được giảm 10% khi đăng ký</li>
+                  <li>Voucher dùng cho BodiX hoặc tặng tiếp cho người khác</li>
+                </ul>
+              </div>
+              <div>
+                <p className="font-semibold text-neutral-900">💰 Chương trình Cộng tác viên</p>
+                <p className="mt-1 text-neutral-600">(Dành cho người muốn kiếm thu nhập từ BodiX)</p>
+                <ul className="mt-2 list-disc space-y-1 pl-5">
+                  <li>Hoa hồng 40% tiền mặt cho mỗi đơn đăng ký</li>
+                  <li>Đăng ký 1 click trong Dashboard sau khi đăng nhập</li>
+                  <li>Theo dõi thu nhập realtime</li>
+                  <li>
+                    Chi tiết tại:{" "}
+                    <a
+                      href="https://bodix.fit/affiliate"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline"
+                    >
+                      bodix.fit/affiliate
+                    </a>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowPromoModal(false)}
+              className="mt-6 w-full rounded-lg bg-primary py-3 font-semibold text-white hover:bg-primary-dark"
+            >
+              Đã hiểu
+            </button>
+          </div>
+        </div>
+      )}
+
       <div>
         <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
-          Tạo mã giới thiệu của riêng bạn
+          Mời bạn bè tập cùng — nhận quà từ BodiX!
         </h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Chia sẻ mã này để mời bạn bè tập cùng BodiX
+          Khi bạn bè đăng ký qua link của bạn, cả hai đều nhận ưu đãi. Chọn mã riêng theo tên bạn để bắt đầu.
         </p>
+        <button
+          type="button"
+          onClick={() => setShowPromoModal(true)}
+          className="mt-2 text-sm text-[#2D4A3E] underline cursor-pointer"
+        >
+          ℹ️ Tìm hiểu chương trình ưu đãi →
+        </button>
       </div>
 
       {suggestions.length > 0 && (
@@ -222,7 +294,7 @@ export function ReferralCodeSelector({
               Copy link
             </button>
             <a
-              href={`https://zalo.me/share/inline?u=${encodeURIComponent(referralLink)}&text=${encodeURIComponent(shareZaloText)}`}
+              href={shareZaloUrl || "#"}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-lg bg-[#0068FF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     program: programSlug,
     amount,
     payment_method: paymentMethod,
-    payment_status: "confirming",
+    payment_status: "pending",
   });
 
   if (insertError) {

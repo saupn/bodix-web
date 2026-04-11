@@ -41,12 +41,11 @@ export function CheckoutForm({
   } | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
 
-  // Voucher
-  const [voucherCode, setVoucherCode] = useState("");
-  const [voucherValid, setVoucherValid] = useState<{
-    valid: boolean;
-    remaining_amount?: number;
-  } | null>(null);
+  // Voucher — nhiều mã, phân tách bằng dấu phẩy
+  const [voucherInput, setVoucherInput] = useState("");
+  const [voucherLines, setVoucherLines] = useState<
+    { code: string; valid: boolean; amount: number }[]
+  >([]);
   const [voucherValidating, setVoucherValidating] = useState(false);
 
   const [loading, setLoading] = useState(false);
@@ -113,39 +112,57 @@ export function CheckoutForm({
     return () => clearTimeout(timer);
   }, [referralCode, priceVnd, onReferralChange]);
 
-  // ── Voucher code validation ───────────────────────────────────────────────
+  // ── Voucher: từng mã sau dấu phẩy, cộng dồn giảm ───────────────────────────
 
   useEffect(() => {
-    if (!voucherCode.trim()) {
-      setVoucherValid(null);
+    const codes = voucherInput
+      .split(",")
+      .map((c) => c.trim().toUpperCase())
+      .filter(Boolean);
+    if (codes.length === 0) {
+      setVoucherLines([]);
       onVoucherChange?.(false, 0);
       return;
     }
     const timer = setTimeout(async () => {
       setVoucherValidating(true);
       try {
-        const res = await fetch(`/api/voucher/validate?code=${encodeURIComponent(voucherCode.trim())}`);
-        const data = await res.json();
-        if (data.valid && data.remaining_amount > 0) {
-          // Max voucher deduction = price after referral discount
-          const referralDiscount = referralValid?.valid ? (referralValid.discount_amount ?? 0) : 0;
-          const priceAfterReferral = priceVnd - referralDiscount;
-          const voucherAmount = Math.min(data.remaining_amount, priceAfterReferral);
-          setVoucherValid({ valid: true, remaining_amount: voucherAmount });
-          onVoucherChange?.(true, voucherAmount);
-        } else {
-          setVoucherValid({ valid: false });
-          onVoucherChange?.(false, 0);
+        const referralDiscount = referralValid?.valid
+          ? (referralValid.discount_amount ?? 0)
+          : 0;
+        let priceLeft = priceVnd - referralDiscount;
+        const lines: { code: string; valid: boolean; amount: number }[] = [];
+        let total = 0;
+        for (const code of codes) {
+          const res = await fetch(
+            `/api/voucher/validate?code=${encodeURIComponent(code)}`
+          );
+          const data = (await res.json()) as {
+            valid?: boolean;
+            remaining_amount?: number;
+          };
+          if (data.valid && (data.remaining_amount ?? 0) > 0 && priceLeft > 0) {
+            const take = Math.min(data.remaining_amount ?? 0, priceLeft);
+            total += take;
+            priceLeft -= take;
+            lines.push({ code, valid: true, amount: take });
+          } else {
+            lines.push({ code, valid: false, amount: 0 });
+          }
         }
+        setVoucherLines(lines);
+        const validOnly = lines.filter((l) => l.valid);
+        const sum = validOnly.reduce((s, l) => s + l.amount, 0);
+        onVoucherChange?.(validOnly.length > 0 && sum > 0, sum);
       } catch {
-        setVoucherValid({ valid: false });
+        setVoucherLines([]);
         onVoucherChange?.(false, 0);
       } finally {
         setVoucherValidating(false);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [voucherCode, priceVnd, referralValid, onVoucherChange]);
+  }, [voucherInput, priceVnd, referralValid, onVoucherChange]);
 
   // ── Submit ────────────────────────────────────────────────────────────────
 
@@ -161,7 +178,10 @@ export function CheckoutForm({
           slug,
           payment_method: paymentMethod,
           referral_code: referralValid?.valid ? referralCode.trim() : undefined,
-          voucher_code: voucherValid?.valid ? voucherCode.trim() : undefined,
+          voucher_codes:
+            voucherLines.filter((l) => l.valid).length > 0
+              ? voucherLines.filter((l) => l.valid).map((l) => l.code)
+              : undefined,
         }),
       });
       const data = await res.json();
@@ -281,7 +301,7 @@ export function CheckoutForm({
         )}
       </div>
 
-      {/* Voucher code */}
+      {/* Voucher — nhiều mã */}
       <div>
         <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-600">
           <Ticket className="h-4 w-4" />
@@ -289,26 +309,55 @@ export function CheckoutForm({
         </label>
         <input
           type="text"
-          value={voucherCode}
-          onChange={(e) => setVoucherCode(e.target.value.toUpperCase())}
-          placeholder="VD: V-ABC12 (nếu có)"
+          value={voucherInput}
+          onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
+          placeholder="Nhập mã voucher (nhiều mã cách nhau bằng dấu phẩy)"
           className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
+        <p className="mt-1 text-xs text-neutral-500">
+          Ví dụ: V-ABC123, V-DEF456
+        </p>
         {voucherValidating && (
           <p className="mt-1 text-xs text-neutral-500">Đang kiểm tra...</p>
         )}
-        {!voucherValidating && voucherValid?.valid && (
-          <p className="mt-1 text-sm text-success">
-            ✓ Voucher hợp lệ — Giảm {voucherValid.remaining_amount?.toLocaleString("vi-VN")}đ
-          </p>
-        )}
-        {!voucherValidating && voucherValid && !voucherValid.valid && voucherCode.trim() && (
-          <p className="mt-1 text-xs text-red-600">Voucher không hợp lệ hoặc đã hết hạn</p>
+        {!voucherValidating && voucherLines.length > 0 && (
+          <ul className="mt-2 space-y-1 text-sm">
+            {voucherLines.map((line) => (
+              <li
+                key={line.code}
+                className={line.valid ? "text-success" : "text-red-600"}
+              >
+                {line.valid
+                  ? `✅ ${line.code}: -${line.amount.toLocaleString("vi-VN")}đ`
+                  : `❌ ${line.code}: không hợp lệ`}
+              </li>
+            ))}
+            {voucherLines.some((l) => l.valid) && (
+              <li className="font-medium text-neutral-800">
+                Tổng giảm voucher: -
+                {voucherLines
+                  .filter((l) => l.valid)
+                  .reduce((s, l) => s + l.amount, 0)
+                  .toLocaleString("vi-VN")}
+                đ
+              </li>
+            )}
+          </ul>
         )}
       </div>
 
       {/* Payment method */}
       <div>
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-neutral-700">
+          <p className="font-medium text-blue-900">ℹ️ Bạn chưa cần thanh toán ngay.</p>
+          <p className="mt-2">
+            Hiện có nhiều người đang đăng ký. Chúng tôi sẽ xác nhận và gửi thông báo cho bạn khi bạn
+            được tham gia đợt tập tiếp theo.
+          </p>
+          <p className="mt-2">
+            Vui lòng xác nhận đăng ký bên dưới để giữ chỗ.
+          </p>
+        </div>
         <h2 className="font-heading text-lg font-semibold text-primary">
           Phương thức thanh toán
         </h2>

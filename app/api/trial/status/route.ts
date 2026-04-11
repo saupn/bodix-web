@@ -16,7 +16,7 @@ export async function GET() {
   // --- Lấy profile (trial timestamps) ---
   const { data: profile } = await supabase
     .from('profiles')
-    .select('trial_started_at, trial_ends_at')
+    .select('trial_started_at, trial_ends_at, bodix_start_date, bodix_current_day')
     .eq('id', user.id)
     .single()
 
@@ -81,6 +81,8 @@ export async function GET() {
     is_expired: trialStatus.isExpired,
     trial_started_at: profile?.trial_started_at ?? null,
     trial_ends_at: profile?.trial_ends_at ?? null,
+    bodix_start_date: profile?.bodix_start_date ?? null,
+    bodix_current_day: profile?.bodix_current_day ?? null,
     days_remaining: trialStatus.daysRemaining,
     hours_remaining: trialStatus.hoursRemaining,
     can_access_content: canAccess,

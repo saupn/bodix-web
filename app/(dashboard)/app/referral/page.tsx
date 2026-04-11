@@ -126,9 +126,10 @@ export default function ReferralPage() {
   };
 
   const shareZalo = () => {
-    const encoded = encodeURIComponent(shareMessage);
     window.open(
-      `https://zalo.me/share?text=${encoded}`,
+      `https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent(
+        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+      )}`,
       "_blank",
       "noopener,noreferrer"
     );

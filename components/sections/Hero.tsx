@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { SITE } from "@/lib/constants";
+import { NextCohortBanner } from "@/components/sections/NextCohortBanner";
 
 function ScrollLink({
   href,
@@ -78,6 +79,12 @@ export function Hero() {
               Tìm hiểu thêm ↓
             </span>
           </ScrollLink>
+        </div>
+        <div
+          className="mt-8 max-w-lg mx-auto w-full opacity-0 animate-fade-slide-up px-2"
+          style={{ animationDelay: "0.55s" }}
+        >
+          <NextCohortBanner />
         </div>
         <p
           className="mt-6 text-sm text-secondary-light/80 opacity-0 animate-fade-slide-up"

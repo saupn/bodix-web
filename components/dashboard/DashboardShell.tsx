@@ -12,11 +12,11 @@ import { RescueBanner } from "@/components/rescue/RescueBanner";
 
 const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
-  { href: "/app/programs", label: "Chương trình", icon: Dumbbell },
-  { href: "/app/review/history", label: "📝 Review", icon: FileText },
-  { href: "/app/referral", label: "🎁 Giới thiệu bạn bè", icon: Gift },
-  { href: "/app/community", label: "👥 Cộng đồng", icon: Users, badgeKey: "community" },
-  { href: "/app/progress", label: "📊 Tiến độ", icon: BarChart3 },
+  { href: "/app/programs", label: "Chương trình tập", icon: Dumbbell },
+  { href: "/app/review/history", label: "Review", icon: FileText },
+  { href: "/app/referral", label: "Giới thiệu bạn bè", icon: Gift },
+  { href: "/app/community", label: "Cộng đồng", icon: Users, badgeKey: "community" },
+  { href: "/app/progress", label: "Tiến độ", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
 ];
 
@@ -292,7 +292,7 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
                   Copy
                 </button>
                 <a
-                  href={`https://zalo.me/share?text=${encodeURIComponent(`Mình tặng bạn Cẩm nang BodiX Fuel Guide miễn phí! ${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`)}`}
+                  href={`https://zalo.me/share?url=${encodeURIComponent(`${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`)}&title=${encodeURIComponent("Mình tặng bạn Cẩm nang BodiX Fuel Guide miễn phí!")}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="rounded-lg bg-[#0068FF] px-3 py-2 text-sm font-medium text-white hover:bg-[#0052cc]"

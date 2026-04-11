@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { TRIAL_DAYS } from '@/lib/trial/utils'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
+import { getVietnamTomorrowDateString } from '@/lib/date/vietnam'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -58,13 +59,18 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  // --- Tạo enrollment ---
+  const startDate = getVietnamTomorrowDateString()
+  const startedAt = `${startDate}T00:00:00+07:00`
+
+  // --- Tạo enrollment — bắt đầu từ ngày mai (current_day 0 = chưa vào ngày 1) ---
   const { data: enrollment, error: enrollError } = await supabase
     .from('enrollments')
     .insert({
       user_id: user.id,
       program_id: programId,
       status: 'trial',
+      current_day: 0,
+      started_at: startedAt,
     })
     .select('id, user_id, program_id, status, enrolled_at')
     .single()
@@ -81,7 +87,12 @@ export async function POST(request: NextRequest) {
   const service = createServiceClient()
   const { error: profileError } = await service
     .from('profiles')
-    .update({ trial_started_at: trialStartedAt, trial_ends_at: trialEndsAt })
+    .update({
+      trial_started_at: trialStartedAt,
+      trial_ends_at: trialEndsAt,
+      bodix_start_date: startDate,
+      bodix_current_day: 0,
+    })
     .eq('id', user.id)
 
   if (profileError) {
@@ -99,7 +110,7 @@ export async function POST(request: NextRequest) {
     const name = profileData.full_name?.split(' ').pop() || profileData.full_name || 'bạn'
     sendViaZalo(
       profileData.channel_user_id,
-      `🎉 ${name} đã đăng ký tập thử 3 ngày! Sáng mai 6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên.`
+      `🎉 ${name} đã đăng ký tập thử 3 ngày! Chương trình bắt đầu ngày ${startDate.split('-').reverse().join('/')} — sáng hôm đó ~6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên.`
     ).catch(err => console.error('[trial/start] zalo send:', err))
   }
 

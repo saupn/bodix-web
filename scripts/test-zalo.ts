@@ -54,7 +54,7 @@ async function checkOAInfo() {
   console.log("\n── Kiểm tra OA Info ──");
   const token = await getToken();
 
-  const res = await fetch("https://openapi.zalo.me/v2.0/oa/getoa", {
+  const res = await fetch("https://openapi.zalo.me/v3.0/oa/getoa", {
     headers: { access_token: token },
   });
   const data = await res.json();
@@ -77,19 +77,28 @@ async function getFollowers() {
   console.log("\n── Danh sách Followers ──");
   const token = await getToken();
 
-  const params = encodeURIComponent(JSON.stringify({ offset: 0, count: 10 }));
   const res = await fetch(
-    `https://openapi.zalo.me/v2.0/oa/getfollowers?data=${params}`,
-    { headers: { access_token: token } },
+    "https://openapi.zalo.me/v3.0/oa/user/getlist",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        access_token: token,
+      },
+      body: JSON.stringify({ offset: 0, count: 10 }),
+    },
   );
   const data = await res.json();
 
   if (data.error === 0) {
     const total = data.data.total;
-    const followers: string[] = data.data.followers ?? [];
-    ok(`${total} followers total, showing first ${followers.length}:`);
-    followers.forEach((uid: string, i: number) => info(`  ${i + 1}. ${uid}`));
-    return followers;
+    const users = data.data.users ?? [];
+    ok(`${total} followers total, showing first ${users.length}:`);
+    users.forEach((u: any, i: number) => {
+      const uid = u.user_id ?? u;
+      info(`  ${i + 1}. ${uid}`);
+    });
+    return users.map((u: any) => u.user_id ?? u);
   } else {
     fail(`Zalo API error ${data.error}: ${data.message}`);
     return [];

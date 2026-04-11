@@ -40,10 +40,47 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Step 1
+  // Step 1 — ngày sinh: 3 dropdown (YYYY-MM-DD)
   const [fullName, setFullName] = useState(initialName);
   const [dateOfBirth, setDateOfBirth] = useState("");
+  const [birthDay, setBirthDay] = useState("");
+  const [birthMonth, setBirthMonth] = useState("");
+  const [birthYear, setBirthYear] = useState("");
   const [gender, setGender] = useState<"female" | "male" | "other">("female");
+
+  const vnNowYear = parseInt(
+    new Date().toLocaleString("en-US", { timeZone: "Asia/Ho_Chi_Minh", year: "numeric" }),
+    10
+  );
+  const BIRTH_YEAR_OPTIONS = Array.from({ length: 48 }, (_, i) => vnNowYear - 18 - i);
+  const MONTH_LABELS = Array.from({ length: 12 }, (_, i) => `Tháng ${i + 1}`);
+  const birthDayOptions = (() => {
+    if (!birthMonth || !birthYear) return Array.from({ length: 31 }, (_, i) => i + 1);
+    const dim = new Date(parseInt(birthYear, 10), parseInt(birthMonth, 10), 0).getDate();
+    return Array.from({ length: dim }, (_, i) => i + 1);
+  })();
+
+  useEffect(() => {
+    if (!birthYear || !birthMonth || !birthDay) {
+      setDateOfBirth("");
+      return;
+    }
+    const d = parseInt(birthDay, 10);
+    const m = parseInt(birthMonth, 10);
+    const y = parseInt(birthYear, 10);
+    if (!y || !m || !d) {
+      setDateOfBirth("");
+      return;
+    }
+    const dim = new Date(y, m, 0).getDate();
+    if (d > dim || d < 1) {
+      setDateOfBirth("");
+      return;
+    }
+    const mm = String(m).padStart(2, "0");
+    const dd = String(d).padStart(2, "0");
+    setDateOfBirth(`${y}-${mm}-${dd}`);
+  }, [birthDay, birthMonth, birthYear]);
 
   // Step 2
   const [goals, setGoals] = useState<string[]>([]);
@@ -330,13 +367,53 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                 <label className="mb-1.5 block text-sm font-medium text-neutral-700">
                   Ngày sinh
                 </label>
-                <input
-                  type="date"
-                  value={dateOfBirth}
-                  onChange={(e) => setDateOfBirth(e.target.value)}
-                  className={inputBase}
-                  suppressHydrationWarning
-                />
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-stretch">
+                  <select
+                    value={birthDay}
+                    onChange={(e) => setBirthDay(e.target.value)}
+                    className="w-full rounded-lg border border-gray-200 bg-white py-3 px-4 text-gray-900 focus:border-[#2D4A3E] focus:outline-none focus:ring-1 focus:ring-[#2D4A3E]"
+                    aria-label="Ngày"
+                  >
+                    <option value="">Ngày</option>
+                    {birthDayOptions.map((n) => (
+                      <option key={n} value={String(n)}>
+                        {n}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={birthMonth}
+                    onChange={(e) => {
+                      setBirthMonth(e.target.value);
+                      setBirthDay("");
+                    }}
+                    className="w-full rounded-lg border border-gray-200 bg-white py-3 px-4 text-gray-900 focus:border-[#2D4A3E] focus:outline-none focus:ring-1 focus:ring-[#2D4A3E]"
+                    aria-label="Tháng"
+                  >
+                    <option value="">Tháng</option>
+                    {MONTH_LABELS.map((label, idx) => (
+                      <option key={label} value={String(idx + 1)}>
+                        {label}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={birthYear}
+                    onChange={(e) => {
+                      setBirthYear(e.target.value);
+                      setBirthDay("");
+                    }}
+                    className="w-full rounded-lg border border-gray-200 bg-white py-3 px-4 text-gray-900 focus:border-[#2D4A3E] focus:outline-none focus:ring-1 focus:ring-[#2D4A3E]"
+                    aria-label="Năm"
+                  >
+                    <option value="">Năm</option>
+                    {BIRTH_YEAR_OPTIONS.map((y) => (
+                      <option key={y} value={String(y)}>
+                        {y}
+                      </option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               <div>
@@ -534,7 +611,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   </div>
 
-                  <p className="text-xs text-neutral-400 text-center mt-1">
+                  <p className="text-xs text-neutral-600 text-center mt-1">
                     Sau khi gửi tin nhắn, trang này sẽ tự động cập nhật
                   </p>
 
@@ -570,7 +647,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     <button
                       type="button"
                       onClick={() => goNext(4)}
-                      className="text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                      className="text-sm text-neutral-600 hover:text-neutral-600 transition-colors"
                       suppressHydrationWarning
                     >
                       Bỏ qua, kết nối sau →
@@ -641,7 +718,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                   <button
                     type="button"
                     onClick={() => goNext(4)}
-                    className="w-full text-sm text-neutral-400 hover:text-neutral-600 transition-colors"
+                    className="w-full text-sm text-neutral-600 hover:text-neutral-600 transition-colors"
                     suppressHydrationWarning
                   >
                     Bỏ qua, kết nối sau →

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { verifyAdmin } from '@/lib/admin/verify-admin'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
+import { autoMatchCohort } from '@/lib/buddy/auto-match'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -112,11 +113,20 @@ export async function POST(request: NextRequest) {
     await new Promise(r => setTimeout(r, 100))
   }
 
+  // Auto-match buddy pairs cho cohort vừa activate
+  let buddyResult = { matched: 0, unpaired: 0, zalo_sent: 0, zalo_errors: 0 }
+  try {
+    buddyResult = await autoMatchCohort(service, cohortId)
+  } catch (err) {
+    console.error('[admin/cohort/activate] buddy auto-match:', err)
+  }
+
   return NextResponse.json({
     activated: enrollments.length,
     cohort_status: 'active',
     start_date: cohort.start_date,
     zalo_sent: sentCount,
     zalo_errors: errorCount,
+    buddy: buddyResult,
   })
 }

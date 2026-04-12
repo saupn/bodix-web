@@ -7,18 +7,27 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
 
-  // Lấy enrollment active
+  // Lấy enrollment active hoặc trial
   const { data: enrollment } = await supabase
     .from('enrollments')
-    .select('id, cohort_id, current_day')
+    .select('id, cohort_id, current_day, status')
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .in('status', ['active', 'trial'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
 
-  if (!enrollment?.cohort_id) {
-    return NextResponse.json({ has_buddy: false, enrollment: null })
+  if (!enrollment) {
+    return NextResponse.json({ has_buddy: false, enrollment_status: null })
+  }
+
+  // Trial → không có buddy, trả về enrollment_status để BuddyCard hiện preview
+  if (enrollment.status === 'trial' || !enrollment.cohort_id) {
+    return NextResponse.json({
+      has_buddy: false,
+      enrollment_status: enrollment.status,
+      cohort_id: enrollment.cohort_id ?? null,
+    })
   }
 
   const service = createServiceClient()
@@ -35,6 +44,7 @@ export async function GET() {
   if (!pair) {
     return NextResponse.json({
       has_buddy: false,
+      enrollment_status: 'active',
       cohort_id: enrollment.cohort_id,
       enrollment_id: enrollment.id,
     })
@@ -80,6 +90,7 @@ export async function GET() {
 
   return NextResponse.json({
     has_buddy: true,
+    enrollment_status: 'active',
     buddy: {
       id: buddyProfile?.id,
       name: buddyProfile?.full_name,
@@ -89,6 +100,7 @@ export async function GET() {
     },
     pair_id: pair.id,
     matched_by: pair.matched_by,
+    paired_at: pair.created_at,
     cohort_id: enrollment.cohort_id,
     enrollment_id: enrollment.id,
   })

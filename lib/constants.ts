@@ -7,7 +7,7 @@ export const REFERRAL_BASE =
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
-  slogan: "Thay đổi vóc dáng tại nhà — không cần phòng tập, không cần PT",
+  slogan: "Thay đổi vóc dáng tại nhà — không cần phòng tập hay PT",
   targetAudience: "Phụ nữ Việt Nam, 25-45 tuổi",
 } as const;
 

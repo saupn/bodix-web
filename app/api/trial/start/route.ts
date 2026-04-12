@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { TRIAL_DAYS } from '@/lib/trial/utils'
+import { TRIAL_DAYS, hasMinDaysBeforeCohortForTrial } from '@/lib/trial/utils'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
 import { getVietnamTomorrowDateString } from '@/lib/date/vietnam'
 
@@ -59,6 +59,27 @@ export async function POST(request: NextRequest) {
     )
   }
 
+  const service = createServiceClient()
+  const { data: nextCohort } = await service
+    .from('cohorts')
+    .select('start_date')
+    .eq('program_id', programId)
+    .eq('status', 'upcoming')
+    .order('start_date', { ascending: true })
+    .limit(1)
+    .maybeSingle()
+
+  if (nextCohort?.start_date && !hasMinDaysBeforeCohortForTrial(nextCohort.start_date)) {
+    return NextResponse.json(
+      {
+        error:
+          'Đợt tập sắp tới quá gần — không đủ 3 ngày cho tập thử. Vui lòng chờ đợt cohort tiếp theo.',
+        code: 'cohort_too_soon',
+      },
+      { status: 409 }
+    )
+  }
+
   const startDate = getVietnamTomorrowDateString()
   const startedAt = `${startDate}T00:00:00+07:00`
 
@@ -84,7 +105,6 @@ export async function POST(request: NextRequest) {
   const trialStartedAt = new Date().toISOString()
   const trialEndsAt = new Date(Date.now() + TRIAL_DAYS * 24 * 60 * 60 * 1000).toISOString()
 
-  const service = createServiceClient()
   const { error: profileError } = await service
     .from('profiles')
     .update({

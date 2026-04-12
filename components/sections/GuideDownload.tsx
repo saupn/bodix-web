@@ -43,10 +43,10 @@ export function GuideDownload() {
     return (
       <section className="border-t border-neutral-200 bg-white py-16 sm:py-24">
         <div className="mx-auto max-w-2xl px-4 text-center">
-          <h2 className="font-heading text-2xl font-bold text-[#2D4A3E] sm:text-3xl">
+          <h2 className="font-heading text-lg font-bold text-[#2D4A3E] sm:text-xl">
             Đã gửi thành công!
           </h2>
-          <p className="mt-4 text-neutral-600">
+          <p className="mt-4 text-neutral-800">
             Nhấn nút bên dưới để tải xuống Cẩm nang BodiX Fuel Guide.
           </p>
           <a
@@ -64,10 +64,10 @@ export function GuideDownload() {
   return (
     <section className="border-t border-neutral-200 bg-white py-16 sm:py-24">
       <div className="mx-auto max-w-2xl px-4 text-center">
-        <h2 className="font-heading text-2xl font-bold text-[#2D4A3E] sm:text-3xl">
+        <h2 className="font-heading text-lg font-bold text-[#2D4A3E] sm:text-xl">
           Nhận miễn phí: Cẩm nang BodiX Fuel Guide
         </h2>
-        <p className="mt-4 text-neutral-600">
+        <p className="mt-4 text-neutral-800">
           Hướng dẫn dinh dưỡng, giấc ngủ và tập luyện cơ bản cho phụ nữ Việt Nam
         </p>
 

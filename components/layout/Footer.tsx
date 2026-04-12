@@ -23,16 +23,25 @@ export function Footer() {
                 {column.title}
               </h4>
               <ul className="mt-4 space-y-2">
-                {column.links.map((link) => (
-                  <li key={link.label}>
-                    <Link
-                      href={link.href}
-                      className="text-sm text-neutral-400 hover:text-white transition-colors"
-                    >
-                      {link.label}
-                    </Link>
-                  </li>
-                ))}
+                {column.links.map((link) => {
+                  const openInNewTab = link.href.startsWith("http");
+                  return (
+                    <li key={link.label}>
+                      <Link
+                        href={link.href}
+                        {...(openInNewTab
+                          ? {
+                              target: "_blank",
+                              rel: "noopener noreferrer",
+                            }
+                          : {})}
+                        className="text-sm text-neutral-400 hover:text-white transition-colors"
+                      >
+                        {link.label}
+                      </Link>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}

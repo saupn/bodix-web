@@ -82,7 +82,7 @@ export function Pricing() {
                 </span>
               )}
               <div className="text-center">
-                <h3 className="font-heading text-xl sm:text-2xl font-bold text-primary">
+                <h3 className="font-heading text-lg sm:text-xl font-bold text-primary">
                   {card.name}
                 </h3>
                 <p className="mt-1 text-sm text-neutral-500">{card.duration}</p>
@@ -95,7 +95,7 @@ export function Pricing() {
                 {card.features.map((feature) => (
                   <li
                     key={feature}
-                    className="flex items-start gap-2 text-sm text-neutral-600"
+                    className="flex items-start gap-2 text-sm text-neutral-800"
                   >
                     <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
                     <span>{feature}</span>
@@ -113,7 +113,7 @@ export function Pricing() {
             </div>
           ))}
         </div>
-        <p className="mt-8 text-center text-sm text-neutral-500 max-w-2xl mx-auto">
+        <p className="mt-8 text-center text-sm text-neutral-700 max-w-2xl mx-auto">
           Thanh toán 1 lần. Không subscription. Không phí ẩn.
         </p>
       </div>

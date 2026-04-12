@@ -188,9 +188,9 @@ export const FOOTER_DATA = {
     {
       title: "LIÊN HỆ",
       links: [
-        { label: "Email", href: "mailto:hello@bodix.vn" },
-        { label: "Facebook", href: "#" },
-        { label: "Zalo", href: "#" },
+        { label: "Email", href: "mailto:office@bodix.fit" },
+        { label: "Facebook", href: "https://www.facebook.com/bodixfit" },
+        { label: "Zalo", href: "https://zalo.me/2495331839057844851" },
       ],
     },
   ],

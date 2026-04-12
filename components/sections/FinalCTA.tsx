@@ -5,7 +5,7 @@ export function FinalCTA() {
     <section className="py-12 md:py-20 lg:py-24 bg-primary text-white">
       <div className="container mx-auto px-4 sm:px-6">
         <div className="text-center max-w-2xl mx-auto">
-          <h2 className="font-heading text-2xl font-bold sm:text-3xl md:text-4xl">
+          <h2 className="font-heading text-lg font-bold sm:text-xl">
             Lần này, bạn sẽ đi đến cuối
           </h2>
           <p className="mt-4 text-base sm:text-lg opacity-90 leading-relaxed">

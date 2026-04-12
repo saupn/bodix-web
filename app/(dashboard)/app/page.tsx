@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { hasMinDaysBeforeCohortForTrial } from "@/lib/trial/utils";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 
@@ -356,16 +357,6 @@ export default async function AppPage() {
   }
 
   // Brand new user — show trial signup card
-  // Fetch next cohort to check if trial timing is feasible
-  const { data: nextCohort } = await supabase
-    .from("cohorts")
-    .select("id, start_date, name")
-    .eq("status", "upcoming")
-    .order("start_date", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  // Fetch bodix-21 program id for trial start
   const { data: bodix21 } = await supabase
     .from("programs")
     .select("id")
@@ -373,16 +364,24 @@ export default async function AppPage() {
     .eq("is_active", true)
     .maybeSingle();
 
-  // Need at least 4 days before cohort starts (3 trial + 1 buffer)
+  const { data: nextCohort } = bodix21?.id
+    ? await supabase
+        .from("cohorts")
+        .select("id, start_date, name")
+        .eq("program_id", bodix21.id)
+        .eq("status", "upcoming")
+        .order("start_date", { ascending: true })
+        .limit(1)
+        .maybeSingle()
+    : { data: null };
+
+  // Từ ngày mai (D1 trial) đến cohort cần ≥ 3 ngày lịch — xem hasMinDaysBeforeCohortForTrial
   let canTrial = false;
   let nextCohortDate: string | null = null;
 
   if (nextCohort) {
-    const cohortStart = new Date(nextCohort.start_date + "T00:00:00Z");
-    const now = new Date();
-    const daysUntilCohort = Math.floor((cohortStart.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
-    canTrial = daysUntilCohort >= 4 && !hasEverTrialed;
     nextCohortDate = nextCohort.start_date;
+    canTrial = hasMinDaysBeforeCohortForTrial(nextCohort.start_date) && !hasEverTrialed;
   } else {
     // No upcoming cohort — allow trial (admin will create cohort later)
     canTrial = !hasEverTrialed;

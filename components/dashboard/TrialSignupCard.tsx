@@ -59,27 +59,30 @@ export function TrialSignupCard({
         Bạn chọn cường độ phù hợp — cả 3 mức đều tính hoàn thành.
       </p>
 
-      {canTrial ? (
-        <>
-          <button
-            type="button"
-            onClick={handleStartTrial}
-            disabled={loading || !programId}
-            className="mt-6 w-full rounded-xl bg-primary px-6 py-4 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60 sm:w-auto"
-          >
-            {loading ? "Đang đăng ký..." : "Đăng ký tập thử 3 ngày (miễn phí)"}
-          </button>
-          {error && (
-            <p className="mt-3 text-sm text-red-600">{error}</p>
-          )}
-        </>
-      ) : (
-        <div className="mt-6 rounded-lg bg-neutral-50 px-4 py-3 text-sm text-neutral-600">
-          {nextCohortDate
-            ? `Đợt tiếp theo bắt đầu ngày ${nextCohortDate}. Tập thử sẽ mở lại sau.`
-            : "Chưa có đợt tập tiếp theo. Vui lòng quay lại sau."}
-        </div>
-      )}
+      <div className="mt-6 space-y-3">
+        <button
+          type="button"
+          onClick={handleStartTrial}
+          disabled={loading || !programId || !canTrial}
+          className={`w-full rounded-xl px-6 py-4 text-base font-semibold transition-colors sm:w-auto ${
+            canTrial
+              ? "bg-primary text-secondary-light hover:bg-primary-dark disabled:opacity-60"
+              : "cursor-not-allowed bg-primary/35 text-secondary-light/90 opacity-70"
+          }`}
+        >
+          {loading ? "Đang đăng ký..." : "Đăng ký tập thử 3 ngày (miễn phí)"}
+        </button>
+        {!canTrial && (
+          <p className="text-sm text-neutral-600 leading-relaxed">
+            {nextCohortDate
+              ? `Đợt sắp tới bắt đầu ${nextCohortDate.split("-").reverse().join("/")} — khoảng cách từ ngày mai đến ngày cohort chưa đủ 3 ngày cho tập thử. Bạn vui lòng chờ đợt cohort tiếp theo nhé.`
+              : "Chưa có đợt tập tiếp theo phù hợp. Vui lòng quay lại sau."}
+          </p>
+        )}
+        {error && (
+          <p className="text-sm text-red-600">{error}</p>
+        )}
+      </div>
     </div>
   );
 }

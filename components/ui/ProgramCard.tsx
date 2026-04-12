@@ -38,16 +38,16 @@ export function ProgramCard({
         </span>
       )}
       <div className="flex items-baseline justify-between">
-        <h3 className="font-heading text-lg sm:text-xl font-semibold text-primary">
+        <h3 className="font-heading text-base sm:text-lg font-semibold text-primary">
           {name}
         </h3>
         <span className="text-sm font-medium text-accent">{duration}</span>
       </div>
       <p className="mt-1 text-sm text-neutral-500">{tagline}</p>
-      <p className="mt-3 sm:mt-4 text-neutral-600 text-sm sm:text-base leading-relaxed">{description}</p>
+      <p className="mt-3 sm:mt-4 text-neutral-800 text-sm sm:text-base leading-relaxed">{description}</p>
       <ul className="mt-6 space-y-2">
         {features.map((feature) => (
-          <li key={feature} className="flex items-start gap-2 text-xs sm:text-sm text-neutral-600">
+          <li key={feature} className="flex items-start gap-2 text-xs sm:text-sm text-neutral-800">
             <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
             {feature}
           </li>

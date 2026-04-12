@@ -1,7 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
-import { getVietnamDateString } from '@/lib/date/vietnam';
+import {
+  calendarDaysBetween,
+  getVietnamDateString,
+  isoTimestampToVietnamYmd,
+} from '@/lib/date/vietnam';
+import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Session metadata (source: lib/workout/video-config.ts)
@@ -66,7 +71,7 @@ const PROGRAM_CONFIG: Record<string, { slug: string; totalDays: number }> = {
 };
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// BUILD MESSAGES
+// BUILD MESSAGES — active program
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 function buildMainMessage(
@@ -122,6 +127,60 @@ function buildRecoveryMessage(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BUILD MESSAGES — trial (D1–D3, thân mật)
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+function buildTrialMainMessage(
+  name: string,
+  trialDay: number,
+  session: SessionMeta,
+  isWeekStart: boolean,
+): string {
+  const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
+  const weekTip = isWeekStart
+    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha — đang tập thử mà, thoải mái hết!'
+    : '';
+
+  return (
+    `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay mình cùng ${session.focus}, cứ nhẹ nhàng theo cảm giác nha.\n` +
+    `\n` +
+    `Session ${session.code}:\n` +
+    `${exerciseList}\n` +
+    `\n` +
+    `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
+    `\n` +
+    `Tập xong nhắn qua đây:\n` +
+    `  3 → đủ 3 lượt (~21 phút)\n` +
+    `  2 → 2 lượt (~14 phút)\n` +
+    `  1 → 1 lượt (~7 phút)\n` +
+    `\n` +
+    `Cả 3 đều tính hoàn thành — cứ từ từ, quan trọng là bạn đến được! 💪` +
+    weekTip
+  );
+}
+
+function buildTrialRecoveryMessage(
+  name: string,
+  trialDay: number,
+  isWeekStart: boolean,
+): string {
+  const weekTip = isWeekStart
+    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha!'
+    : '';
+
+  return (
+    `Chào ${name}! 🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay cho cơ thể phục hồi nhẹ nhàng thôi nha.\n` +
+    `\n` +
+    `Recovery ~7 phút một lượt.\n` +
+    `\n` +
+    `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
+    `\n` +
+    `Xong nhắn 1 là được!` +
+    weekTip
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // ROUTE HANDLER
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -150,22 +209,23 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   let skippedCount = 0;
   let errorCount = 0;
 
-  // ── Trial: current_day = 0 → 1 khi đến bodix_start_date, gửi tin ngày 1 ──
+  // ── Trial: status = trial, ngày 1–3 theo bodix_start_date hoặc enrolled_at + 1 ──
   const { data: trialEnrollments, error: trialErr } = await supabase
     .from('enrollments')
     .select(`
       id,
       user_id,
       program_id,
+      enrolled_at,
       profiles!inner (
         id,
         full_name,
         channel_user_id,
-        bodix_start_date
+        bodix_start_date,
+        trial_ends_at
       )
     `)
     .eq('status', 'trial')
-    .eq('current_day', 0)
     .eq('program_id', program.id);
 
   if (trialErr) {
@@ -175,14 +235,30 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const en = row as any;
       const profile = Array.isArray(en.profiles) ? en.profiles[0] : en.profiles;
-      const bodixStart: string | undefined = profile?.bodix_start_date;
       const channelUserId: string | null = profile?.channel_user_id;
+      const enrolledAt: string = en.enrolled_at;
 
-      if (!bodixStart || bodixStart > todayVN) {
+      if (!channelUserId) {
         skippedCount++;
         continue;
       }
-      if (!channelUserId) {
+
+      if (profile?.trial_ends_at) {
+        const end = new Date(profile.trial_ends_at).getTime();
+        if (end <= Date.now()) {
+          skippedCount++;
+          continue;
+        }
+      }
+
+      const anchor = getTrialMorningAnchorDate(profile?.bodix_start_date, enrolledAt);
+      if (todayVN < anchor) {
+        skippedCount++;
+        continue;
+      }
+
+      const trialDay = calendarDaysBetween(anchor, todayVN) + 1;
+      if (trialDay < 1 || trialDay > TRIAL_DAYS) {
         skippedCount++;
         continue;
       }
@@ -191,7 +267,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         .from('workout_templates')
         .select('day_number, title, workout_type')
         .eq('program_id', en.program_id)
-        .eq('day_number', 1)
+        .eq('day_number', trialDay)
         .maybeSingle();
 
       if (!workout || workout.workout_type === 'review') {
@@ -200,12 +276,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       }
 
       const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
-      const isWeekStart = true;
-      const dayNumber = 1;
+      const isWeekStart = trialDay === 1;
       let message: string;
 
       if (workout.workout_type === 'recovery') {
-        message = buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart);
+        message = buildTrialRecoveryMessage(displayName, trialDay, isWeekStart);
       } else {
         const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
         const session = sessionCode ? SESSIONS[sessionCode] : null;
@@ -214,22 +289,24 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           errorCount++;
           continue;
         }
-        message = buildMainMessage(displayName, dayNumber, config.totalDays, session, isWeekStart);
+        message = buildTrialMainMessage(displayName, trialDay, session, isWeekStart);
       }
 
       try {
         const result = await sendViaZalo(channelUserId, message);
         if (result.success) {
           sentCount++;
-          await supabase.from('enrollments').update({ current_day: 1 }).eq('id', en.id);
-          await supabase.from('profiles').update({ bodix_current_day: 1 }).eq('id', profile.id);
           await supabase.from('nudge_logs').insert({
             user_id: profile.id,
             enrollment_id: en.id,
             nudge_type: 'morning_reminder',
             channel: 'zalo',
-            content_template: workout.workout_type === 'recovery' ? 'morning_recovery' : 'morning_main',
-            content_variables: { day_number: dayNumber, workout_type: workout.workout_type, trial: true },
+            content_template: workout.workout_type === 'recovery' ? 'morning_recovery_trial' : 'morning_main_trial',
+            content_variables: {
+              day_number: trialDay,
+              workout_type: workout.workout_type,
+              trial: true,
+            },
             delivered: true,
           });
         } else {
@@ -244,7 +321,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     }
   }
 
-  // Lấy enrollments active + profile + cohort
+  // Lấy enrollments active + profile; cohort optional (fallback enrolled_at)
   const { data: enrollments, error: enrollError } = await supabase
     .from('enrollments')
     .select(`
@@ -252,7 +329,8 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       user_id,
       program_id,
       cohort_id,
-      cohorts!inner ( start_date ),
+      enrolled_at,
+      cohorts ( start_date ),
       profiles!inner (
         id,
         full_name,
@@ -275,12 +353,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       sent: sentCount,
       skipped: skippedCount,
       errors: errorCount,
-      message: 'No active enrollments',
       trial_processed: true,
+      active_total: 0,
+      message: 'No active enrollments',
     });
   }
-
-  const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD (UTC)
 
   for (const row of enrollments) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -289,15 +366,15 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const cohort = Array.isArray(enrollment.cohorts) ? enrollment.cohorts[0] : enrollment.cohorts;
     const channelUserId: string | null = profile?.channel_user_id;
 
-    if (!channelUserId || !cohort?.start_date) {
+    const startAnchor: string =
+      cohort?.start_date ?? isoTimestampToVietnamYmd(enrollment.enrolled_at as string);
+
+    if (!channelUserId) {
       skippedCount++;
       continue;
     }
 
-    // Tính day_number từ cohort start_date
-    const startDate = new Date(cohort.start_date + 'T00:00:00Z');
-    const todayDate = new Date(today + 'T00:00:00Z');
-    const dayNumber = Math.floor((todayDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    const dayNumber = calendarDaysBetween(startAnchor, todayVN) + 1;
 
     if (dayNumber < 1 || dayNumber > config.totalDays) {
       skippedCount++;
@@ -379,7 +456,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     sent: sentCount,
     skipped: skippedCount,
     errors: errorCount,
-    total: enrollments.length,
+    active_total: enrollments.length,
   });
 }
 

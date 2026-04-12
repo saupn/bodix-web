@@ -23,7 +23,7 @@ export function FAQItem({ question, answer }: FAQItemProps) {
         />
       </button>
       {isOpen && (
-        <div className="pb-4 text-sm sm:text-base text-neutral-600 leading-relaxed">{answer}</div>
+        <div className="pb-4 text-sm sm:text-base text-neutral-800 leading-relaxed">{answer}</div>
       )}
     </div>
   );

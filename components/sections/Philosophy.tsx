@@ -41,10 +41,10 @@ export function Philosophy() {
               className="rounded-xl bg-white p-4 sm:p-6 border border-neutral-200 shadow-sm"
             >
               <span className="text-4xl">{emoji}</span>
-              <h3 className="mt-4 font-heading text-lg font-semibold text-primary">
+              <h3 className="mt-4 font-heading text-base font-semibold text-primary">
                 {title}
               </h3>
-              <p className="mt-2 text-neutral-600 leading-relaxed">{description}</p>
+              <p className="mt-2 text-neutral-800 leading-relaxed">{description}</p>
             </div>
           ))}
         </div>

@@ -1,5 +1,31 @@
+import {
+  addCalendarDays,
+  calendarDaysBetween,
+  getVietnamTomorrowDateString,
+  isoTimestampToVietnamYmd,
+} from "@/lib/date/vietnam";
+
 export const TRIAL_DAYS = 3
 export const TRIAL_CONTENT_DAY_LIMIT = 3  // user xem được ngày 1, 2, 3
+
+/**
+ * Ngày bắt đầu trial cho tin nhắn sáng (ngày 1 = tin đầu tiên).
+ * Ưu tiên bodix_start_date (đặt khi POST /api/trial/start); nếu thiếu → ngày đăng ký + 1 (VN).
+ */
+export function getTrialMorningAnchorDate(
+  bodixStartDate: string | null | undefined,
+  enrolledAtIso: string,
+): string {
+  if (bodixStartDate) return bodixStartDate;
+  const enrollYmd = isoTimestampToVietnamYmd(enrolledAtIso);
+  return addCalendarDays(enrollYmd, 1);
+}
+
+/** Từ ngày mai (D1 trial) đến ngày cohort còn ít nhất 3 ngày lịch */
+export function hasMinDaysBeforeCohortForTrial(cohortStartYmd: string): boolean {
+  const tomorrow = getVietnamTomorrowDateString();
+  return calendarDaysBetween(tomorrow, cohortStartYmd) >= 3;
+}
 
 export const VALID_ACTIVITY_TYPES = [
   'view_program',

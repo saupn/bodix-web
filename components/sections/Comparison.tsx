@@ -21,14 +21,14 @@ export function Comparison() {
               className="flex items-start gap-3 rounded-xl bg-white p-4 sm:p-5 border border-neutral-200 shadow-sm"
             >
               <span className="mt-0.5 text-lg text-primary">✓</span>
-              <p className="text-neutral-700 text-sm sm:text-base leading-relaxed">
+              <p className="text-neutral-900 text-sm sm:text-base leading-relaxed">
                 {item}
               </p>
             </div>
           ))}
         </div>
         <div className="mt-8 sm:mt-10 max-w-2xl mx-auto rounded-lg bg-secondary-light p-4 sm:p-5 text-center">
-          <p className="text-sm text-neutral-700 leading-relaxed">
+          <p className="text-sm text-neutral-900 leading-relaxed">
             Chương trình hiện tại dành cho Nữ. Phiên bản Nam sắp ra mắt —{" "}
             <Link
               href="/signup"

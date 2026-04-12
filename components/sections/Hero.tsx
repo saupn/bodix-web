@@ -52,7 +52,7 @@ export function Hero() {
       {/* Content */}
       <div className="container relative z-10 mx-auto max-w-[1200px] px-4 py-12 text-center sm:px-6">
         <h1
-          className="font-heading text-3xl font-bold text-white drop-shadow-lg sm:text-4xl md:text-5xl lg:text-6xl animate-fade-slide-up leading-tight"
+          className="font-heading text-2xl font-bold text-white drop-shadow-lg sm:text-3xl md:text-4xl animate-fade-slide-up leading-tight"
           style={{ animationDelay: "0.1s" }}
         >
           {SITE.slogan}

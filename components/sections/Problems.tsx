@@ -44,10 +44,10 @@ export function Problems() {
                   {i + 1}
                 </span>
               </div>
-              <h3 className="mt-4 font-heading text-base sm:text-lg font-semibold text-primary">
+              <h3 className="mt-4 font-heading text-sm sm:text-base font-semibold text-primary">
                 {step.title}
               </h3>
-              <p className="mt-3 text-sm text-neutral-600 leading-relaxed">
+              <p className="mt-3 text-sm text-neutral-800 leading-relaxed">
                 {step.description}
               </p>
             </div>

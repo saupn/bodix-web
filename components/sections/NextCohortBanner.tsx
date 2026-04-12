@@ -44,11 +44,13 @@ export function NextCohortBanner() {
   if (loading) return null;
 
   return (
-    <div className="rounded-xl bg-[#2D4A3E]/10 p-6 text-center">
+    <div className="rounded-xl bg-white/10 p-6 text-center backdrop-blur-sm ring-1 ring-white/20">
       {label ? (
         <>
-          <p className="font-heading text-lg font-semibold text-[#2D4A3E]">{label}</p>
-          <p className="mt-2 text-sm text-neutral-600">
+          <p className="font-heading text-lg font-semibold text-cyan-50 drop-shadow-sm">
+            {label}
+          </p>
+          <p className="mt-2 text-sm text-cyan-50/95">
             Đăng ký tập thử 3 ngày để giữ chỗ!
           </p>
           <Link
@@ -59,7 +61,7 @@ export function NextCohortBanner() {
           </Link>
         </>
       ) : (
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-cyan-50/95">
           Đợt tập mới sắp mở — đăng ký để nhận thông báo!
         </p>
       )}

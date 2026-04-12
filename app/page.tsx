@@ -7,7 +7,6 @@ import { Programs } from "@/components/sections/Programs";
 import { Pricing } from "@/components/sections/Pricing";
 import { Comparison } from "@/components/sections/Comparison";
 import { FAQ } from "@/components/sections/FAQ";
-import { GuideDownload } from "@/components/sections/GuideDownload";
 import { FinalCTA } from "@/components/sections/FinalCTA";
 
 export default function Home() {
@@ -22,7 +21,6 @@ export default function Home() {
         <Pricing />
         <Comparison />
         <FAQ />
-        <GuideDownload />
         <FinalCTA />
       </main>
       <Footer />

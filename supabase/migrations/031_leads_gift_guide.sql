@@ -1,5 +1,5 @@
 -- Migration: 031_leads_gift_guide
--- Tặng sách BodiX Fuel Guide — leads + gift suất cho user đã đăng ký
+-- Tặng sách (lead magnet) — leads + gift suất; tên sách hiển thị: Tại sao nhịn ăn không giúp bạn gọn hơn
 
 CREATE TABLE IF NOT EXISTS public.leads (
   id bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

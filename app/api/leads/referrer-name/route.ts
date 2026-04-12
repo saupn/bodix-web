@@ -1,15 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 
-/** GET ?code=LAN → { name: "Nguyễn Thị Lan" } */
+/** GET ?code=LAN → { name: "Nguyễn Thị Lan" } — dùng service role (RLS không cho anon đọc profiles người khác) */
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get("code")?.trim().toUpperCase();
   if (!code) {
     return NextResponse.json({ name: null });
   }
 
-  const supabase = await createClient();
-  const { data: profile } = await supabase
+  const service = createServiceClient();
+  const { data: profile } = await service
     .from("profiles")
     .select("full_name")
     .eq("referral_code", code)

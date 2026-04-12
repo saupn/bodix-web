@@ -1,58 +1,90 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { downloadGuideLeadSchema, safeParseBody } from "@/lib/validation/schemas";
 
 const DOWNLOAD_URL = "/guides/bodix-fuel-guide.pdf";
 
+function stripHtml(s: string): string {
+  return s
+    .replace(/<[^>]*>/g, "")
+    .replace(/&[a-z]+;/gi, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function isValidVnPhone10(digits: string): boolean {
+  return digits.length === 10 && digits.startsWith("0");
+}
+
+/** 0909123456 → 84909123456 */
+function formatPhoneStorage(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  if (!isValidVnPhone10(digits)) return null;
+  return `84${digits.slice(1)}`;
+}
+
 export async function POST(request: NextRequest) {
-  let body: { email?: string; name?: string; referral_code?: string };
-
+  let json: unknown;
   try {
-    body = await request.json();
+    json = await request.json();
   } catch {
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  const parsed = safeParseBody(downloadGuideLeadSchema, json);
+  if (!parsed.ok) {
+    return NextResponse.json({ error: parsed.error }, { status: 400 });
+  }
+
+  const { phone: phoneRaw, name: nameRaw, referral_code: referralCode } = parsed.data;
+  const formattedPhone = formatPhoneStorage(phoneRaw);
+  if (!formattedPhone) {
     return NextResponse.json(
-      { error: "Invalid JSON." },
-      { status: 400 }
+      { error: "Số điện thoại không hợp lệ (cần 10 số, bắt đầu bằng 0)." },
+      { status: 400 },
     );
   }
 
-  const email = body.email?.trim().toLowerCase();
-  if (!email) {
-    return NextResponse.json(
-      { error: "Vui lòng nhập email." },
-      { status: 400 }
-    );
-  }
-
-  const name = body.name?.trim() || null;
-  const referralCode = body.referral_code?.trim().toUpperCase() || null;
-  const source = referralCode ? "gift_page" : "homepage";
+  const name = nameRaw?.trim() ? stripHtml(nameRaw).slice(0, 200) || null : null;
 
   const service = createServiceClient();
 
-  await service.from("leads").insert({
-    email,
+  const { data: profile } = await service
+    .from("profiles")
+    .select("id, gift_remaining")
+    .eq("referral_code", referralCode)
+    .maybeSingle();
+
+  if (!profile) {
+    return NextResponse.json({ error: "Link tặng không hợp lệ." }, { status: 400 });
+  }
+
+  const remaining = profile.gift_remaining ?? 10;
+
+  const { error: insertError } = await service.from("leads").insert({
+    phone: formattedPhone,
+    email: null,
     name,
-    source,
+    source: "gift",
     referral_code: referralCode,
     downloaded: true,
   });
 
-  if (referralCode) {
-    const { data: profile } = await service
-      .from("profiles")
-      .select("id, gift_remaining")
-      .eq("referral_code", referralCode)
-      .gt("gift_remaining", 0)
-      .maybeSingle();
+  if (insertError) {
+    console.error("[download-guide] insert:", insertError);
+    return NextResponse.json({ error: "Không thể lưu thông tin. Vui lòng thử lại." }, { status: 500 });
+  }
 
-    if (profile) {
-      const newRemaining = Math.max(0, (profile.gift_remaining ?? 10) - 1);
-      await service
-        .from("profiles")
-        .update({ gift_remaining: newRemaining })
-        .eq("id", profile.id);
+  if (remaining > 0) {
+    const { error: updateError } = await service
+      .from("profiles")
+      .update({ gift_remaining: remaining - 1 })
+      .eq("id", profile.id);
+
+    if (updateError) {
+      console.error("[download-guide] gift decrement:", updateError);
     }
   }
 
-  return NextResponse.json({ downloadUrl: DOWNLOAD_URL });
+  return NextResponse.json({ success: true, downloadUrl: DOWNLOAD_URL });
 }

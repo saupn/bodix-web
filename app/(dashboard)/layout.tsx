@@ -104,14 +104,25 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       giftSection={
-        profile?.referral_code && (profile?.gift_remaining ?? 10) > 0 ? (
-          {
-            remaining: profile.gift_remaining ?? 10,
-            total: profile.gift_total ?? 10,
-            referralCode: profile.referral_code,
-            baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
-          }
-        ) : null
+        profile.referral_code
+          ? (profile.gift_remaining ?? 10) <= 0
+            ? {
+                kind: "exhausted" as const,
+                total: profile.gift_total ?? 10,
+                referralCode: profile.referral_code,
+                baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
+              }
+            : {
+                kind: "active" as const,
+                remaining: profile.gift_remaining ?? 10,
+                total: profile.gift_total ?? 10,
+                referralCode: profile.referral_code,
+                baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
+              }
+          : {
+              kind: "need_code" as const,
+              fullName: profile.full_name ?? null,
+            }
       }
       unpaidBanner={
         showUnpaidBanner ? (

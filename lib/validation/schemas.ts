@@ -116,6 +116,17 @@ export const checkoutCreateSchema = z.object({
 })
 export type CheckoutCreateInput = z.infer<typeof checkoutCreateSchema>
 
+/** POST /api/leads/download-guide — nhận sách qua link tặng */
+export const downloadGuideLeadSchema = z.object({
+  phone: z.string().min(1, 'Vui lòng nhập số điện thoại.'),
+  name: z.string().max(200).optional(),
+  referral_code: z
+    .string()
+    .min(1, 'Thiếu mã giới thiệu.')
+    .transform((s) => s.trim().toUpperCase()),
+})
+export type DownloadGuideLeadInput = z.infer<typeof downloadGuideLeadSchema>
+
 // ─── Parse helpers ────────────────────────────────────────────────────────────
 
 /**

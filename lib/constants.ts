@@ -4,6 +4,12 @@ export const ZALO_OA_LINK = `https://zalo.me/${process.env.NEXT_PUBLIC_ZALO_OA_I
 export const REFERRAL_BASE =
   process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit";
 
+/** Tên hiển thị sách tặng (file PDF giữ nguyên public/guides/bodix-fuel-guide.pdf) */
+export const GIFT_BOOK_TITLE = "Sách Tại sao nhịn ăn không giúp bạn gọn hơn";
+
+export const GIFT_BOOK_DESCRIPTION =
+  "Sách Tại sao nhịn ăn không giúp bạn gọn hơn - Thực ra cần ba thứ - và không phải thứ bạn đang nghĩ. Đây là hướng dẫn thực tế cho phụ nữ bận rộn. Hoàn toàn miễn phí.";
+
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",

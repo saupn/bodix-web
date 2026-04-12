@@ -9,6 +9,8 @@ import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
 import { StreakBadge } from "@/components/completion/StreakBadge";
 import { RescueBanner } from "@/components/rescue/RescueBanner";
+import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
+import { useToast } from "@/components/ui/Toast";
 
 const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
@@ -22,14 +24,14 @@ const NAV_LINKS_BASE = [
 
 const PROGRAM_NAV = { href: "/app/program", label: "Chương trình của tôi", icon: Dumbbell };
 
+export type GiftBookSection =
+  | { kind: "need_code"; fullName: string | null }
+  | { kind: "exhausted"; total: number; referralCode: string; baseUrl: string }
+  | { kind: "active"; remaining: number; total: number; referralCode: string; baseUrl: string };
+
 interface DashboardShellProps {
   children: React.ReactNode;
-  giftSection?: {
-    remaining: number;
-    total: number;
-    referralCode: string;
-    baseUrl: string;
-  } | null;
+  giftSection?: GiftBookSection | null;
   unpaidBanner?: React.ReactNode;
   profile: {
     full_name: string | null;
@@ -73,8 +75,10 @@ function getInitials(name: string | null, email: string): string {
 
 export function DashboardShell({ children, giftSection, unpaidBanner, profile, userEmail, userId, hasActiveProgram, streak, rescue, isAffiliate }: DashboardShellProps) {
   const router = useRouter();
+  const { success: toastSuccess } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [communityBadge, setCommunityBadge] = useState(0);
+  const [referralModalOpen, setReferralModalOpen] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
@@ -133,6 +137,18 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
   const displayName = profile.full_name?.trim() || userEmail || "bạn";
   const trialDays = getTrialDaysLeft(profile.trial_ends_at);
   const isInTrial = trialDays !== null && trialDays > 0;
+
+  const activeGift =
+    giftSection?.kind === "active"
+      ? {
+          ...giftSection,
+          link: `${giftSection.baseUrl.replace(/\/$/, "")}/tang-sach?from=${giftSection.referralCode}`,
+          pct: Math.min(
+            100,
+            Math.round((giftSection.remaining / Math.max(1, giftSection.total)) * 100),
+          ),
+        }
+      : null;
 
   const handleLogout = async () => {
     const supabase = createClient();
@@ -268,37 +284,130 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
         {/* Content */}
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" tabIndex={-1}>
           {giftSection && (
-            <div className="mb-6 rounded-xl border-2 border-[#2D4A3E]/20 bg-[#2D4A3E]/5 p-4 sm:p-5">
-              <h3 className="font-heading font-semibold text-[#2D4A3E]">
-                Tặng sách cho bạn bè
+            <div className="mb-6 rounded-2xl bg-[#2D4A3E]/5 p-6">
+              <h3 className="font-heading text-lg font-semibold text-[#2D4A3E]">
+                📚 Tặng Sách cho bạn bè
               </h3>
-              <p className="mt-1 text-sm text-neutral-600">
-                Còn lại: {giftSection.remaining}/{giftSection.total} suất
+              <p className="mt-2 text-sm text-neutral-600">
+                Chia sẻ sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn bè — hoàn toàn miễn phí.
               </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={`${giftSection.baseUrl}/tang-sach?from=${giftSection.referralCode}`}
-                  className="flex-1 min-w-0 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm font-mono"
-                />
+
+              {giftSection.kind === "need_code" && (
+                <div className="mt-4">
+                  <p className="text-sm text-neutral-700">
+                    Bạn chưa có mã giới thiệu. Tạo mã để bắt đầu tặng sách.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setReferralModalOpen(true)}
+                    className="mt-3 rounded-xl bg-[#2D4A3E] px-4 py-3 text-sm font-semibold text-white hover:bg-[#243d32]"
+                  >
+                    Tạo mã giới thiệu
+                  </button>
+                </div>
+              )}
+
+              {giftSection.kind === "exhausted" && (
+                <div className="mt-4 space-y-3">
+                  <p className="text-sm text-neutral-800">
+                    🎉 Bạn đã tặng hết {giftSection.total} suất! Cảm ơn bạn đã chia sẻ.
+                  </p>
+                  <p className="text-sm text-neutral-600">
+                    Muốn thêm suất? Nhắn cho BodiX để được hỗ trợ.
+                  </p>
+                </div>
+              )}
+
+              {activeGift && (
+                  <div className="mt-4 space-y-4">
+                    <p className="text-sm font-medium text-neutral-800">
+                      Còn lại: {activeGift.remaining}/{activeGift.total} suất
+                    </p>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200/80">
+                      <div
+                        className="h-full rounded-full bg-[#2D4A3E] transition-all"
+                        style={{ width: `${activeGift.pct}%` }}
+                      />
+                    </div>
+                    <div className="rounded-lg border border-neutral-200 bg-white p-4">
+                      <p className="text-xs font-medium text-neutral-500">Link tặng</p>
+                      <p className="mt-1 break-all font-mono text-sm text-neutral-900">
+                        {activeGift.link.replace(/^https?:\/\//, "")}
+                      </p>
+                    </div>
+                    <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          await navigator.clipboard.writeText(activeGift.link);
+                          toastSuccess("Đã copy!");
+                        }}
+                        className="inline-flex flex-1 items-center justify-center rounded-xl border border-[#2D4A3E]/30 bg-white px-4 py-3 text-sm font-medium text-[#2D4A3E] hover:bg-[#2D4A3E]/5 min-h-[44px]"
+                      >
+                        📋 Copy link
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://zalo.me/share?url=${encodeURIComponent(activeGift.link)}&title=${encodeURIComponent(
+                              "Tặng bạn Cẩm nang Khởi động BodiX — miễn phí!",
+                            )}`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        className="inline-flex flex-1 items-center justify-center rounded-xl bg-[#0068FF] px-4 py-3 text-sm font-medium text-white hover:bg-[#0052cc] min-h-[44px]"
+                      >
+                        💬 Chia sẻ Zalo
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          window.open(
+                            `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(activeGift.link)}`,
+                            "_blank",
+                            "noopener,noreferrer",
+                          )
+                        }
+                        className="inline-flex flex-1 items-center justify-center rounded-xl border border-[#1877F2] bg-[#1877F2] px-4 py-3 text-sm font-medium text-white hover:bg-[#166fe5] min-h-[44px]"
+                      >
+                        📘 Chia sẻ Facebook
+                      </button>
+                    </div>
+                  </div>
+              )}
+            </div>
+          )}
+
+          {referralModalOpen && giftSection?.kind === "need_code" && (
+            <div
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="referral-gift-modal-title"
+            >
+              <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
                 <button
                   type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(`${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`);
-                  }}
-                  className="rounded-lg border border-[#2D4A3E]/30 px-3 py-2 text-sm font-medium text-[#2D4A3E] hover:bg-[#2D4A3E]/5"
+                  onClick={() => setReferralModalOpen(false)}
+                  className="absolute right-4 top-4 rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+                  aria-label="Đóng"
                 >
-                  Copy
+                  ✕
                 </button>
-                <a
-                  href={`https://zalo.me/share?url=${encodeURIComponent(`${giftSection!.baseUrl}/tang-sach?from=${giftSection!.referralCode}`)}&title=${encodeURIComponent("Mình tặng bạn Cẩm nang BodiX Fuel Guide miễn phí!")}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="rounded-lg bg-[#0068FF] px-3 py-2 text-sm font-medium text-white hover:bg-[#0052cc]"
-                >
-                  Chia sẻ Zalo
-                </a>
+                <h2 id="referral-gift-modal-title" className="sr-only">
+                  Tạo mã giới thiệu
+                </h2>
+                <div className="mt-1">
+                  <ReferralCodeSelector
+                    fullName={giftSection.fullName || ""}
+                    onCodeSet={() => {
+                      setReferralModalOpen(false);
+                      router.refresh();
+                    }}
+                  />
+                </div>
               </div>
             </div>
           )}

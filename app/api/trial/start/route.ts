@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     const name = profileData.full_name?.split(' ').pop() || profileData.full_name || 'bạn'
     sendViaZalo(
       profileData.channel_user_id,
-      `🎉 ${name} đã đăng ký tập thử 3 ngày! Chương trình bắt đầu ngày ${startDate.split('-').reverse().join('/')} — sáng hôm đó ~6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên.`
+      `🎉 ${name} đã đăng ký tập thử 3 ngày! Chương trình bắt đầu ngày ${startDate.split('-').reverse().join('/')}.\n\nNgày mai lúc 6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên qua Zalo. Chuẩn bị tinh thần nhé! 💪`
     ).catch(err => console.error('[trial/start] zalo send:', err))
   }
 

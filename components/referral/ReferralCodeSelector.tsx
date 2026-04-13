@@ -6,7 +6,7 @@ import {
   sanitizeReferralCodeInput,
   isValidReferralCode,
 } from "@/lib/referral/utils";
-import { REFERRAL_BASE } from "@/lib/constants";
+import { useToast } from "@/components/ui/Toast";
 
 interface Props {
   fullName: string;
@@ -22,6 +22,7 @@ export function ReferralCodeSelector({
   onSkip,
   initialCode,
 }: Props) {
+  const { info: toastInfo } = useToast();
   const [suggestions, setSuggestions] = useState<string[]>([]);
   const [customCode, setCustomCode] = useState(initialCode ?? "");
   const [selectedCode, setSelectedCode] = useState<string | null>(
@@ -68,7 +69,6 @@ export function ReferralCodeSelector({
   }, [customCode, checkAvailability]);
 
   const handleSelectSuggestion = (code: string) => {
-    setSelectedCode(code);
     setCustomCode(code);
     setAvailability("checking");
     checkAvailability(code);
@@ -109,7 +109,6 @@ export function ReferralCodeSelector({
       }
 
       setSelectedCode(code);
-      onCodeSet?.(code);
     } catch {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
     } finally {
@@ -122,19 +121,35 @@ export function ReferralCodeSelector({
   };
 
   const displayCode = selectedCode || customCode.trim().toUpperCase();
-  const referralLink = displayCode ? `${REFERRAL_BASE}/r/${displayCode}` : "";
   const canCopy = displayCode && isValidReferralCode(displayCode);
   const showResult = selectedCode && !error;
 
   const shareMessage = displayCode
-    ? `Mình đang tập với BodiX — chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: ${REFERRAL_BASE}?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
+    ? `Mình đang tập với BodiX — chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: https://bodix.fit?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
     : "";
 
   const shareZaloUrl = displayCode
     ? `https://zalo.me/share?url=${encodeURIComponent(
-        `${REFERRAL_BASE}?ref=${encodeURIComponent(displayCode)}`
+        `https://bodix.fit?ref=${displayCode}`
       )}&title=${encodeURIComponent(shareMessage)}`
     : "";
+
+  const handleShareZalo = async () => {
+    if (!shareZaloUrl || !shareMessage) return;
+
+    try {
+      const popup = window.open(shareZaloUrl, "_blank");
+      if (!popup) {
+        throw new Error("Unable to open Zalo share window");
+      }
+    } catch {
+      try {
+        await navigator.clipboard.writeText(shareMessage);
+      } catch {}
+      toastInfo("Đã copy tin nhắn! Mở Zalo và gửi cho bạn bè nha 🎉");
+      window.open("https://zalo.me", "_blank");
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -208,7 +223,7 @@ export function ReferralCodeSelector({
         <button
           type="button"
           onClick={() => setShowPromoModal(true)}
-          className="mt-2 text-sm text-[#2D4A3E] underline cursor-pointer"
+          className="mt-2 cursor-pointer text-sm font-medium text-[#2D4A3E] hover:text-[#1f352d]"
         >
           ℹ️ Tìm hiểu chương trình ưu đãi →
         </button>
@@ -296,14 +311,14 @@ export function ReferralCodeSelector({
             >
               Copy tin nhắn
             </button>
-            <a
-              href={shareZaloUrl || "#"}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              type="button"
+              onClick={handleShareZalo}
+              disabled={!shareZaloUrl}
               className="rounded-lg bg-[#0068FF] px-4 py-2 text-sm font-medium text-white hover:opacity-90"
             >
               Chia sẻ Zalo
-            </a>
+            </button>
           </div>
         </div>
       )}

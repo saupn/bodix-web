@@ -330,7 +330,11 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
                       />
                     </div>
                     <div className="rounded-lg border border-neutral-200 bg-white p-4">
-                      <p className="text-xs font-medium text-neutral-500">Link tặng</p>
+                      <p className="text-xs font-medium text-neutral-500">Mã của bạn</p>
+                      <p className="mt-1 font-mono text-lg font-bold tracking-wider text-[#2D4A3E]">
+                        {activeGift.referralCode}
+                      </p>
+                      <p className="mt-3 text-xs font-medium text-neutral-500">Link tặng</p>
                       <p className="mt-1 break-all font-mono text-sm text-neutral-900">
                         {activeGift.link.replace(/^https?:\/\//, "")}
                       </p>

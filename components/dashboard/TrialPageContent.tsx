@@ -218,7 +218,7 @@ export function TrialPageContent() {
               {formatVnYmd(data.bodix_start_date)}.
             </p>
             <p className="mt-2 text-sm text-neutral-600">
-              Sáng ngày đó ~6:30 bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo!
+              Ngày mai lúc 6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên qua Zalo. Chuẩn bị tinh thần nhé! 💪
             </p>
           </div>
         )}

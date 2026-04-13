@@ -79,6 +79,7 @@ function buildMainMessage(
   dayNumber: number,
   totalDays: number,
   session: SessionMeta,
+  sessionTitle: string,
   isWeekStart: boolean,
 ): string {
   const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
@@ -87,9 +88,7 @@ function buildMainMessage(
     : '';
 
   return (
-    `Hi ${name}! 🌸 Ngày ${dayNumber}/${totalDays} — hôm nay tập ${session.focus} nhé!\n` +
-    `\n` +
-    `Session ${session.code}:\n` +
+    `Hi ${name}! 🌸 Ngày ${dayNumber}/${totalDays} — hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
     `▶️ Xem video: https://bodix.fit/app/program/workout/${dayNumber}\n` +
@@ -134,17 +133,16 @@ function buildTrialMainMessage(
   name: string,
   trialDay: number,
   session: SessionMeta,
+  sessionTitle: string,
   isWeekStart: boolean,
 ): string {
   const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
   const weekTip = isWeekStart
-    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha — đang tập thử mà, thoải mái hết!'
+    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha — đang tập thử mà, thoải mái đi!'
     : '';
 
   return (
-    `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay mình cùng ${session.focus}, cứ nhẹ nhàng theo cảm giác nha.\n` +
-    `\n` +
-    `Session ${session.code}:\n` +
+    `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
     `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
@@ -154,7 +152,7 @@ function buildTrialMainMessage(
     `  2 → 2 lượt (~14 phút)\n` +
     `  1 → 1 lượt (~7 phút)\n` +
     `\n` +
-    `Cả 3 đều tính hoàn thành — cứ từ từ, quan trọng là bạn đến được! 💪` +
+    `Cả 3 đều tính hoàn thành — cứ từ từ, quan trọng là bạn không bỏ cuộc! 💪` +
     weekTip
   );
 }
@@ -205,9 +203,23 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   }
 
   const todayVN = getVietnamDateString();
+  const todayVNStartUtc = new Date(`${todayVN}T00:00:00+07:00`).toISOString();
   let sentCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
+
+  // Dedup: trả true nếu user đã nhận morning_reminder hôm nay (tính theo giờ VN)
+  async function alreadySentToday(userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('nudge_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('nudge_type', 'morning_reminder')
+      .gte('created_at', todayVNStartUtc)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
+  }
 
   // ── Trial: status = trial, ngày 1–3 theo bodix_start_date hoặc enrolled_at + 1 ──
   const { data: trialEnrollments, error: trialErr } = await supabase
@@ -239,6 +251,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       const enrolledAt: string = en.enrolled_at;
 
       if (!channelUserId) {
+        skippedCount++;
+        continue;
+      }
+
+      if (await alreadySentToday(profile.id)) {
         skippedCount++;
         continue;
       }
@@ -289,7 +306,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           errorCount++;
           continue;
         }
-        message = buildTrialMainMessage(displayName, trialDay, session, isWeekStart);
+        message = buildTrialMainMessage(displayName, trialDay, session, workout.title, isWeekStart);
       }
 
       try {
@@ -374,6 +391,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
+    if (await alreadySentToday(profile.id)) {
+      skippedCount++;
+      continue;
+    }
+
     const dayNumber = calendarDaysBetween(startAnchor, todayVN) + 1;
 
     if (dayNumber < 1 || dayNumber > config.totalDays) {
@@ -420,7 +442,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         continue;
       }
 
-      message = buildMainMessage(displayName, dayNumber, config.totalDays, session, isWeekStart);
+      message = buildMainMessage(displayName, dayNumber, config.totalDays, session, workout.title, isWeekStart);
     }
 
     try {

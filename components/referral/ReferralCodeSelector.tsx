@@ -126,12 +126,14 @@ export function ReferralCodeSelector({
   const canCopy = displayCode && isValidReferralCode(displayCode);
   const showResult = selectedCode && !error;
 
+  const shareMessage = displayCode
+    ? `Mình đang tập với BodiX — chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: ${REFERRAL_BASE}?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
+    : "";
+
   const shareZaloUrl = displayCode
     ? `https://zalo.me/share?url=${encodeURIComponent(
         `${REFERRAL_BASE}?ref=${encodeURIComponent(displayCode)}`
-      )}&title=${encodeURIComponent(
-        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
-      )}`
+      )}&title=${encodeURIComponent(shareMessage)}`
     : "";
 
   return (
@@ -281,17 +283,18 @@ export function ReferralCodeSelector({
 
       {showResult && (
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
-          <p className="text-sm font-medium text-primary">Link giới thiệu của bạn</p>
-          <p className="mt-1 font-mono text-sm break-all">{referralLink}</p>
+          <p className="text-sm font-medium text-primary">Tin nhắn giới thiệu của bạn</p>
+          <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{shareMessage}</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => {
-                navigator.clipboard.writeText(referralLink);
+                navigator.clipboard.writeText(shareMessage);
               }}
-              className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10"
+              disabled={!canCopy}
+              className="rounded-lg border border-primary px-4 py-2 text-sm font-medium text-primary hover:bg-primary/10 disabled:opacity-50"
             >
-              Copy link
+              Copy tin nhắn
             </button>
             <a
               href={shareZaloUrl || "#"}

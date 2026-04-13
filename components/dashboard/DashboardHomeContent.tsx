@@ -59,6 +59,16 @@ interface HistoryData {
   days: CheckinData[];
 }
 
+interface TrialData {
+  day: number;
+  workout: {
+    day_number: number;
+    title: string;
+    duration_minutes: number;
+    workout_type: string;
+  };
+}
+
 export function DashboardHomeContent({
   displayName,
   phoneVerified = true,
@@ -70,6 +80,8 @@ export function DashboardHomeContent({
   const [stats, setStats] = useState<MyStats | null>(null);
   const [cohort, setCohort] = useState<CohortBoard | null>(null);
   const [history, setHistory] = useState<HistoryData | null>(null);
+  const [trial, setTrial] = useState<TrialData | null>(null);
+  const [creditBalance, setCreditBalance] = useState<number>(0);
   const [loading, setLoading] = useState(true);
   const [comebackDismissed, setComebackDismissed] = useState<string | null>(null);
   const [reviewPending, setReviewPending] = useState<{
@@ -85,13 +97,40 @@ export function DashboardHomeContent({
   useEffect(() => {
     const load = async () => {
       try {
-        const [progRes, statsRes, pendingRes] = await Promise.all([
+        const [progRes, statsRes, pendingRes, creditsRes] = await Promise.all([
           fetch("/api/program/active"),
           fetch("/api/completion/my-stats"),
           fetch("/api/reviews/weekly/pending"),
+          fetch("/api/user/credits"),
         ]);
 
-        if (!progRes.ok || !statsRes.ok) {
+        if (creditsRes.ok) {
+          const credits = await creditsRes.json();
+          setCreditBalance(credits.balance ?? 0);
+        }
+
+        // Trial fallback: nếu không có active program → load trial workout card
+        if (!progRes.ok) {
+          const trialRes = await fetch("/api/trial/status");
+          if (trialRes.ok) {
+            const trialStatus = await trialRes.json();
+            if (trialStatus.is_trial && trialStatus.enrollment) {
+              const trialDay = Math.min(
+                Math.max(trialStatus.enrollment.current_day ?? 0, 0) + 1,
+                3,
+              );
+              const woRes = await fetch(`/api/trial/workout/${trialDay}`);
+              if (woRes.ok) {
+                const wo = await woRes.json();
+                setTrial({ day: trialDay, workout: wo.workout });
+              }
+            }
+          }
+          setLoading(false);
+          return;
+        }
+
+        if (!statsRes.ok) {
           setLoading(false);
           return;
         }
@@ -146,10 +185,64 @@ export function DashboardHomeContent({
     load();
   }, []);
 
-  if (loading || !program || !stats) {
+  if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
         <p className="text-neutral-500">Đang tải...</p>
+      </div>
+    );
+  }
+
+  // Trial state — chưa có active program
+  if (!program || !stats) {
+    return (
+      <div className="space-y-6">
+        <ZaloConnectBanner phoneVerified={phoneVerified} />
+
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+            Xin chào, {displayName}!
+          </h1>
+        </div>
+
+        {creditBalance > 0 && (
+          <Link
+            href="/app/profile"
+            className="block rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:border-amber-300 hover:bg-amber-100"
+          >
+            <p className="font-medium text-amber-900">
+              🎁 Bạn có {creditBalance.toLocaleString("vi-VN")}đ voucher
+            </p>
+            <span className="mt-1 inline-block text-sm text-amber-800">
+              Xem chi tiết →
+            </span>
+          </Link>
+        )}
+
+        {trial && (
+          <Link
+            href={`/app/trial/workout/${trial.day}`}
+            className="block rounded-xl border-2 border-primary/30 bg-primary/5 p-6 transition-colors hover:border-primary/50 hover:bg-primary/10"
+          >
+            <h2 className="font-heading text-xl font-semibold text-primary">
+              Bài tập hôm nay
+            </h2>
+            <p className="mt-2 font-medium text-neutral-800">
+              Ngày {trial.day}/3 — Tập thử
+            </p>
+            <p className="mt-1 text-neutral-700">{trial.workout.title}</p>
+            <div className="mt-2 flex gap-2 text-sm text-neutral-600">
+              <span>{trial.workout.duration_minutes} phút</span>
+              <span>
+                {WORKOUT_TYPE_LABEL[trial.workout.workout_type] ??
+                  trial.workout.workout_type}
+              </span>
+            </div>
+            <span className="mt-4 inline-block font-medium text-primary">
+              Bắt đầu tập thử →
+            </span>
+          </Link>
+        )}
       </div>
     );
   }
@@ -200,6 +293,21 @@ export function DashboardHomeContent({
           compact
         />
       </div>
+
+      {/* Voucher/credit card */}
+      {creditBalance > 0 && (
+        <Link
+          href="/app/profile"
+          className="block rounded-xl border border-amber-200 bg-amber-50 p-4 transition-colors hover:border-amber-300 hover:bg-amber-100"
+        >
+          <p className="font-medium text-amber-900">
+            🎁 Bạn có {creditBalance.toLocaleString("vi-VN")}đ voucher
+          </p>
+          <span className="mt-1 inline-block text-sm text-amber-800">
+            Xem chi tiết →
+          </span>
+        </Link>
+      )}
 
       {/* Review pending card — Chủ nhật/Thứ 2 */}
       {reviewPending?.pending && (

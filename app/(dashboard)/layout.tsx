@@ -97,6 +97,25 @@ export default async function DashboardLayout({
     .maybeSingle();
   const isAffiliate = !!affiliateProfile;
 
+  // Gift section: fallback — nếu profile.referral_code null, kiểm tra referral_codes table
+  // (user cũ có thể đã tạo code qua /api/referral/code trước khi profiles.referral_code được backfill)
+  let referralCode: string | null = profile.referral_code ?? null;
+  if (!referralCode) {
+    const { data: existingRef } = await service
+      .from("referral_codes")
+      .select("code")
+      .eq("user_id", user.id)
+      .eq("code_type", "referral")
+      .maybeSingle();
+    if (existingRef?.code) {
+      referralCode = existingRef.code;
+      await service
+        .from("profiles")
+        .update({ referral_code: existingRef.code })
+        .eq("id", user.id);
+    }
+  }
+
   const showUnpaidBanner =
     profile?.onboarding_completed === true &&
     profile?.payment_status !== "paid";
@@ -104,19 +123,19 @@ export default async function DashboardLayout({
   return (
     <DashboardShell
       giftSection={
-        profile.referral_code
+        referralCode
           ? (profile.gift_remaining ?? 10) <= 0
             ? {
                 kind: "exhausted" as const,
                 total: profile.gift_total ?? 10,
-                referralCode: profile.referral_code,
+                referralCode,
                 baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
               }
             : {
                 kind: "active" as const,
                 remaining: profile.gift_remaining ?? 10,
                 total: profile.gift_total ?? 10,
-                referralCode: profile.referral_code,
+                referralCode,
                 baseUrl: process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit",
               }
           : {

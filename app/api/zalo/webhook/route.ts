@@ -528,7 +528,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
       .eq('id', enrollment.id);
   }
 
-  // ── Phản hồi: chỉ gửi trong 3 ngoại lệ, im lặng khi thành công bình thường ──
+  // ── Ngoại lệ đặc biệt (thay thế phản hồi thông thường) ──
 
   // Ngoại lệ b: Ngày cuối trial (D3, status='trial')
   if (isTrialLastDay && !isLastDay) {
@@ -546,7 +546,15 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     return;
   }
 
-  // Check-in thành công bình thường → im lặng, không gửi tin phản hồi
+  // Phản hồi thông thường theo loại check-in
+  const CHECKIN_RESPONSES: Record<'hard' | 'light' | 'easy' | 'recovery', string> = {
+    hard: '💪 Tuyệt vời! 3 lượt — bạn thật sự nghiêm túc!',
+    light: '👏 Giỏi lắm! 2 lượt là rất tốt rồi!',
+    easy: '✅ Hoàn thành! 1 lượt cũng là chiến thắng!',
+    recovery: '🧘 Recovery xong! Cơ thể cảm ơn bạn đó.',
+  };
+
+  await sendZaloMessage(zaloUserId, CHECKIN_RESPONSES[checkinType]);
 }
 
 function shiftDate(dateStr: string, days: number): string {

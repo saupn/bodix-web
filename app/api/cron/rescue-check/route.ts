@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
+import {
+  sendFcmMessage,
+  pickMessagingChannel,
+} from '@/lib/messaging/adapters/push';
+import type { MessageResult } from '@/lib/messaging/types';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RESCUE MESSAGES
@@ -56,7 +61,9 @@ export async function GET(request: NextRequest) {
       profiles!inner (
         id,
         full_name,
-        channel_user_id
+        channel_user_id,
+        fcm_token,
+        notification_via
       )
     `)
     .eq('status', 'active');
@@ -73,8 +80,14 @@ export async function GET(request: NextRequest) {
     const enrollment = row as any;
     const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
     const channelUserId: string | null = profile?.channel_user_id;
+    const fcmToken: string | null = profile?.fcm_token;
 
-    if (!channelUserId) {
+    const userChannel = pickMessagingChannel({
+      fcm_token: fcmToken,
+      channel_user_id: channelUserId,
+      notification_via: profile?.notification_via ?? null,
+    });
+    if (userChannel === 'none') {
       stats.skipped++;
       continue;
     }
@@ -125,15 +138,29 @@ export async function GET(request: NextRequest) {
     try {
       if (level === 1) {
         // ── CẤP 1: miss 2 ngày → gửi cho user ──
-        const message = buildL1Message(displayName);
-        const result = await sendViaZalo(channelUserId, message);
+        const zaloMessage = buildL1Message(displayName);
+        let result: MessageResult;
+        if (userChannel === 'push') {
+          result = await sendFcmMessage(
+            fcmToken!,
+            {
+              type: 'rescueDay2',
+              title: 'Mình thấy bạn chưa tập 2 ngày rồi',
+              body: 'Chỉ cần 1 lượt (~7 phút). Mở app tập ngay!',
+              data: { days_missed: String(daysMissed) },
+            },
+            profile.id,
+          );
+        } else {
+          result = await sendViaZalo(channelUserId!, zaloMessage);
+        }
 
         await supabase.from('rescue_interventions').insert({
           enrollment_id: enrollment.id,
           user_id: enrollment.user_id,
           trigger_reason: 'missed_2_days',
           action_taken: 'send_rescue_message',
-          message_sent: message,
+          message_sent: userChannel === 'push' ? 'push:rescueDay2' : zaloMessage,
           outcome: 'pending',
         });
 
@@ -141,7 +168,7 @@ export async function GET(request: NextRequest) {
           user_id: profile.id,
           enrollment_id: enrollment.id,
           nudge_type: 'rescue_soft',
-          channel: 'zalo',
+          channel: userChannel,
           content_template: 'rescue_l1',
           content_variables: { days_missed: daysMissed },
           delivered: result.success,
@@ -152,15 +179,32 @@ export async function GET(request: NextRequest) {
 
       } else if (level === 2) {
         // ── CẤP 2: miss 3 ngày → gửi cho user ──
-        const message = buildL2Message(displayName, completedDays);
-        const result = await sendViaZalo(channelUserId, message);
+        const zaloMessage = buildL2Message(displayName, completedDays);
+        let result: MessageResult;
+        if (userChannel === 'push') {
+          result = await sendFcmMessage(
+            fcmToken!,
+            {
+              type: 'rescueDay3',
+              title: `${displayName} ơi, mình nhớ bạn 💚`,
+              body: `Bạn đã đi được ${completedDays} ngày — chỉ 1 lượt là quay lại ngay!`,
+              data: {
+                days_missed: String(daysMissed),
+                completed_days: String(completedDays),
+              },
+            },
+            profile.id,
+          );
+        } else {
+          result = await sendViaZalo(channelUserId!, zaloMessage);
+        }
 
         await supabase.from('rescue_interventions').insert({
           enrollment_id: enrollment.id,
           user_id: enrollment.user_id,
           trigger_reason: 'missed_3_plus_days',
           action_taken: 'send_rescue_message',
-          message_sent: message,
+          message_sent: userChannel === 'push' ? 'push:rescueDay3' : zaloMessage,
           outcome: 'pending',
         });
 
@@ -168,7 +212,7 @@ export async function GET(request: NextRequest) {
           user_id: profile.id,
           enrollment_id: enrollment.id,
           nudge_type: 'rescue_urgent',
-          channel: 'zalo',
+          channel: userChannel,
           content_template: 'rescue_l2',
           content_variables: { days_missed: daysMissed, completed_days: completedDays },
           delivered: result.success,
@@ -181,18 +225,44 @@ export async function GET(request: NextRequest) {
         // ── CẤP 3: miss 4+ ngày → gửi cho buddy ──
         const buddy = await findBuddy(supabase, enrollment.user_id, enrollment.cohort_id);
 
-        if (buddy) {
+        const buddyChannel = buddy
+          ? pickMessagingChannel({
+              fcm_token: buddy.fcm_token,
+              channel_user_id: buddy.channel_user_id,
+              notification_via: buddy.notification_via,
+            })
+          : 'none';
+
+        if (buddy && buddyChannel !== 'none') {
           const buddyDisplayName = buddy.full_name?.split(' ').pop() || buddy.full_name || 'Bạn';
           const userFullName = profile.full_name || 'buddy của bạn';
-          const message = buildL3BuddyMessage(buddyDisplayName, userFullName, daysMissed);
-          const result = await sendViaZalo(buddy.channel_user_id, message);
+          const zaloMessage = buildL3BuddyMessage(buddyDisplayName, userFullName, daysMissed);
+
+          let result: MessageResult;
+          if (buddyChannel === 'push') {
+            result = await sendFcmMessage(
+              buddy.fcm_token!,
+              {
+                type: 'system',
+                title: `Buddy ${userFullName} cần bạn động viên`,
+                body: `${userFullName} đã nghỉ ${daysMissed} ngày — nhắn hoặc gọi cho bạn ấy nha 🙏`,
+                data: {
+                  days_missed: String(daysMissed),
+                  buddy_id: buddy.id,
+                },
+              },
+              buddy.id,
+            );
+          } else {
+            result = await sendViaZalo(buddy.channel_user_id!, zaloMessage);
+          }
 
           await supabase.from('rescue_interventions').insert({
             enrollment_id: enrollment.id,
             user_id: enrollment.user_id,
             trigger_reason: 'missed_3_plus_days',
             action_taken: 'send_rescue_message',
-            message_sent: message,
+            message_sent: buddyChannel === 'push' ? 'push:buddy_l3' : zaloMessage,
             outcome: 'pending',
           });
 
@@ -200,7 +270,7 @@ export async function GET(request: NextRequest) {
             user_id: profile.id,
             enrollment_id: enrollment.id,
             nudge_type: 'rescue_critical',
-            channel: 'zalo',
+            channel: buddyChannel,
             content_template: 'rescue_l3_buddy',
             content_variables: {
               days_missed: daysMissed,
@@ -228,7 +298,7 @@ export async function GET(request: NextRequest) {
             user_id: profile.id,
             enrollment_id: enrollment.id,
             nudge_type: 'rescue_critical',
-            channel: 'zalo',
+            channel: 'none',
             content_template: 'rescue_l3_no_buddy',
             content_variables: { days_missed: daysMissed },
             delivered: false,
@@ -255,7 +325,9 @@ export async function GET(request: NextRequest) {
 interface BuddyProfile {
   id: string;
   full_name: string | null;
-  channel_user_id: string;
+  channel_user_id: string | null;
+  fcm_token: string | null;
+  notification_via: string | null;
 }
 
 async function findBuddy(
@@ -285,14 +357,15 @@ async function findBuddy(
   const buddyId = pairA?.user_b ?? pairB?.user_a ?? null;
   if (!buddyId) return null;
 
-  // Lấy profile buddy (cần channel_user_id để gửi Zalo)
+  // Lấy profile buddy — buddy có thể là app user (fcm_token) hoặc web user (channel_user_id)
   const { data: buddyProfile } = await supabase
     .from('profiles')
-    .select('id, full_name, channel_user_id')
+    .select('id, full_name, channel_user_id, fcm_token, notification_via')
     .eq('id', buddyId)
     .single();
 
-  if (!buddyProfile?.channel_user_id) return null;
+  if (!buddyProfile) return null;
+  if (!buddyProfile.channel_user_id && !buddyProfile.fcm_token) return null;
 
   return buddyProfile as BuddyProfile;
 }

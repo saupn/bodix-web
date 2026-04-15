@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { sendPushToUser } from "@/lib/messaging/adapters/push";
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -80,6 +81,21 @@ export async function POST(request: NextRequest) {
         bodix_current_day: 1,
       })
       .eq("id", order.user_id);
+
+    // App user → push notification xác nhận thanh toán. Không chặn flow nếu fail.
+    try {
+      await sendPushToUser(order.user_id, {
+        type: "paymentConfirmed",
+        title: "Thanh toán xác nhận! 🎉",
+        body: "Bạn sẽ được thông báo khi đợt tập tiếp theo mở.",
+        data: {
+          order_id: order.id,
+          program: order.program ?? "",
+        },
+      });
+    } catch (e) {
+      console.error("[confirm-order] push failed:", e);
+    }
   }
 
   return NextResponse.json({ success: true });

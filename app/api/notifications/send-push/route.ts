@@ -23,6 +23,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  console.log('[send-push] Firebase project:', process.env.FIREBASE_PROJECT_ID);
+  console.log(
+    '[send-push] Firebase email:',
+    process.env.FIREBASE_CLIENT_EMAIL?.substring(0, 20) + '...',
+  );
+  console.log(
+    '[send-push] Private key exists:',
+    !!process.env.FIREBASE_PRIVATE_KEY,
+  );
+
   let payload: PushApiPayload;
   try {
     payload = (await request.json()) as PushApiPayload;
@@ -76,8 +86,10 @@ export async function POST(request: NextRequest) {
 
   let sent = 0;
   let errors = 0;
+  const errorDetails: Array<{ user_id: string; error: string }> = [];
 
   for (const user of eligibleUsers) {
+    const user_id = user.id;
     const result = await sendFcmMessage(
       user.fcm_token!,
       {
@@ -86,14 +98,25 @@ export async function POST(request: NextRequest) {
         body: payload.body,
         data: payload.data,
       },
-      user.id,
+      user_id,
     );
     if (result.success) {
       sent++;
     } else {
       errors++;
+      const error = result.error;
+      console.error('[send-push] FCM error for user', user_id, ':', error);
+      errorDetails.push({
+        user_id,
+        error: error ?? 'unknown_error',
+      });
     }
   }
 
-  return NextResponse.json({ sent, errors, total: eligibleUsers.length });
+  return NextResponse.json({
+    sent,
+    errors,
+    total: eligibleUsers.length,
+    error_details: errorDetails,
+  });
 }

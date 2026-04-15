@@ -89,20 +89,20 @@ export async function POST(request: NextRequest) {
 function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | 'recovery' | null {
   const t = text.trim().toUpperCase();
 
+  // CHỈ match exact hoặc "KEYWORD ...". KHÔNG dùng includes()
+  // vì sẽ khớp sai với text bất kỳ (ví dụ "hello" có "E" → easy).
   const hard = ['HARD', 'H', '3', 'FULL', 'DONE', 'XONG', '✅', 'DA TAP'];
   const light = ['LIGHT', 'L', '2', 'NHE'];
   const easy = ['EASY', 'E', '1', 'DE', 'OK'];
   const recovery = ['REC', 'RECOVERY', 'R'];
 
-  if (hard.some(k => t === k || t.startsWith(k + ' '))) return 'hard';
-  if (light.some(k => t === k || t.startsWith(k + ' '))) return 'light';
-  if (easy.some(k => t === k || t.startsWith(k + ' '))) return 'easy';
-  if (recovery.some(k => t === k || t.startsWith(k + ' '))) return 'recovery';
+  const match = (keys: string[]) =>
+    keys.some((k) => t === k || t.startsWith(k + ' '));
 
-  if (hard.some(k => t.includes(k))) return 'hard';
-  if (light.some(k => t.includes(k))) return 'light';
-  if (easy.some(k => t.includes(k))) return 'easy';
-  if (recovery.some(k => t.includes(k))) return 'recovery';
+  if (match(hard)) return 'hard';
+  if (match(light)) return 'light';
+  if (match(easy)) return 'easy';
+  if (match(recovery)) return 'recovery';
 
   return null;
 }
@@ -114,6 +114,28 @@ function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | 'recovery' 
 async function handleUserMessage(payload: any) {
   const zaloUserId = payload.sender.id;
   const messageText = payload.message?.text || '';
+  const msgId: string | undefined = payload.message?.msg_id;
+
+  // ── Dedup: Zalo có thể retry webhook → tránh xử lý cùng msg_id 2 lần ──
+  if (msgId) {
+    const { error: dedupError } = await service
+      .from('zalo_webhook_events')
+      .insert({
+        msg_id: msgId,
+        zalo_uid: zaloUserId,
+        event_name: payload.event_name ?? 'user_send_text',
+      });
+
+    if (dedupError) {
+      // 23505 = unique_violation → đã xử lý msg_id này → bỏ qua
+      if (dedupError.code === '23505') {
+        console.log('[webhook] duplicate msg_id=' + msgId + ', skip');
+        return;
+      }
+      console.error('[webhook] dedup insert error:', dedupError);
+      // Không return — tiếp tục xử lý để không mất tin nếu table lỗi
+    }
+  }
 
   // ── Verify code check (phone verification via Zalo OA) ──
   const codeCandidate = messageText.trim().toUpperCase();
@@ -127,6 +149,7 @@ async function handleUserMessage(payload: any) {
       .maybeSingle();
 
     if (verification) {
+      console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=verify');
       await service
         .from('phone_verifications')
         .update({ status: 'verified', zalo_uid: zaloUserId, verified_at: new Date().toISOString() })
@@ -155,6 +178,7 @@ async function handleUserMessage(payload: any) {
     .single();
 
   if (profileError || !profile) {
+    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=no_profile');
     await sendZaloMessage(zaloUserId,
       'Mình chưa tìm thấy tài khoản của bạn. Vui lòng đăng ký tại bodix.fit trước nhé!'
     );
@@ -169,21 +193,41 @@ async function handleUserMessage(payload: any) {
     .in('status', ['active', 'trial'])
     .order('created_at', { ascending: false })
     .limit(1)
-    .single();
+    .maybeSingle();
 
-  if (enrollmentError || !enrollment) {
-    // Kiểm tra trial hết hạn
-    const { data: expiredTrial } = await supabase
+  if (enrollmentError) {
+    console.error('[webhook] enrollment query error:', enrollmentError);
+  }
+
+  if (!enrollment) {
+    // Kiểm tra các status khác để phản hồi phù hợp (chỉ 1 lần mỗi status)
+    const { data: otherEnrollment } = await supabase
       .from('enrollments')
-      .select('id')
+      .select('status')
       .eq('user_id', profile.id)
-      .eq('status', 'pending_payment')
+      .in('status', ['trial_completed', 'pending_payment', 'paid_waiting_cohort', 'completed', 'paused', 'dropped'])
+      .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    if (expiredTrial) {
+    const status = otherEnrollment?.status;
+    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=no_active_enrollment, status=' + status);
+
+    if (status === 'trial_completed' || status === 'paid_waiting_cohort') {
+      await sendZaloMessage(zaloUserId,
+        'Bạn đã hoàn thành tập thử. Chờ thông báo để tham gia chính thức nhé!'
+      );
+    } else if (status === 'pending_payment') {
       await sendZaloMessage(zaloUserId,
         '⏰ 3 ngày tập thử đã kết thúc. Thanh toán tại bodix.fit/checkout'
+      );
+    } else if (status === 'completed') {
+      await sendZaloMessage(zaloUserId,
+        '🏆 Bạn đã hoàn thành chương trình rồi! Chờ thông báo đợt tiếp theo nha.'
+      );
+    } else if (status === 'paused') {
+      await sendZaloMessage(zaloUserId,
+        'Enrollment của bạn đang tạm dừng. Liên hệ bodix.fit để tiếp tục nhé.'
       );
     } else {
       await sendZaloMessage(zaloUserId,
@@ -197,12 +241,16 @@ async function handleUserMessage(payload: any) {
   if (feelingScore !== null) {
     const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
     const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore);
-    if (handled) return;
+    if (handled) {
+      console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=feeling');
+      return;
+    }
     // Nếu không phải context review → tiếp tục xử lý check-in (1/2/3 overlap)
   }
 
   // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
   if (checkinType) {
+    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=checkin:' + checkinType);
     await handleCheckin(zaloUserId, profile, enrollment, checkinType);
     return;
   }
@@ -210,6 +258,7 @@ async function handleUserMessage(payload: any) {
   // ── Không phải check-in hay feeling → kiểm tra có phải text không hợp lệ ──
   // Nếu tin nhắn ngắn (< 20 ký tự) và không match → hướng dẫn check-in
   if (messageText.trim().length < 20) {
+    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=invalid_short');
     await sendZaloMessage(zaloUserId,
       'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nCả 3 đều tính hoàn thành!'
     );
@@ -217,6 +266,7 @@ async function handleUserMessage(payload: any) {
   }
 
   // ── Tin nhắn dài → lưu là câu hỏi/vấn đề ──
+  console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=question');
   await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload);
 }
 

@@ -208,6 +208,20 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   let sentCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
+  const skipReasons: string[] = [];
+  const errorReasons: string[] = [];
+
+  function skip(userId: string, reason: string) {
+    console.log('[morning-messages] SKIP user:', userId, 'reason:', reason);
+    skipReasons.push(`${userId}: ${reason}`);
+    skippedCount++;
+  }
+
+  function fail(userId: string, reason: string) {
+    console.error('[morning-messages] ERROR user:', userId, 'reason:', reason);
+    errorReasons.push(`${userId}: ${reason}`);
+    errorCount++;
+  }
 
   // Dedup: trả true nếu user đã nhận morning_reminder hôm nay (tính theo giờ VN)
   async function alreadySentToday(userId: string): Promise<boolean> {
@@ -265,33 +279,32 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       );
 
       if (!channelUserId && !fcmToken) {
-        console.log('[morning-messages] No channel available for user:', userId);
-        skippedCount++;
+        skip(userId, 'trial: no channel (channel_user_id and fcm_token both null)');
         continue;
       }
 
       if (await alreadySentToday(userId)) {
-        skippedCount++;
+        skip(userId, 'trial: already sent morning_reminder today');
         continue;
       }
 
       if (profile?.trial_ends_at) {
         const end = new Date(profile.trial_ends_at).getTime();
         if (end <= Date.now()) {
-          skippedCount++;
+          skip(userId, `trial: trial_ends_at (${profile.trial_ends_at}) already passed`);
           continue;
         }
       }
 
       const anchor = getTrialMorningAnchorDate(profile?.bodix_start_date, enrolledAt);
       if (todayVN < anchor) {
-        skippedCount++;
+        skip(userId, `trial: anchor date ${anchor} is in future (todayVN=${todayVN})`);
         continue;
       }
 
       const trialDay = calendarDaysBetween(anchor, todayVN) + 1;
       if (trialDay < 1 || trialDay > TRIAL_DAYS) {
-        skippedCount++;
+        skip(userId, `trial: trialDay=${trialDay} out of range 1..${TRIAL_DAYS} (anchor=${anchor})`);
         continue;
       }
 
@@ -302,8 +315,12 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         .eq('day_number', trialDay)
         .maybeSingle();
 
-      if (!workout || workout.workout_type === 'review') {
-        errorCount++;
+      if (!workout) {
+        fail(userId, `trial: no workout_template for day ${trialDay}`);
+        continue;
+      }
+      if (workout.workout_type === 'review') {
+        fail(userId, `trial: workout_type=review for day ${trialDay} (unexpected in trial range)`);
         continue;
       }
 
@@ -317,8 +334,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
         session = sessionCode ? SESSIONS[sessionCode] : null;
         if (!session) {
-          console.error(`[morning-messages] trial: unknown title "${workout.title}"`);
-          errorCount++;
+          fail(userId, `trial: unknown session title "${workout.title}"`);
           continue;
         }
       }
@@ -335,6 +351,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
       // BƯỚC 1: Ưu tiên Zalo
       let zaloDone = false;
+      let zaloErrorDetail: string | null = null;
       if (channelUserId) {
         try {
           const result = await sendViaZalo(channelUserId, zaloMessage);
@@ -352,10 +369,12 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               delivered: true,
             });
           } else {
-            console.error('[morning-messages] Zalo failed:', userId, result.error);
+            zaloErrorDetail = result.error ?? 'unknown';
+            console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
           }
         } catch (zaloErr) {
-          console.error('[morning-messages] Zalo threw:', userId, zaloErr);
+          zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
+          console.error('[morning-messages] Zalo threw:', userId, zaloErrorDetail);
         }
       }
 
@@ -402,16 +421,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               delivered: true,
             });
           } else {
-            console.error('[morning-messages] FCM failed:', userId, result.error);
-            errorCount++;
+            fail(userId, `trial: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
           }
         } catch (fcmErr) {
-          console.error('[morning-messages] FCM threw:', userId, fcmErr);
-          errorCount++;
+          const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+          fail(userId, `trial: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
         }
       } else {
-        console.error('[morning-messages] Zalo failed & no FCM fallback:', userId);
-        errorCount++;
+        fail(userId, `trial: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
       }
 
       await new Promise((r) => setTimeout(r, 100));
@@ -442,7 +459,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   if (enrollError) {
     console.error('[morning-messages] enrollments query:', enrollError);
     return NextResponse.json(
-      { sent: sentCount, skipped: skippedCount, errors: errorCount + 1, message: enrollError.message },
+      {
+        sent: sentCount,
+        skipped: skippedCount,
+        errors: errorCount + 1,
+        message: enrollError.message,
+        skip_reasons: skipReasons,
+        error_reasons: errorReasons,
+      },
       { status: 500 }
     );
   }
@@ -455,6 +479,8 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       trial_processed: true,
       active_total: 0,
       message: 'No active enrollments',
+      skip_reasons: skipReasons,
+      error_reasons: errorReasons,
     });
   }
 
@@ -480,20 +506,19 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     );
 
     if (!channelUserId && !fcmToken) {
-      console.log('[morning-messages] No channel available for user:', userId);
-      skippedCount++;
+      skip(userId, 'active: no channel (channel_user_id and fcm_token both null)');
       continue;
     }
 
     if (await alreadySentToday(userId)) {
-      skippedCount++;
+      skip(userId, 'active: already sent morning_reminder today');
       continue;
     }
 
     const dayNumber = calendarDaysBetween(startAnchor, todayVN) + 1;
 
     if (dayNumber < 1 || dayNumber > config.totalDays) {
-      skippedCount++;
+      skip(userId, `active: dayNumber=${dayNumber} out of range 1..${config.totalDays} (startAnchor=${startAnchor})`);
       continue;
     }
 
@@ -506,7 +531,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       .maybeSingle();
 
     if (!workout) {
-      errorCount++;
+      fail(userId, `active: no workout_template for day ${dayNumber}`);
       continue;
     }
 
@@ -514,7 +539,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     // Review → skip
     if (workoutType === 'review') {
-      skippedCount++;
+      skip(userId, `active: workout_type=review for day ${dayNumber} (Chủ nhật)`);
       continue;
     }
 
@@ -528,8 +553,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
       session = sessionCode ? SESSIONS[sessionCode] : null;
       if (!session) {
-        console.error(`[morning-messages] Unknown session title: "${workout.title}" for day ${dayNumber}`);
-        errorCount++;
+        fail(userId, `active: unknown session title "${workout.title}" for day ${dayNumber}`);
         continue;
       }
     }
@@ -542,6 +566,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     // BƯỚC 1: Ưu tiên Zalo
     let zaloDone = false;
+    let zaloErrorDetail: string | null = null;
     if (channelUserId) {
       try {
         const result = await sendViaZalo(channelUserId, zaloMessage);
@@ -559,10 +584,12 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             delivered: true,
           });
         } else {
-          console.error('[morning-messages] Zalo failed:', userId, result.error);
+          zaloErrorDetail = result.error ?? 'unknown';
+          console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
         }
       } catch (zaloErr) {
-        console.error('[morning-messages] Zalo threw:', userId, zaloErr);
+        zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
+        console.error('[morning-messages] Zalo threw:', userId, zaloErrorDetail);
       }
     }
 
@@ -608,16 +635,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             delivered: true,
           });
         } else {
-          console.error('[morning-messages] FCM failed:', userId, result.error);
-          errorCount++;
+          fail(userId, `active: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
         }
       } catch (fcmErr) {
-        console.error('[morning-messages] FCM threw:', userId, fcmErr);
-        errorCount++;
+        const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+        fail(userId, `active: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
       }
     } else {
-      console.error('[morning-messages] Zalo failed & no FCM fallback:', userId);
-      errorCount++;
+      fail(userId, `active: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
     }
 
     // Rate limit: 100ms giữa mỗi tin
@@ -629,6 +654,8 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     skipped: skippedCount,
     errors: errorCount,
     active_total: enrollments.length,
+    skip_reasons: skipReasons,
+    error_reasons: errorReasons,
   });
 }
 

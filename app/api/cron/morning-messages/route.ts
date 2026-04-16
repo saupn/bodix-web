@@ -262,6 +262,18 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         channel_user_id: channelUserId,
         notification_via: profile?.notification_via ?? null,
       });
+      console.log(
+        '[morning-messages] trial user:',
+        profile?.full_name,
+        'notification_via:',
+        profile?.notification_via,
+        'channel_user_id:',
+        channelUserId,
+        'fcm_token:',
+        !!fcmToken,
+        '→ channel:',
+        channel,
+      );
       if (channel === 'none') {
         skippedCount++;
         continue;
@@ -465,6 +477,18 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       channel_user_id: channelUserId,
       notification_via: profile?.notification_via ?? null,
     });
+    console.log(
+      '[morning-messages] active user:',
+      profile?.full_name,
+      'notification_via:',
+      profile?.notification_via,
+      'channel_user_id:',
+      channelUserId,
+      'fcm_token:',
+      !!fcmToken,
+      '→ channel:',
+      channel,
+    );
     if (channel === 'none') {
       skippedCount++;
       continue;

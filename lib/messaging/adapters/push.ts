@@ -178,6 +178,21 @@ export function pickMessagingChannel(profile: {
   notification_via: string | null;
 }): "push" | "zalo" | "none" {
   if (profile.notification_via === "none") return "none";
+
+  // Tôn trọng notification_via trước — user có thể có cả fcm_token (app cũ)
+  // và channel_user_id (Zalo) đồng thời; preference quyết định kênh.
+  if (profile.notification_via === "zalo") {
+    if (profile.channel_user_id) return "zalo";
+    if (profile.fcm_token) return "push"; // fallback nếu thiếu Zalo UID
+    return "none";
+  }
+  if (profile.notification_via === "push") {
+    if (profile.fcm_token) return "push";
+    if (profile.channel_user_id) return "zalo"; // fallback nếu thiếu token
+    return "none";
+  }
+
+  // notification_via chưa set → auto-pick
   if (profile.fcm_token) return "push";
   if (profile.channel_user_id) return "zalo";
   return "none";

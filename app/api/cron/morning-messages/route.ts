@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
-import {
-  sendFcmMessage,
-  pickMessagingChannel,
-} from '@/lib/messaging/adapters/push';
+import { sendFcmMessage } from '@/lib/messaging/adapters/push';
 import {
   calendarDaysBetween,
   getVietnamDateString,
@@ -253,33 +250,27 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const en = row as any;
       const profile = Array.isArray(en.profiles) ? en.profiles[0] : en.profiles;
-      const channelUserId: string | null = profile?.channel_user_id;
-      const fcmToken: string | null = profile?.fcm_token;
+      const userId: string = profile?.id;
+      const channelUserId: string | null = profile?.channel_user_id ?? null;
+      const fcmToken: string | null = profile?.fcm_token ?? null;
       const enrolledAt: string = en.enrolled_at;
 
-      const channel = pickMessagingChannel({
-        fcm_token: fcmToken,
-        channel_user_id: channelUserId,
-        notification_via: profile?.notification_via ?? null,
-      });
       console.log(
-        '[morning-messages] trial user:',
-        profile?.full_name,
-        'notification_via:',
-        profile?.notification_via,
+        '[morning-messages] processing trial user:',
+        userId,
         'channel_user_id:',
         channelUserId,
         'fcm_token:',
         !!fcmToken,
-        '→ channel:',
-        channel,
       );
-      if (channel === 'none') {
+
+      if (!channelUserId && !fcmToken) {
+        console.log('[morning-messages] No channel available for user:', userId);
         skippedCount++;
         continue;
       }
 
-      if (await alreadySentToday(profile.id)) {
+      if (await alreadySentToday(userId)) {
         skippedCount++;
         continue;
       }
@@ -318,10 +309,13 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
       const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
       const isWeekStart = trialDay === 1;
+      const isRecovery = workout.workout_type === 'recovery';
+      const contentTemplate = isRecovery ? 'morning_recovery_trial' : 'morning_main_trial';
 
-      if (workout.workout_type !== 'recovery') {
+      let session: SessionMeta | null = null;
+      if (!isRecovery) {
         const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-        const session = sessionCode ? SESSIONS[sessionCode] : null;
+        session = sessionCode ? SESSIONS[sessionCode] : null;
         if (!session) {
           console.error(`[morning-messages] trial: unknown title "${workout.title}"`);
           errorCount++;
@@ -329,11 +323,50 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         }
       }
 
-      const isRecovery = workout.workout_type === 'recovery';
-      const contentTemplate = isRecovery ? 'morning_recovery_trial' : 'morning_main_trial';
+      const zaloMessage = isRecovery
+        ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart)
+        : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart);
 
-      try {
-        if (channel === 'push') {
+      const logVars = {
+        day_number: trialDay,
+        workout_type: workout.workout_type,
+        trial: true,
+      };
+
+      // BƯỚC 1: Ưu tiên Zalo
+      let zaloDone = false;
+      if (channelUserId) {
+        try {
+          const result = await sendViaZalo(channelUserId, zaloMessage);
+          if (result.success) {
+            console.log('[morning-messages] Zalo sent:', userId);
+            zaloDone = true;
+            sentCount++;
+            await supabase.from('nudge_logs').insert({
+              user_id: userId,
+              enrollment_id: en.id,
+              nudge_type: 'morning_reminder',
+              channel: 'zalo',
+              content_template: contentTemplate,
+              content_variables: logVars,
+              delivered: true,
+            });
+          } else {
+            console.error('[morning-messages] Zalo failed:', userId, result.error);
+          }
+        } catch (zaloErr) {
+          console.error('[morning-messages] Zalo threw:', userId, zaloErr);
+        }
+      }
+
+      if (zaloDone) {
+        await new Promise((r) => setTimeout(r, 100));
+        continue;
+      }
+
+      // BƯỚC 2: Fallback FCM
+      if (fcmToken) {
+        try {
           const pushTitle = isRecovery
             ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử — Recovery 🧘`
             : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử — ${workout.title}`;
@@ -342,7 +375,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
           const result = await sendFcmMessage(
-            fcmToken!,
+            fcmToken,
             {
               type: 'morningWorkout',
               title: pushTitle,
@@ -353,70 +386,34 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
                 trial: 'true',
               },
             },
-            profile.id,
+            userId,
           );
 
           if (result.success) {
+            console.log('[morning-messages] FCM sent:', userId);
             sentCount++;
             await supabase.from('nudge_logs').insert({
-              user_id: profile.id,
+              user_id: userId,
               enrollment_id: en.id,
               nudge_type: 'morning_reminder',
               channel: 'push',
               content_template: contentTemplate,
-              content_variables: {
-                day_number: trialDay,
-                workout_type: workout.workout_type,
-                trial: true,
-              },
+              content_variables: logVars,
               delivered: true,
             });
           } else {
-            console.error(`[morning-messages] trial push failed:`, result.error);
+            console.error('[morning-messages] FCM failed:', userId, result.error);
             errorCount++;
           }
-        } else {
-          // channel === 'zalo' — web-only user
-          let message: string;
-          if (isRecovery) {
-            message = buildTrialRecoveryMessage(displayName, trialDay, isWeekStart);
-          } else {
-            const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-            const session = sessionCode ? SESSIONS[sessionCode]! : null;
-            message = buildTrialMainMessage(
-              displayName,
-              trialDay,
-              session!,
-              workout.title,
-              isWeekStart,
-            );
-          }
-
-          const result = await sendViaZalo(channelUserId!, message);
-          if (result.success) {
-            sentCount++;
-            await supabase.from('nudge_logs').insert({
-              user_id: profile.id,
-              enrollment_id: en.id,
-              nudge_type: 'morning_reminder',
-              channel: 'zalo',
-              content_template: contentTemplate,
-              content_variables: {
-                day_number: trialDay,
-                workout_type: workout.workout_type,
-                trial: true,
-              },
-              delivered: true,
-            });
-          } else {
-            console.error(`[morning-messages] trial zalo failed:`, result.error);
-            errorCount++;
-          }
+        } catch (fcmErr) {
+          console.error('[morning-messages] FCM threw:', userId, fcmErr);
+          errorCount++;
         }
-      } catch (err) {
-        console.error('[morning-messages] trial send:', err);
+      } else {
+        console.error('[morning-messages] Zalo failed & no FCM fallback:', userId);
         errorCount++;
       }
+
       await new Promise((r) => setTimeout(r, 100));
     }
   }
@@ -466,35 +463,29 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const enrollment = row as any;
     const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
     const cohort = Array.isArray(enrollment.cohorts) ? enrollment.cohorts[0] : enrollment.cohorts;
-    const channelUserId: string | null = profile?.channel_user_id;
-    const fcmToken: string | null = profile?.fcm_token;
+    const userId: string = profile?.id;
+    const channelUserId: string | null = profile?.channel_user_id ?? null;
+    const fcmToken: string | null = profile?.fcm_token ?? null;
 
     const startAnchor: string =
       cohort?.start_date ?? isoTimestampToVietnamYmd(enrollment.enrolled_at as string);
 
-    const channel = pickMessagingChannel({
-      fcm_token: fcmToken,
-      channel_user_id: channelUserId,
-      notification_via: profile?.notification_via ?? null,
-    });
     console.log(
-      '[morning-messages] active user:',
-      profile?.full_name,
-      'notification_via:',
-      profile?.notification_via,
+      '[morning-messages] processing active user:',
+      userId,
       'channel_user_id:',
       channelUserId,
       'fcm_token:',
       !!fcmToken,
-      '→ channel:',
-      channel,
     );
-    if (channel === 'none') {
+
+    if (!channelUserId && !fcmToken) {
+      console.log('[morning-messages] No channel available for user:', userId);
       skippedCount++;
       continue;
     }
 
-    if (await alreadySentToday(profile.id)) {
+    if (await alreadySentToday(userId)) {
       skippedCount++;
       continue;
     }
@@ -532,18 +523,57 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const isRecovery = workoutType === 'recovery';
     const contentTemplate = isRecovery ? 'morning_recovery' : 'morning_main';
 
-    // Validate session mapping for non-recovery — áp dụng cho cả push và zalo path
+    let session: SessionMeta | null = null;
     if (!isRecovery) {
       const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-      if (!sessionCode || !SESSIONS[sessionCode]) {
+      session = sessionCode ? SESSIONS[sessionCode] : null;
+      if (!session) {
         console.error(`[morning-messages] Unknown session title: "${workout.title}" for day ${dayNumber}`);
         errorCount++;
         continue;
       }
     }
 
-    try {
-      if (channel === 'push') {
+    const zaloMessage = isRecovery
+      ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart)
+      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart);
+
+    const logVars = { day_number: dayNumber, workout_type: workoutType };
+
+    // BƯỚC 1: Ưu tiên Zalo
+    let zaloDone = false;
+    if (channelUserId) {
+      try {
+        const result = await sendViaZalo(channelUserId, zaloMessage);
+        if (result.success) {
+          console.log('[morning-messages] Zalo sent:', userId);
+          zaloDone = true;
+          sentCount++;
+          await supabase.from('nudge_logs').insert({
+            user_id: userId,
+            enrollment_id: enrollment.id,
+            nudge_type: 'morning_reminder',
+            channel: 'zalo',
+            content_template: contentTemplate,
+            content_variables: logVars,
+            delivered: true,
+          });
+        } else {
+          console.error('[morning-messages] Zalo failed:', userId, result.error);
+        }
+      } catch (zaloErr) {
+        console.error('[morning-messages] Zalo threw:', userId, zaloErr);
+      }
+    }
+
+    if (zaloDone) {
+      await new Promise((r) => setTimeout(r, 100));
+      continue;
+    }
+
+    // BƯỚC 2: Fallback FCM
+    if (fcmToken) {
+      try {
         const pushTitle = isRecovery
           ? `Ngày ${dayNumber}/${config.totalDays} — Recovery 🧘`
           : `Ngày ${dayNumber}/${config.totalDays} — ${workout.title}`;
@@ -552,7 +582,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
         const result = await sendFcmMessage(
-          fcmToken!,
+          fcmToken,
           {
             type: 'morningWorkout',
             title: pushTitle,
@@ -562,54 +592,31 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               workout_type: workoutType,
             },
           },
-          profile.id,
+          userId,
         );
 
         if (result.success) {
+          console.log('[morning-messages] FCM sent:', userId);
           sentCount++;
           await supabase.from('nudge_logs').insert({
-            user_id: profile.id,
+            user_id: userId,
             enrollment_id: enrollment.id,
             nudge_type: 'morning_reminder',
             channel: 'push',
             content_template: contentTemplate,
-            content_variables: { day_number: dayNumber, workout_type: workoutType },
+            content_variables: logVars,
             delivered: true,
           });
         } else {
-          console.error(`[morning-messages] push failed for user ${profile.id}:`, result.error);
+          console.error('[morning-messages] FCM failed:', userId, result.error);
           errorCount++;
         }
-      } else {
-        // channel === 'zalo' — web-only user
-        let message: string;
-        if (isRecovery) {
-          message = buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart);
-        } else {
-          const sessionCode = TITLE_TO_SESSION[workout.title]!;
-          const session = SESSIONS[sessionCode]!;
-          message = buildMainMessage(displayName, dayNumber, config.totalDays, session, workout.title, isWeekStart);
-        }
-
-        const result = await sendViaZalo(channelUserId!, message);
-        if (result.success) {
-          sentCount++;
-          await supabase.from('nudge_logs').insert({
-            user_id: profile.id,
-            enrollment_id: enrollment.id,
-            nudge_type: 'morning_reminder',
-            channel: 'zalo',
-            content_template: contentTemplate,
-            content_variables: { day_number: dayNumber, workout_type: workoutType },
-            delivered: true,
-          });
-        } else {
-          console.error(`[morning-messages] zalo failed for user ${profile.id}:`, result.error);
-          errorCount++;
-        }
+      } catch (fcmErr) {
+        console.error('[morning-messages] FCM threw:', userId, fcmErr);
+        errorCount++;
       }
-    } catch (err) {
-      console.error(`[morning-messages] Error sending to user ${profile.id}:`, err);
+    } else {
+      console.error('[morning-messages] Zalo failed & no FCM fallback:', userId);
       errorCount++;
     }
 

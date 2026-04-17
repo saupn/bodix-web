@@ -75,9 +75,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ sent: 0, errors: 0, total: 0 });
   }
 
-  // App users chỉ có 'push' hoặc 'none'. KHÔNG check 'both'.
   const eligibleUsers = (users as ProfileRow[]).filter(
-    (u) => u.notification_via === 'push' && u.fcm_token,
+    (u) =>
+      (u.notification_via === 'push' || u.notification_via === 'both') &&
+      u.fcm_token,
   );
 
   if (!eligibleUsers.length) {

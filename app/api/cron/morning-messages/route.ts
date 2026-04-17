@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
 import { sendFcmMessage } from '@/lib/messaging/adapters/push';
+import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
 import {
   calendarDaysBetween,
   getVietnamDateString,
@@ -371,6 +372,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         trial: true,
       };
 
+      // Chat mirror — hiện trong BodiX Support history (app user)
+      const chatContent = isRecovery
+        ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — Recovery\nHôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)`
+        : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
+
       // BƯỚC 1: Ưu tiên Zalo
       let zaloDone = false;
       let zaloErrorDetail: string | null = null;
@@ -391,6 +397,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               content_variables: logVars,
               delivered: true,
             });
+            await insertSupportSystemMessage(supabase, userId, chatContent);
           } else {
             zaloErrorDetail = result.error ?? 'unknown';
             console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
@@ -444,6 +451,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               content_variables: logVars,
               delivered: true,
             });
+            await insertSupportSystemMessage(supabase, userId, chatContent);
           } else {
             fail(userId, `trial: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
           }
@@ -608,6 +616,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 
+    // Chat mirror — hiện trong BodiX Support history (app user)
+    const chatContent = isRecovery
+      ? `🧘 Ngày ${dayNumber}/${config.totalDays} — Recovery\nHôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)`
+      : `📅 Ngày ${dayNumber}/${config.totalDays} — ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
+
     // BƯỚC 1: Ưu tiên Zalo
     let zaloDone = false;
     let zaloErrorDetail: string | null = null;
@@ -628,6 +641,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             content_variables: logVars,
             delivered: true,
           });
+          await insertSupportSystemMessage(supabase, userId, chatContent);
         } else {
           zaloErrorDetail = result.error ?? 'unknown';
           console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
@@ -680,6 +694,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             content_variables: logVars,
             delivered: true,
           });
+          await insertSupportSystemMessage(supabase, userId, chatContent);
         } else {
           fail(userId, `active: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
         }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
+import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
 import {
   sendFcmMessage,
   pickMessagingChannel,
@@ -174,8 +175,16 @@ export async function GET(request: NextRequest) {
           delivered: result.success,
         });
 
-        if (result.success) stats.l1++;
-        else stats.errors++;
+        if (result.success) {
+          stats.l1++;
+          await insertSupportSystemMessage(
+            supabase,
+            profile.id,
+            `Mình thấy bạn chưa tập 2 ngày rồi 💚\nChỉ cần 1 lượt (~7 phút). Mở app tập ngay!`,
+          );
+        } else {
+          stats.errors++;
+        }
 
       } else if (level === 2) {
         // ── CẤP 2: miss 3 ngày → gửi cho user ──
@@ -218,8 +227,16 @@ export async function GET(request: NextRequest) {
           delivered: result.success,
         });
 
-        if (result.success) stats.l2++;
-        else stats.errors++;
+        if (result.success) {
+          stats.l2++;
+          await insertSupportSystemMessage(
+            supabase,
+            profile.id,
+            `${displayName} ơi, mình nhớ bạn 💚\nBạn đã đi được ${completedDays} ngày — chỉ 1 lượt là quay lại ngay!`,
+          );
+        } else {
+          stats.errors++;
+        }
 
       } else {
         // ── CẤP 3: miss 4+ ngày → gửi cho buddy ──

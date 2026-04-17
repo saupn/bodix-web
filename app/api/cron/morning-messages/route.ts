@@ -210,6 +210,9 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   let errorCount = 0;
   const skipReasons: string[] = [];
   const errorReasons: string[] = [];
+  // In-memory dedup: mỗi user chỉ nhận đúng 1 tin trong 1 lần chạy cron,
+  // kể cả khi rơi vào cả trial loop và active loop hoặc có duplicate rows từ query
+  const sentUserIds = new Set<string>();
 
   function skip(userId: string, reason: string) {
     console.log('[morning-messages] SKIP user:', userId, 'reason:', reason);
@@ -260,7 +263,17 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   if (trialErr) {
     console.error('[morning-messages] trial enrollments:', trialErr);
   } else if (trialEnrollments?.length) {
+    // Dedup enrollments theo user_id: nếu query trả nhiều rows cùng user, chỉ giữ 1
+    const trialByUser = new Map<string, (typeof trialEnrollments)[number]>();
     for (const row of trialEnrollments) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profile = Array.isArray((row as any).profiles) ? (row as any).profiles[0] : (row as any).profiles;
+      const uid: string | undefined = profile?.id;
+      if (!uid) continue;
+      if (!trialByUser.has(uid)) trialByUser.set(uid, row);
+    }
+
+    for (const row of trialByUser.values()) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const en = row as any;
       const profile = Array.isArray(en.profiles) ? en.profiles[0] : en.profiles;
@@ -278,12 +291,21 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         !!fcmToken,
       );
 
+      // Lớp 1: in-memory dedup — nếu vì lý do gì đó user đã được gửi trong cùng run
+      if (sentUserIds.has(userId)) {
+        console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
+        skip(userId, 'trial: DEDUP in-memory — already sent in this run');
+        continue;
+      }
+
       if (!channelUserId && !fcmToken) {
         skip(userId, 'trial: no channel (channel_user_id and fcm_token both null)');
         continue;
       }
 
+      // Lớp 2: nudge_logs dedup — backup cho cron overlap giữa 2 lần chạy
       if (await alreadySentToday(userId)) {
+        sentUserIds.add(userId);
         skip(userId, 'trial: already sent morning_reminder today');
         continue;
       }
@@ -359,6 +381,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
             console.log('[morning-messages] Zalo sent:', userId);
             zaloDone = true;
             sentCount++;
+            sentUserIds.add(userId);
             await supabase.from('nudge_logs').insert({
               user_id: userId,
               enrollment_id: en.id,
@@ -411,6 +434,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           if (result.success) {
             console.log('[morning-messages] FCM sent:', userId);
             sentCount++;
+            sentUserIds.add(userId);
             await supabase.from('nudge_logs').insert({
               user_id: userId,
               enrollment_id: en.id,
@@ -484,7 +508,18 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     });
   }
 
+  // Dedup enrollments theo user_id: nếu user có nhiều rows active (re-enrollment, anomaly),
+  // chỉ giữ 1 row để tránh gửi 2 tin trong cùng loop
+  const activeByUser = new Map<string, (typeof enrollments)[number]>();
   for (const row of enrollments) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const profile = Array.isArray((row as any).profiles) ? (row as any).profiles[0] : (row as any).profiles;
+    const uid: string | undefined = profile?.id;
+    if (!uid) continue;
+    if (!activeByUser.has(uid)) activeByUser.set(uid, row);
+  }
+
+  for (const row of activeByUser.values()) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrollment = row as any;
     const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
@@ -505,12 +540,21 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       !!fcmToken,
     );
 
+    // Lớp 1: in-memory dedup — quan trọng nhất cho case user có cả trial và active enrollment
+    if (sentUserIds.has(userId)) {
+      console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
+      skip(userId, 'active: DEDUP in-memory — already sent in trial loop or earlier');
+      continue;
+    }
+
     if (!channelUserId && !fcmToken) {
       skip(userId, 'active: no channel (channel_user_id and fcm_token both null)');
       continue;
     }
 
+    // Lớp 2: nudge_logs dedup
     if (await alreadySentToday(userId)) {
+      sentUserIds.add(userId);
       skip(userId, 'active: already sent morning_reminder today');
       continue;
     }
@@ -574,6 +618,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           console.log('[morning-messages] Zalo sent:', userId);
           zaloDone = true;
           sentCount++;
+          sentUserIds.add(userId);
           await supabase.from('nudge_logs').insert({
             user_id: userId,
             enrollment_id: enrollment.id,
@@ -625,6 +670,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         if (result.success) {
           console.log('[morning-messages] FCM sent:', userId);
           sentCount++;
+          sentUserIds.add(userId);
           await supabase.from('nudge_logs').insert({
             user_id: userId,
             enrollment_id: enrollment.id,

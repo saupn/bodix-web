@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { notFound } from "next/navigation";
 import Link from "next/link";
+import { VimeoPlayer } from "@/components/workout/VimeoPlayer";
 
 export default async function ReviewVideoPage({
   params,
@@ -21,27 +22,12 @@ export default async function ReviewVideoPage({
     notFound();
   }
 
-  // Parse Vimeo URL to get embed URL
-  let embedUrl = video.video_url;
-  const vimeoMatch = video.video_url.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
-  if (vimeoMatch) {
-    embedUrl = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}` : ""}`;
-  }
-
   return (
     <div className="mx-auto max-w-3xl space-y-6 px-4 py-8">
       <h1 className="text-2xl font-bold">{video.title}</h1>
 
       {/* Vimeo Player */}
-      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black">
-        <iframe
-          src={embedUrl}
-          className="absolute inset-0 h-full w-full"
-          allow="autoplay; fullscreen; picture-in-picture"
-          allowFullScreen
-          title={video.title}
-        />
-      </div>
+      <VimeoPlayer videoUrl={video.video_url} title={video.title} />
 
       {/* Description */}
       {video.description && (

@@ -7,6 +7,7 @@ import { Play } from "lucide-react";
 import { CheckInModal } from "@/components/completion/CheckInModal";
 import { CelebrationOverlay } from "@/components/completion/CelebrationOverlay";
 import { Toast } from "@/components/ui/Toast";
+import { VimeoPlayer } from "@/components/workout/VimeoPlayer";
 
 type Exercise = {
   name: string;
@@ -315,35 +316,23 @@ export default function ProgramWorkoutPage() {
       </div>
 
       {/* Video area */}
-      <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
-        {(() => {
-          const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
-          const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
-          if (videoUrl && videoUrl.includes("vimeo.com")) {
-            const vimeoMatch = videoUrl.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
-            if (vimeoMatch) {
-              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}` : ""}`;
-              return (
-                <iframe
-                  src={src}
-                  className="h-full w-full"
-                  allow="autoplay; fullscreen; picture-in-picture"
-                  allowFullScreen
-                  title={workout.title}
-                />
-              );
-            }
-          }
-          return (
+      {(() => {
+        const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
+        const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
+        if (videoUrl && videoUrl.includes("vimeo.com")) {
+          return <VimeoPlayer videoUrl={videoUrl} title={workout.title} />;
+        }
+        return (
+          <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
             <div className="flex h-full w-full items-center justify-center">
               <div className="flex flex-col items-center gap-2 text-neutral-400">
                 <Play className="h-14 w-14" strokeWidth={1.5} />
                 <span className="text-sm">Video bài tập sẽ được cập nhật</span>
               </div>
             </div>
-          );
-        })()}
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Exercise list */}
       <div>

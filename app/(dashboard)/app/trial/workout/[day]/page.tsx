@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Play } from "lucide-react";
 import { Toast } from "@/components/ui/Toast";
+import { VimeoPlayer } from "@/components/workout/VimeoPlayer";
 
 type Exercise = {
   name: string;
@@ -246,37 +247,23 @@ export default function TrialWorkoutPage() {
       </div>
 
       {/* Video area — Vimeo embed */}
-      <div className="relative overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100" style={{ padding: "56.25% 0 0 0" }}>
-        {(() => {
-          const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
-          const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
-          if (videoUrl && videoUrl.includes("vimeo.com")) {
-            const vimeoMatch = videoUrl.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
-            if (vimeoMatch) {
-              const src = `https://player.vimeo.com/video/${vimeoMatch[1]}${vimeoMatch[2] ? `?h=${vimeoMatch[2]}&` : "?"}badge=0&autopause=0&player_id=0&app_id=58479`;
-              return (
-                <iframe
-                  src={src}
-                  frameBorder="0"
-                  allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
-                  referrerPolicy="strict-origin-when-cross-origin"
-                  allowFullScreen
-                  title={workout.title}
-                  style={{ position: "absolute", top: 0, left: 0, width: "100%", height: "100%" }}
-                />
-              );
-            }
-          }
-          return (
-            <div className="absolute inset-0 flex items-center justify-center">
+      {(() => {
+        const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
+        const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
+        if (videoUrl && videoUrl.includes("vimeo.com")) {
+          return <VimeoPlayer videoUrl={videoUrl} title={workout.title} />;
+        }
+        return (
+          <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
+            <div className="flex h-full w-full items-center justify-center">
               <div className="flex flex-col items-center gap-2 text-neutral-400">
                 <Play className="h-14 w-14" strokeWidth={1.5} />
                 <span className="text-sm">Video bài tập sẽ được cập nhật</span>
               </div>
             </div>
-          );
-        })()}
-      </div>
+          </div>
+        );
+      })()}
 
       {/* Exercise list */}
       <div>

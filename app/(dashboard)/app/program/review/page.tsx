@@ -3,6 +3,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { VimeoPlayer } from "@/components/workout/VimeoPlayer";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -386,33 +387,10 @@ export default function SundayReviewPage() {
         {activeSection >= 1 && (
           <div className="space-y-4">
             {reviewContent?.review_video_url ? (
-              <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
-                {(() => {
-                  const url = reviewContent.review_video_url!;
-                  const m = url.match(/vimeo\.com\/(\d+)(?:\/([a-f0-9]+))?/);
-                  if (m) {
-                    const src = `https://player.vimeo.com/video/${m[1]}${m[2] ? `?h=${m[2]}` : ""}`;
-                    return (
-                      <iframe
-                        src={src}
-                        className="h-full w-full"
-                        allow="autoplay; fullscreen; picture-in-picture"
-                        allowFullScreen
-                        title={reviewContent.review_video_title ?? "Review video"}
-                      />
-                    );
-                  }
-                  return (
-                    <iframe
-                      src={url}
-                      className="h-full w-full"
-                      allow="autoplay; fullscreen; picture-in-picture"
-                      allowFullScreen
-                      title={reviewContent.review_video_title ?? "Review video"}
-                    />
-                  );
-                })()}
-              </div>
+              <VimeoPlayer
+                videoUrl={reviewContent.review_video_url}
+                title={reviewContent.review_video_title ?? "Review video"}
+              />
             ) : (
               <div className="rounded-xl bg-purple-50 p-8 text-center">
                 <div className="text-5xl mb-3">🎬</div>

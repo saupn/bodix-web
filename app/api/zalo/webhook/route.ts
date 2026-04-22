@@ -40,7 +40,9 @@ export async function GET() {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // POST — Zalo webhook events
-// Trả 200 ngay để Zalo không retry; xử lý logic sau khi parse payload.
+// Trả 200 NGAY (< 100ms) để Zalo KHÔNG retry. Xử lý fire-and-forget.
+// Zalo timeout ~2s; nếu handler chạy lâu (nhiều DB query + call Zalo API),
+// Zalo retry webhook → gửi tin trùng 2-4 lần, thậm chí cách 30p/1h.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export async function POST(request: NextRequest) {
   try {
@@ -51,33 +53,42 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Xử lý events
-    switch (payload.event_name) {
+    const eventName: string | undefined = payload.event_name;
+
+    // Fire-and-forget: KHÔNG await. Trả 200 ngay, xử lý ở background.
+    // Dedup (msg_id) trong handleUserMessage đảm bảo retry không gửi trùng.
+    switch (eventName) {
       case 'user_send_text':
-        await handleUserMessage(payload);
+        handleUserMessage(payload).catch((err) => {
+          console.error('[webhook] handleUserMessage error:', err);
+        });
         break;
       case 'user_send_image':
       case 'user_send_file':
       case 'user_send_audio':
       case 'user_send_video':
-        await handleUserMedia(payload);
+        handleUserMedia(payload).catch((err) => {
+          console.error('[webhook] handleUserMedia error:', err);
+        });
         break;
       case 'follow':
-        await handleFollow(payload);
+        handleFollow(payload).catch((err) => {
+          console.error('[webhook] handleFollow error:', err);
+        });
         break;
       case 'unfollow':
-        await handleUnfollow(payload);
+        handleUnfollow(payload).catch((err) => {
+          console.error('[webhook] handleUnfollow error:', err);
+        });
         break;
       default:
-        console.log('Unhandled event:', payload.event_name);
+        console.log('[webhook] unhandled event:', eventName);
     }
 
-    // Trả 200 ngay — Zalo chờ max 2 giây
     return NextResponse.json({ ok: true }, { status: 200 });
-
   } catch (error) {
-    console.error('Webhook error:', error);
-    return NextResponse.json({ ok: true }, { status: 200 }); // Vẫn trả 200 để Zalo không retry
+    console.error('[webhook] POST error:', error);
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
 }
 
@@ -116,7 +127,15 @@ async function handleUserMessage(payload: any) {
   const messageText = payload.message?.text || '';
   const msgId: string | undefined = payload.message?.msg_id;
 
-  // ── Dedup: Zalo có thể retry webhook → tránh xử lý cùng msg_id 2 lần ──
+  console.log(
+    '[webhook] START msg_id:', msgId,
+    'event:', payload.event_name,
+    'text:', messageText.substring(0, 30),
+    'timestamp:', new Date().toISOString(),
+  );
+
+  // ── Dedup: Zalo có thể retry webhook → chặn mọi xử lý cùng msg_id. ──
+  // AN TOÀN: kể cả lỗi table/permission cũng RETURN — thà mất 1 tin còn hơn gửi 4 tin trùng.
   if (msgId) {
     const { error: dedupError } = await service
       .from('zalo_webhook_events')
@@ -127,15 +146,30 @@ async function handleUserMessage(payload: any) {
       });
 
     if (dedupError) {
-      // 23505 = unique_violation → đã xử lý msg_id này → bỏ qua
       if (dedupError.code === '23505') {
-        console.log('[webhook] duplicate msg_id=' + msgId + ', skip');
-        return;
+        console.log('[webhook] DEDUP SKIP msg_id:', msgId, '(already processed)');
+      } else {
+        console.error('[webhook] DEDUP ERROR — BLOCKING to prevent duplicate:', dedupError);
       }
-      console.error('[webhook] dedup insert error:', dedupError);
-      // Không return — tiếp tục xử lý để không mất tin nếu table lỗi
+      return;
     }
   }
+
+  // ── Single-send guard: mỗi request CHỈ được gửi tối đa 1 tin qua Zalo. ──
+  // Scope: chỉ trong handleUserMessage. KHÔNG ảnh hưởng cron/admin (vẫn dùng sendZaloMessage trực tiếp).
+  let messageSentInThisRequest = false;
+  const safeSend = async (uid: string, text: string) => {
+    if (messageSentInThisRequest) {
+      console.log(
+        '[webhook] BLOCKED extra send, msg_id:', msgId,
+        'preview:', text.substring(0, 50),
+      );
+      return;
+    }
+    messageSentInThisRequest = true;
+    console.log('[webhook] SENDING msg_id:', msgId, 'preview:', text.substring(0, 50));
+    await sendZaloMessage(uid, text);
+  };
 
   // ── Verify code check (phone verification via Zalo OA) ──
   const codeCandidate = messageText.trim().toUpperCase();
@@ -149,7 +183,7 @@ async function handleUserMessage(payload: any) {
       .maybeSingle();
 
     if (verification) {
-      console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=verify');
+      console.log('[webhook] matched=verify msg_id:', msgId);
       await service
         .from('phone_verifications')
         .update({ status: 'verified', zalo_uid: zaloUserId, verified_at: new Date().toISOString() })
@@ -160,7 +194,7 @@ async function handleUserMessage(payload: any) {
         .update({ phone_verified: true, channel_user_id: zaloUserId, phone: verification.phone })
         .eq('id', verification.user_id);
 
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         'Xác minh thành công! ✅\n\nQuay lại trang bodix.fit để tiếp tục đăng ký nha.'
       );
       return;
@@ -178,8 +212,8 @@ async function handleUserMessage(payload: any) {
     .single();
 
   if (profileError || !profile) {
-    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=no_profile');
-    await sendZaloMessage(zaloUserId,
+    console.log('[webhook] matched=no_profile msg_id:', msgId);
+    await safeSend(zaloUserId,
       'Mình chưa tìm thấy tài khoản của bạn. Vui lòng đăng ký tại bodix.fit trước nhé!'
     );
     return;
@@ -211,26 +245,26 @@ async function handleUserMessage(payload: any) {
       .maybeSingle();
 
     const status = otherEnrollment?.status;
-    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=no_active_enrollment, status=' + status);
+    console.log('[webhook] matched=no_active_enrollment msg_id:', msgId, 'status:', status);
 
     if (status === 'trial_completed' || status === 'paid_waiting_cohort') {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         'Bạn đã hoàn thành tập thử. Chờ thông báo để tham gia chính thức nhé!'
       );
     } else if (status === 'pending_payment') {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         '⏰ 3 ngày tập thử đã kết thúc. Thanh toán tại bodix.fit/checkout'
       );
     } else if (status === 'completed') {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         '🏆 Bạn đã hoàn thành chương trình rồi! Chờ thông báo đợt tiếp theo nha.'
       );
     } else if (status === 'paused') {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         'Enrollment của bạn đang tạm dừng. Liên hệ bodix.fit để tiếp tục nhé.'
       );
     } else {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         'Bạn chưa đăng ký chương trình. Vui lòng đăng ký tại bodix.fit nhé!'
       );
     }
@@ -240,9 +274,9 @@ async function handleUserMessage(payload: any) {
   // ── Kiểm tra: reply feeling (1-5) cho weekly review? ──
   if (feelingScore !== null) {
     const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
-    const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore);
+    const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore, safeSend);
     if (handled) {
-      console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=feeling');
+      console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
       return;
     }
     // Nếu không phải context review → tiếp tục xử lý check-in (1/2/3 overlap)
@@ -250,24 +284,24 @@ async function handleUserMessage(payload: any) {
 
   // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
   if (checkinType) {
-    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=checkin:' + checkinType);
-    await handleCheckin(zaloUserId, profile, enrollment, checkinType);
+    console.log('[webhook] matched=checkin msg_id:', msgId, 'type:', checkinType);
+    await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
     return;
   }
 
   // ── Không phải check-in hay feeling → kiểm tra có phải text không hợp lệ ──
   // Nếu tin nhắn ngắn (< 20 ký tự) và không match → hướng dẫn check-in
   if (messageText.trim().length < 20) {
-    console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=invalid_short');
-    await sendZaloMessage(zaloUserId,
+    console.log('[webhook] matched=invalid_short msg_id:', msgId);
+    await safeSend(zaloUserId,
       'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nCả 3 đều tính hoàn thành!'
     );
     return;
   }
 
   // ── Tin nhắn dài → lưu là câu hỏi/vấn đề ──
-  console.log('[webhook] processing msg_id=' + msgId + ', text=' + messageText + ', matched=question');
-  await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload);
+  console.log('[webhook] matched=question msg_id:', msgId);
+  await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload, safeSend);
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -338,7 +372,14 @@ async function handleUserMedia(payload: any) {
 // LƯU CÂU HỎI/VẤN ĐỀ
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function saveUserQuestion(zaloUserId: string, profile: any, enrollment: any, messageText: string, payload: any) {
+async function saveUserQuestion(
+  zaloUserId: string,
+  profile: any,
+  enrollment: any,
+  messageText: string,
+  payload: any,
+  safeSend: (uid: string, text: string) => Promise<void>,
+) {
   const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
 
   let messageType: 'text' | 'image' | 'video' | 'voice' = 'text';
@@ -371,7 +412,7 @@ async function saveUserQuestion(zaloUserId: string, profile: any, enrollment: an
     status: 'new',
   });
 
-  await sendZaloMessage(zaloUserId,
+  await safeSend(zaloUserId,
     'Cảm ơn bạn! Mình đã ghi nhận và sẽ giải đáp trong video review cuối tuần nhé.'
   );
 }
@@ -380,7 +421,14 @@ async function saveUserQuestion(zaloUserId: string, profile: any, enrollment: an
 // XỬ LÝ FEELING REPLY (1-5) CHO WEEKLY REVIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: any, weekNumber: number, score: number): Promise<boolean> {
+async function handleFeelingReply(
+  zaloUserId: string,
+  profile: any,
+  enrollment: any,
+  weekNumber: number,
+  score: number,
+  safeSend: (uid: string, text: string) => Promise<void>,
+): Promise<boolean> {
   // Kiểm tra có weekly_review chưa reply feeling không
   const { data: review } = await service
     .from('weekly_reviews')
@@ -412,7 +460,7 @@ async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: 
     1: 'Cảm ơn bạn. Nghỉ ngơi đủ giấc, ăn đủ chất nha.',
   };
 
-  await sendZaloMessage(zaloUserId, FEELING_RESPONSES[score]);
+  await safeSend(zaloUserId, FEELING_RESPONSES[score]);
 
   // Nếu feeling <= 2 liên tiếp 2 tuần → insert dropout_signals
   if (score <= 2) {
@@ -442,7 +490,13 @@ async function handleFeelingReply(zaloUserId: string, profile: any, enrollment: 
 // XỬ LÝ CHECK-IN
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, checkinType: 'hard' | 'light' | 'easy' | 'recovery') {
+async function handleCheckin(
+  zaloUserId: string,
+  profile: any,
+  enrollment: any,
+  checkinType: 'hard' | 'light' | 'easy' | 'recovery',
+  safeSend: (uid: string, text: string) => Promise<void>,
+) {
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const program = Array.isArray((enrollment as any).programs) ? (enrollment as any).programs[0] : (enrollment as any).programs;
@@ -452,7 +506,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
   const enrollmentStatus: string = enrollment.status;
 
   if (dayNumber > programDays) {
-    await sendZaloMessage(zaloUserId,
+    await safeSend(zaloUserId,
       `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`
     );
     return;
@@ -467,7 +521,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     .limit(1);
 
   if (existing && existing.length > 0) {
-    await sendZaloMessage(zaloUserId,
+    await safeSend(zaloUserId,
       `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé.`
     );
     return;
@@ -490,13 +544,13 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
 
   if (checkinError) {
     if (checkinError.code === '23505') {
-      await sendZaloMessage(zaloUserId,
+      await safeSend(zaloUserId,
         `Bạn đã check-in ngày ${dayNumber} rồi! Nghỉ ngơi và hẹn ngày mai nhé.`
       );
       return;
     }
     console.error('[zalo/webhook] insert daily_checkins:', checkinError);
-    await sendZaloMessage(zaloUserId, 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+    await safeSend(zaloUserId, 'Có lỗi xảy ra. Vui lòng thử lại sau.');
     return;
   }
 
@@ -582,7 +636,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
 
   // Ngoại lệ b: Ngày cuối trial (D3, status='trial')
   if (isTrialLastDay && !isLastDay) {
-    await sendZaloMessage(zaloUserId,
+    await safeSend(zaloUserId,
       '🎯 3 ngày tập thử hoàn thành! Bạn sẽ được thông báo khi đợt tiếp theo mở.'
     );
     return;
@@ -590,7 +644,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
 
   // Ngoại lệ c: Ngày cuối chương trình
   if (isLastDay) {
-    await sendZaloMessage(zaloUserId,
+    await safeSend(zaloUserId,
       `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`
     );
     return;
@@ -604,7 +658,7 @@ async function handleCheckin(zaloUserId: string, profile: any, enrollment: any, 
     recovery: '🧘 Recovery xong! Cơ thể cảm ơn bạn đó.',
   };
 
-  await sendZaloMessage(zaloUserId, CHECKIN_RESPONSES[checkinType]);
+  await safeSend(zaloUserId, CHECKIN_RESPONSES[checkinType]);
 }
 
 function shiftDate(dateStr: string, days: number): string {

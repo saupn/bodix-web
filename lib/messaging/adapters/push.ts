@@ -21,17 +21,71 @@ interface FcmErrorResponse {
 }
 
 let cachedAccessToken: { token: string; expiresAt: number } | null = null;
+let loggedKeyDiagnostics = false;
+
+function normalizeFirebasePrivateKey(raw: string): string {
+  let key = raw;
+
+  // 1. Bỏ quotes bao ngoài (Vercel đôi khi wrap value trong dấu ").
+  if (
+    (key.startsWith('"') && key.endsWith('"')) ||
+    (key.startsWith("'") && key.endsWith("'"))
+  ) {
+    try {
+      key = JSON.parse(key);
+    } catch {
+      key = key.slice(1, -1);
+    }
+  }
+
+  // 2. Replace escaped newlines (\n text → newline thật).
+  key = key.replace(/\\n/g, "\n");
+
+  // 3. Nếu key bị flatten thành 1 dòng, reconstruct PEM format.
+  if (!key.includes("\n") && key.includes("-----BEGIN")) {
+    const match = key.match(
+      /-----BEGIN PRIVATE KEY-----([\s\S]+?)-----END PRIVATE KEY-----/,
+    );
+    if (match) {
+      const body = match[1].trim().replace(/\s+/g, "");
+      const lines = body.match(/.{1,64}/g) ?? [];
+      key = `-----BEGIN PRIVATE KEY-----\n${lines.join("\n")}\n-----END PRIVATE KEY-----\n`;
+    }
+  }
+
+  // 4. Đảm bảo kết thúc bằng newline (một số parser yêu cầu).
+  if (!key.endsWith("\n")) key += "\n";
+
+  return key;
+}
 
 export async function getFirebaseAccessToken(): Promise<string> {
   const now = Date.now();
   if (cachedAccessToken && cachedAccessToken.expiresAt > now + 60_000) {
     return cachedAccessToken.token;
   }
+
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY ?? "";
+  const privateKey = normalizeFirebasePrivateKey(rawKey);
+
+  if (!loggedKeyDiagnostics) {
+    console.log(
+      "[firebase] Private key starts with:",
+      privateKey.substring(0, 30),
+    );
+    console.log(
+      "[firebase] Private key contains newlines:",
+      privateKey.includes("\n"),
+    );
+    console.log("[firebase] Private key length:", privateKey.length);
+    loggedKeyDiagnostics = true;
+  }
+
   const { GoogleAuth } = await import("google-auth-library");
   const auth = new GoogleAuth({
     credentials: {
       client_email: process.env.FIREBASE_CLIENT_EMAIL,
-      private_key: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, "\n"),
+      private_key: privateKey,
     },
     scopes: ["https://www.googleapis.com/auth/firebase.messaging"],
   });

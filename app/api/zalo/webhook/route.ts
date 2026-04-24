@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
+import { getAccessToken } from '@/lib/messaging/helpers';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -54,6 +55,11 @@ export async function POST(request: NextRequest) {
     }
 
     const eventName: string | undefined = payload.event_name;
+
+    // Zalo echo lại tin OA đã gửi dưới event user_received_message → ignore ngay.
+    if (eventName === 'user_received_message') {
+      return NextResponse.json({ ok: true }, { status: 200 });
+    }
 
     // Fire-and-forget: KHÔNG await. Trả 200 ngay, xử lý ở background.
     // Dedup (msg_id) trong handleUserMessage đảm bảo retry không gửi trùng.
@@ -135,25 +141,41 @@ async function handleUserMessage(payload: any) {
   );
 
   // ── Dedup: Zalo có thể retry webhook → chặn mọi xử lý cùng msg_id. ──
-  // AN TOÀN: kể cả lỗi table/permission cũng RETURN — thà mất 1 tin còn hơn gửi 4 tin trùng.
+  // Chỉ return khi chắc chắn đã xử lý (23505 unique violation).
+  // Với lỗi khác (timeout, network) → log và tiếp tục — chấp nhận risk gửi trùng
+  // thay vì không phản hồi gì.
   if (msgId) {
-    const { error: dedupError } = await service
+    const dedupPromise = service
       .from('zalo_webhook_events')
       .insert({
         msg_id: msgId,
         zalo_uid: zaloUserId,
         event_name: payload.event_name ?? 'user_send_text',
       });
+    const timeoutPromise = new Promise<{ error: { code: string; message: string } }>((_, reject) =>
+      setTimeout(() => reject(new Error('dedup timeout')), 2000),
+    );
 
-    if (dedupError) {
-      if (dedupError.code === '23505') {
-        console.log('[webhook] DEDUP SKIP msg_id:', msgId, '(already processed)');
-      } else {
-        console.error('[webhook] DEDUP ERROR — BLOCKING to prevent duplicate:', dedupError);
+    try {
+      const { error: dedupError } = await Promise.race([dedupPromise, timeoutPromise]);
+      if (dedupError) {
+        if (dedupError.code === '23505') {
+          console.log('[webhook] DEDUP SKIP msg_id:', msgId, '(already processed)');
+          return;
+        }
+        console.warn('[webhook] DEDUP FAILED, continuing:', dedupError.message || dedupError);
       }
-      return;
+    } catch (e: unknown) {
+      const err = e as { code?: string; message?: string };
+      if (err?.code === '23505') {
+        console.log('[webhook] DEDUP SKIP msg_id:', msgId, '(already processed)');
+        return;
+      }
+      console.warn('[webhook] DEDUP FAILED/TIMEOUT, continuing:', err?.message || e);
     }
   }
+
+  console.log('[webhook] RECEIVED msg_id:', msgId, 'text:', messageText, 'uid:', zaloUserId);
 
   // ── Single-send guard: mỗi request CHỈ được gửi tối đa 1 tin qua Zalo. ──
   // Scope: chỉ trong handleUserMessage. KHÔNG ảnh hưởng cron/admin (vẫn dùng sendZaloMessage trực tiếp).
@@ -284,7 +306,7 @@ async function handleUserMessage(payload: any) {
 
   // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
   if (checkinType) {
-    console.log('[webhook] matched=checkin msg_id:', msgId, 'type:', checkinType);
+    console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
     await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
     return;
   }
@@ -723,14 +745,13 @@ async function handleUnfollow(payload: { follower?: { id: string }; user_id_by_a
 // GỬI TIN NHẮN QUA ZALO OA API
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 async function sendZaloMessage(userId: string, text: string) {
-  const { data: tokenRow } = await supabase
-    .from('zalo_tokens')
-    .select('access_token')
-    .eq('id', 1)
-    .single();
+  console.log('[webhook] SENDING response to:', userId);
 
-  if (!tokenRow?.access_token) {
-    console.error('No Zalo access token found in DB');
+  let accessToken: string;
+  try {
+    accessToken = await getAccessToken();
+  } catch (error) {
+    console.error('[webhook] SEND FAILED: cannot get access token:', error);
     return;
   }
 
@@ -739,7 +760,7 @@ async function sendZaloMessage(userId: string, text: string) {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'access_token': tokenRow.access_token,
+        'access_token': accessToken,
       },
       body: JSON.stringify({
         recipient: { user_id: userId },
@@ -748,13 +769,14 @@ async function sendZaloMessage(userId: string, text: string) {
     });
 
     const result = await res.json();
+    console.log('[webhook] SENT result:', JSON.stringify(result));
 
     if (result.error !== 0) {
-      console.error('Zalo API error:', result);
+      console.error('[webhook] SEND FAILED: Zalo API error:', result);
     }
 
     return result;
-  } catch (err) {
-    console.error('Failed to send Zalo message:', err);
+  } catch (error) {
+    console.error('[webhook] SEND FAILED:', error);
   }
 }

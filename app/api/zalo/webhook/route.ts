@@ -41,9 +41,9 @@ export async function GET() {
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // POST — Zalo webhook events
-// Trả 200 NGAY (< 100ms) để Zalo KHÔNG retry. Xử lý fire-and-forget.
-// Zalo timeout ~2s; nếu handler chạy lâu (nhiều DB query + call Zalo API),
-// Zalo retry webhook → gửi tin trùng 2-4 lần, thậm chí cách 30p/1h.
+// AWAIT thay vì fire-and-forget: Vercel serverless đóng băng lambda
+// ngay sau khi return → background Promise không chạy xong, log/send mất.
+// Zalo có thể retry nếu lâu, nhưng dedup (msg_id unique) sẽ chặn xử lý trùng.
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 export async function POST(request: NextRequest) {
   try {
@@ -61,39 +61,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true }, { status: 200 });
     }
 
-    // Fire-and-forget: KHÔNG await. Trả 200 ngay, xử lý ở background.
-    // Dedup (msg_id) trong handleUserMessage đảm bảo retry không gửi trùng.
+    // AWAIT: Vercel serverless KHÔNG đảm bảo background task chạy xong sau return.
+    // Phải await để handleUserMessage chạy hết (log + Zalo send) trước khi lambda đóng.
+    // Dedup msg_id sẽ chặn xử lý trùng nếu Zalo retry.
+    console.log('[webhook] routing event:', eventName);
     switch (eventName) {
       case 'user_send_text':
-        handleUserMessage(payload).catch((err: { message?: string; stack?: string }) => {
-          console.error('[webhook] CRITICAL handleUserMessage error:', err?.message, err?.stack);
-        });
+        await handleUserMessage(payload);
         break;
       case 'user_send_image':
       case 'user_send_file':
       case 'user_send_audio':
       case 'user_send_video':
-        handleUserMedia(payload).catch((err: { message?: string; stack?: string }) => {
-          console.error('[webhook] CRITICAL handleUserMedia error:', err?.message, err?.stack);
-        });
+        await handleUserMedia(payload);
         break;
       case 'follow':
-        handleFollow(payload).catch((err: { message?: string; stack?: string }) => {
-          console.error('[webhook] CRITICAL handleFollow error:', err?.message, err?.stack);
-        });
+        await handleFollow(payload);
         break;
       case 'unfollow':
-        handleUnfollow(payload).catch((err: { message?: string; stack?: string }) => {
-          console.error('[webhook] CRITICAL handleUnfollow error:', err?.message, err?.stack);
-        });
+        await handleUnfollow(payload);
         break;
       default:
         console.log('[webhook] unhandled event:', eventName);
     }
+    console.log('[webhook] handler completed for event:', eventName);
 
     return NextResponse.json({ ok: true }, { status: 200 });
-  } catch (error) {
-    console.error('[webhook] POST error:', error);
+  } catch (error: unknown) {
+    const err = error as { message?: string; stack?: string };
+    console.error('[webhook] POST handler error:', err?.message, err?.stack);
     return NextResponse.json({ ok: true }, { status: 200 });
   }
 }
@@ -141,6 +137,7 @@ async function handleUserMessage(payload: any) {
     ts: new Date().toISOString(),
   }));
 
+  try {
   // ── Dedup: Zalo có thể retry webhook → chặn mọi xử lý cùng msg_id. ──
   // Chỉ return khi chắc chắn đã xử lý (23505 unique violation).
   // Với lỗi khác (timeout, network) → log và tiếp tục — chấp nhận risk gửi trùng
@@ -338,6 +335,14 @@ async function handleUserMessage(payload: any) {
   // ── Tin nhắn dài → lưu là câu hỏi/vấn đề ──
   console.log('[webhook] matched=question msg_id:', msgId);
   await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload, safeSend);
+  } catch (error: unknown) {
+    const err = error as { message?: string; stack?: string };
+    console.error(
+      '[webhook] FATAL ERROR in handleUserMessage msg_id:', msgId,
+      'message:', err?.message,
+      'stack:', err?.stack,
+    );
+  }
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

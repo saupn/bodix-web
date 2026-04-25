@@ -267,6 +267,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
   // ── Complete onboarding ──
 
   const handleComplete = async () => {
+    console.log('[onboarding] handleComplete start');
     setLoading(true);
     setError(null);
 
@@ -287,6 +288,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       });
 
       const data = await res.json();
+      console.log('[onboarding] complete-onboarding response:', res.status, data);
 
       if (!res.ok) {
         setError(data.error || "Đã xảy ra lỗi. Vui lòng thử lại.");
@@ -299,7 +301,8 @@ export default function OnboardingForm({ userId, initialName }: Props) {
       } catch {}
 
       window.location.href = "/app";
-    } catch {
+    } catch (err) {
+      console.error('[onboarding] handleComplete error:', err);
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
       setLoading(false);
     }
@@ -384,8 +387,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                   <select
                     value={birthMonth}
                     onChange={(e) => {
-                      setBirthMonth(e.target.value);
-                      setBirthDay("");
+                      const newMonth = e.target.value;
+                      setBirthMonth(newMonth);
+                      // Only clear Day if current Day is invalid for the new Month/Year
+                      if (newMonth && birthYear && birthDay) {
+                        const dim = new Date(parseInt(birthYear, 10), parseInt(newMonth, 10), 0).getDate();
+                        if (parseInt(birthDay, 10) > dim) setBirthDay("");
+                      }
                     }}
                     className="w-full rounded-lg border border-gray-200 bg-white py-3 px-4 text-gray-900 focus:border-[#2D4A3E] focus:outline-none focus:ring-1 focus:ring-[#2D4A3E]"
                     aria-label="Tháng"
@@ -400,8 +408,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                   <select
                     value={birthYear}
                     onChange={(e) => {
-                      setBirthYear(e.target.value);
-                      setBirthDay("");
+                      const newYear = e.target.value;
+                      setBirthYear(newYear);
+                      // Only clear Day if current Day is invalid for the new Month/Year (Feb 29 leap-year edge case)
+                      if (newYear && birthMonth && birthDay) {
+                        const dim = new Date(parseInt(newYear, 10), parseInt(birthMonth, 10), 0).getDate();
+                        if (parseInt(birthDay, 10) > dim) setBirthDay("");
+                      }
                     }}
                     className="w-full rounded-lg border border-gray-200 bg-white py-3 px-4 text-gray-900 focus:border-[#2D4A3E] focus:outline-none focus:ring-1 focus:ring-[#2D4A3E]"
                     aria-label="Năm"
@@ -648,10 +661,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
                   <div className="border-t border-neutral-200 pt-4 text-center">
                     <p className="text-xs text-neutral-500">
-                      Chưa có Zalo? Tải app BodiX:
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      App BodiX sắp ra mắt trên Play Store và App Store.
+                      Chưa có Zalo? Tải app Zalo trên Play Store hoặc App Store.
                     </p>
                   </div>
                 </>
@@ -721,16 +731,13 @@ export default function OnboardingForm({ userId, initialName }: Props) {
 
                   {!phoneVerified && (
                     <p className="text-center text-xs text-neutral-500">
-                      (Vui lòng xác minh Zalo để tiếp tục)
+                      (Vui lòng nhập số điện thoại Zalo và bấm Tiếp tục để xác thực)
                     </p>
                   )}
 
                   <div className="border-t border-neutral-200 pt-4 text-center">
                     <p className="text-xs text-neutral-500">
-                      Chưa có Zalo? Tải app BodiX:
-                    </p>
-                    <p className="mt-1 text-xs text-neutral-500">
-                      App BodiX sắp ra mắt trên Play Store và App Store.
+                      Chưa có Zalo? Tải app Zalo trên Play Store hoặc App Store.
                     </p>
                   </div>
                 </>
@@ -801,11 +808,18 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                 fullName={fullName}
                 onCodeSet={() => handleComplete()}
                 onSkip={() => handleComplete()}
+                submittingComplete={loading}
               />
+              {error && (
+                <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  {error}
+                </div>
+              )}
               <button
                 type="button"
                 onClick={goBack}
-                className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline"
+                disabled={loading}
+                className="w-full text-sm text-neutral-500 hover:text-neutral-700 hover:underline disabled:opacity-50"
                 suppressHydrationWarning
               >
                 Quay lại

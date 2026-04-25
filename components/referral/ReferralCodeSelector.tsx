@@ -14,6 +14,8 @@ interface Props {
   onSkip?: () => void;
   /** Đã có mã từ trước (edit mode) */
   initialCode?: string | null;
+  /** Bật khi parent đang chạy handleComplete — disable Tiếp tục, show spinner */
+  submittingComplete?: boolean;
 }
 
 export function ReferralCodeSelector({
@@ -21,6 +23,7 @@ export function ReferralCodeSelector({
   onCodeSet,
   onSkip,
   initialCode,
+  submittingComplete = false,
 }: Props) {
   const { info: toastInfo } = useToast();
   const [suggestions, setSuggestions] = useState<string[]>([]);
@@ -229,7 +232,7 @@ export function ReferralCodeSelector({
         </button>
       </div>
 
-      {suggestions.length > 0 && (
+      {!showResult && suggestions.length > 0 && (
         <div>
           <p className="mb-2 text-sm font-medium text-neutral-700">
             Gợi ý từ tên của bạn
@@ -253,39 +256,41 @@ export function ReferralCodeSelector({
         </div>
       )}
 
-      <div>
-        <label className="mb-1.5 block text-sm font-medium text-neutral-700">
-          Hoặc nhập mã của bạn
-        </label>
-        <div className="flex gap-2">
-          <input
-            type="text"
-            value={customCode}
-            onChange={handleCustomChange}
-            placeholder="VD: LAN, NGUYENLAN"
-            maxLength={15}
-            className="flex-1 rounded-lg border border-neutral-300 bg-white px-4 py-3 font-mono text-neutral-800 placeholder-neutral-400 uppercase transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
-          />
-          {availability === "checking" && (
-            <span className="flex items-center text-sm text-neutral-500">
-              Đang kiểm tra...
-            </span>
-          )}
-          {availability === "ok" && (
-            <span className="flex items-center text-sm text-green-600">
-              ✅ Mã khả dụng
-            </span>
-          )}
-          {availability === "taken" && (
-            <span className="flex items-center text-sm text-red-600">
-              Mã đã được dùng
-            </span>
-          )}
+      {!showResult && (
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-neutral-700">
+            Hoặc nhập mã của bạn
+          </label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={customCode}
+              onChange={handleCustomChange}
+              placeholder="VD: LAN, NGUYENLAN"
+              maxLength={15}
+              className="flex-1 rounded-lg border border-neutral-300 bg-white px-4 py-3 font-mono text-neutral-800 placeholder-neutral-400 uppercase transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+            />
+            {availability === "checking" && (
+              <span className="flex items-center text-sm text-neutral-500">
+                Đang kiểm tra...
+              </span>
+            )}
+            {availability === "ok" && (
+              <span className="flex items-center text-sm text-green-600">
+                ✅ Mã khả dụng
+              </span>
+            )}
+            {availability === "taken" && (
+              <span className="flex items-center text-sm text-red-600">
+                Mã đã được dùng
+              </span>
+            )}
+          </div>
+          <p className="mt-1 text-xs text-neutral-500">
+            3–15 ký tự, A-Z, 0-9, dấu chấm. Tự động viết hoa.
+          </p>
         </div>
-        <p className="mt-1 text-xs text-neutral-500">
-          3–15 ký tự, A-Z, 0-9, dấu chấm. Tự động viết hoa.
-        </p>
-      </div>
+      )}
 
       {error && (
         <div
@@ -336,10 +341,14 @@ export function ReferralCodeSelector({
         {showResult ? (
           <button
             type="button"
-            onClick={() => onCodeSet?.(selectedCode!)}
-            className="flex-1 rounded-lg bg-primary px-4 py-3 font-semibold text-white hover:bg-primary-dark"
+            onClick={() => {
+              console.log('[onboarding] Tiếp tục clicked, selectedCode:', selectedCode);
+              onCodeSet?.(selectedCode!);
+            }}
+            disabled={submittingComplete}
+            className="flex-1 rounded-lg bg-primary px-4 py-3 font-semibold text-white hover:bg-primary-dark disabled:opacity-50"
           >
-            Tiếp tục
+            {submittingComplete ? "Đang hoàn tất..." : "Tiếp tục"}
           </button>
         ) : (
           <button

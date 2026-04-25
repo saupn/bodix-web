@@ -65,26 +65,26 @@ export async function POST(request: NextRequest) {
     // Dedup (msg_id) trong handleUserMessage đảm bảo retry không gửi trùng.
     switch (eventName) {
       case 'user_send_text':
-        handleUserMessage(payload).catch((err) => {
-          console.error('[webhook] handleUserMessage error:', err);
+        handleUserMessage(payload).catch((err: { message?: string; stack?: string }) => {
+          console.error('[webhook] CRITICAL handleUserMessage error:', err?.message, err?.stack);
         });
         break;
       case 'user_send_image':
       case 'user_send_file':
       case 'user_send_audio':
       case 'user_send_video':
-        handleUserMedia(payload).catch((err) => {
-          console.error('[webhook] handleUserMedia error:', err);
+        handleUserMedia(payload).catch((err: { message?: string; stack?: string }) => {
+          console.error('[webhook] CRITICAL handleUserMedia error:', err?.message, err?.stack);
         });
         break;
       case 'follow':
-        handleFollow(payload).catch((err) => {
-          console.error('[webhook] handleFollow error:', err);
+        handleFollow(payload).catch((err: { message?: string; stack?: string }) => {
+          console.error('[webhook] CRITICAL handleFollow error:', err?.message, err?.stack);
         });
         break;
       case 'unfollow':
-        handleUnfollow(payload).catch((err) => {
-          console.error('[webhook] handleUnfollow error:', err);
+        handleUnfollow(payload).catch((err: { message?: string; stack?: string }) => {
+          console.error('[webhook] CRITICAL handleUnfollow error:', err?.message, err?.stack);
         });
         break;
       default:
@@ -133,12 +133,13 @@ async function handleUserMessage(payload: any) {
   const messageText = payload.message?.text || '';
   const msgId: string | undefined = payload.message?.msg_id;
 
-  console.log(
-    '[webhook] START msg_id:', msgId,
-    'event:', payload.event_name,
-    'text:', messageText.substring(0, 30),
-    'timestamp:', new Date().toISOString(),
-  );
+  console.log('[webhook] === START ===', JSON.stringify({
+    event: payload.event_name,
+    msgId,
+    text: messageText.substring(0, 60),
+    uid: zaloUserId,
+    ts: new Date().toISOString(),
+  }));
 
   // ── Dedup: Zalo có thể retry webhook → chặn mọi xử lý cùng msg_id. ──
   // Chỉ return khi chắc chắn đã xử lý (23505 unique violation).
@@ -175,6 +176,7 @@ async function handleUserMessage(payload: any) {
     }
   }
 
+  console.log('[webhook] dedup passed msg_id:', msgId);
   console.log('[webhook] RECEIVED msg_id:', msgId, 'text:', messageText, 'uid:', zaloUserId);
 
   // ── Single-send guard: mỗi request CHỈ được gửi tối đa 1 tin qua Zalo. ──
@@ -189,13 +191,16 @@ async function handleUserMessage(payload: any) {
       return;
     }
     messageSentInThisRequest = true;
-    console.log('[webhook] SENDING msg_id:', msgId, 'preview:', text.substring(0, 50));
-    await sendZaloMessage(uid, text);
+    console.log('[webhook] ABOUT TO SEND to:', uid, 'message:', text.substring(0, 50));
+    const sendResult = await sendZaloMessage(uid, text);
+    console.log('[webhook] SEND RESULT:', JSON.stringify(sendResult));
   };
 
   // ── Verify code check (phone verification via Zalo OA) ──
   const codeCandidate = messageText.trim().toUpperCase();
-  if (/^[A-Z0-9]{5}$/.test(codeCandidate)) {
+  const isVerifyCodeFormat = /^[A-Z0-9]{5}$/.test(codeCandidate);
+  console.log('[webhook] verify code check:', isVerifyCodeFormat, 'candidate:', codeCandidate);
+  if (isVerifyCodeFormat) {
     const { data: verification } = await service
       .from('phone_verifications')
       .select('id, user_id, phone')
@@ -204,6 +209,7 @@ async function handleUserMessage(payload: any) {
       .gt('expires_at', new Date().toISOString())
       .maybeSingle();
 
+    console.log('[webhook] verify code matched in DB:', !!verification);
     if (verification) {
       console.log('[webhook] matched=verify msg_id:', msgId);
       await service
@@ -233,6 +239,8 @@ async function handleUserMessage(payload: any) {
     .eq('channel_user_id', zaloUserId)
     .single();
 
+  console.log('[webhook] profile:', profile?.id, 'channel_user_id:', zaloUserId, 'error:', profileError?.message);
+
   if (profileError || !profile) {
     console.log('[webhook] matched=no_profile msg_id:', msgId);
     await safeSend(zaloUserId,
@@ -250,6 +258,8 @@ async function handleUserMessage(payload: any) {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+
+  console.log('[webhook] enrollment:', enrollment?.status, enrollment?.id, 'error:', enrollmentError?.message);
 
   if (enrollmentError) {
     console.error('[webhook] enrollment query error:', enrollmentError);
@@ -297,14 +307,18 @@ async function handleUserMessage(payload: any) {
   if (feelingScore !== null) {
     const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
     const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore, safeSend);
+    console.log('[webhook] feeling check:', feelingScore, 'handled:', handled);
     if (handled) {
       console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
       return;
     }
     // Nếu không phải context review → tiếp tục xử lý check-in (1/2/3 overlap)
+  } else {
+    console.log('[webhook] feeling check: null (not a feeling reply)');
   }
 
   // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
+  console.log('[webhook] checkin type parsed:', checkinType);
   if (checkinType) {
     console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
     await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
@@ -750,10 +764,14 @@ async function sendZaloMessage(userId: string, text: string) {
   let accessToken: string;
   try {
     accessToken = await getAccessToken();
-  } catch (error) {
-    console.error('[webhook] SEND FAILED: cannot get access token:', error);
-    return;
+  } catch (error: unknown) {
+    const err = error as { message?: string; cause?: unknown };
+    console.error('[webhook] SEND FAILED: cannot get access token:', err?.message, err?.cause);
+    return { error: -1, message: 'getAccessToken failed', detail: err?.message };
   }
+
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
 
   try {
     const res = await fetch('https://openapi.zalo.me/v3.0/oa/message/cs', {
@@ -766,17 +784,23 @@ async function sendZaloMessage(userId: string, text: string) {
         recipient: { user_id: userId },
         message: { text },
       }),
+      signal: controller.signal,
     });
 
+    clearTimeout(timeout);
+
     const result = await res.json();
-    console.log('[webhook] SENT result:', JSON.stringify(result));
+    console.log('[zalo] send result:', JSON.stringify(result));
 
     if (result.error !== 0) {
-      console.error('[webhook] SEND FAILED: Zalo API error:', result);
+      console.error('[zalo] API error:', result.error, result.message);
     }
 
     return result;
-  } catch (error) {
-    console.error('[webhook] SEND FAILED:', error);
+  } catch (error: unknown) {
+    clearTimeout(timeout);
+    const err = error as { name?: string; message?: string; cause?: unknown };
+    console.error('[zalo] sendZaloMessage FAILED:', err?.name, err?.message, err?.cause);
+    return { error: -1, message: err?.message ?? 'fetch failed', name: err?.name };
   }
 }

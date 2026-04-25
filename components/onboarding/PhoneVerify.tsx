@@ -278,7 +278,7 @@ export default function PhoneVerify({ onVerified, onSkip }: Props) {
                 <span className="flex-shrink-0 w-7 h-7 rounded-full bg-primary text-secondary-light flex items-center justify-center text-sm font-bold">
                   2
                 </span>
-                <span className="text-sm pt-0.5">Bấm &quot;Quan tâm&quot;</span>
+                <span className="text-sm pt-0.5">Bấm &quot;Nhắn tin&quot;</span>
               </div>
 
               <div className="flex items-start gap-3">

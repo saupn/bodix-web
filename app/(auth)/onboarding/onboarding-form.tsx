@@ -597,7 +597,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                         2
                       </span>
                       <span className="text-sm text-neutral-700 pt-0.5">
-                        Bấm <strong>Quan tâm</strong> để theo dõi BodiX
+                        Bấm vào nút <strong>Nhắn tin</strong> để mở khung chat với BodiX
                       </span>
                     </div>
 
@@ -630,7 +630,7 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </div>
                   )}
 
-                  {/* Resend / Skip */}
+                  {/* Resend */}
                   <div className="flex flex-col items-center gap-2 pt-1">
                     {showResend && (
                       <button
@@ -644,14 +644,15 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                         Gửi lại mã
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={() => goNext(4)}
-                      className="text-sm text-neutral-600 hover:text-neutral-600 transition-colors"
-                      suppressHydrationWarning
-                    >
-                      Bỏ qua, kết nối sau →
-                    </button>
+                  </div>
+
+                  <div className="border-t border-neutral-200 pt-4 text-center">
+                    <p className="text-xs text-neutral-500">
+                      Chưa có Zalo? Tải app BodiX:
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      App BodiX sắp ra mắt trên Play Store và App Store.
+                    </p>
                   </div>
                 </>
               ) : (
@@ -661,7 +662,10 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     Kết nối Zalo
                   </h1>
                   <p className="text-sm text-neutral-600">
-                    Nhập số điện thoại Zalo để nhận nhắc tập mỗi ngày
+                    Bắt buộc để nhận tin nhắc tập mỗi sáng qua Zalo.
+                  </p>
+                  <p className="text-xs text-neutral-500">
+                    Nếu không dùng Zalo, vui lòng tải app BodiX trên Google Play hoặc App Store.
                   </p>
 
                   {error && (
@@ -715,14 +719,20 @@ export default function OnboardingForm({ userId, initialName }: Props) {
                     </button>
                   </div>
 
-                  <button
-                    type="button"
-                    onClick={() => goNext(4)}
-                    className="w-full text-sm text-neutral-600 hover:text-neutral-600 transition-colors"
-                    suppressHydrationWarning
-                  >
-                    Bỏ qua, kết nối sau →
-                  </button>
+                  {!phoneVerified && (
+                    <p className="text-center text-xs text-neutral-500">
+                      (Vui lòng xác minh Zalo để tiếp tục)
+                    </p>
+                  )}
+
+                  <div className="border-t border-neutral-200 pt-4 text-center">
+                    <p className="text-xs text-neutral-500">
+                      Chưa có Zalo? Tải app BodiX:
+                    </p>
+                    <p className="mt-1 text-xs text-neutral-500">
+                      App BodiX sắp ra mắt trên Play Store và App Store.
+                    </p>
+                  </div>
                 </>
               )}
             </motion.div>

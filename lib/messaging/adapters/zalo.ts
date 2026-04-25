@@ -6,35 +6,64 @@ const ZALO_ZNS_TEMPLATE_URL = "https://business.openapi.zalo.me/message/template
 
 /**
  * Gửi tin nhắn văn bản qua Zalo OA.
+ * AbortController timeout 5s để tránh treo nếu Zalo API chậm.
  */
 export async function sendViaZalo(
   channelUserId: string,
   text: string
 ): Promise<MessageResult> {
-  const accessToken = await getAccessToken();
-
-  const res = await fetch(ZALO_OA_MESSAGE_URL, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      access_token: accessToken,
-    },
-    body: JSON.stringify({
-      recipient: { user_id: channelUserId },
-      message: { text },
-    }),
-  });
-
-  const data = (await res.json()) as { error?: number; message?: string };
-
-  if (data.error === 0) {
-    return { success: true };
+  let accessToken: string;
+  try {
+    accessToken = await getAccessToken();
+  } catch (error: unknown) {
+    const err = error as { message?: string; cause?: unknown };
+    console.error("[zalo] sendViaZalo getAccessToken FAILED:", err?.message, err?.cause);
+    return {
+      success: false,
+      error: err?.message ?? "getAccessToken failed",
+    };
   }
 
-  return {
-    success: false,
-    error: data.message ?? `Zalo API error: ${data.error ?? res.status}`,
-  };
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 5000);
+
+  try {
+    const res = await fetch(ZALO_OA_MESSAGE_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        access_token: accessToken,
+      },
+      body: JSON.stringify({
+        recipient: { user_id: channelUserId },
+        message: { text },
+      }),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeout);
+
+    const data = (await res.json()) as { error?: number; message?: string };
+    console.log("[zalo] send result:", JSON.stringify(data));
+
+    if (data.error === 0) {
+      return { success: true };
+    }
+
+    console.error("[zalo] API error:", data.error, data.message);
+    return {
+      success: false,
+      error: data.message ?? `Zalo API error: ${data.error ?? res.status}`,
+    };
+  } catch (error: unknown) {
+    clearTimeout(timeout);
+    const err = error as { name?: string; message?: string; cause?: unknown };
+    console.error("[zalo] sendViaZalo FAILED:", err?.name, err?.message, err?.cause);
+    return {
+      success: false,
+      error: err?.message ?? "fetch failed",
+    };
+  }
 }
 
 /**

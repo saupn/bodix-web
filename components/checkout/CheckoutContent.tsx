@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
+import Link from "next/link";
 import { CheckoutForm } from "./CheckoutForm";
 
 function formatPrice(vnd: number): string {
@@ -53,6 +54,7 @@ export function CheckoutContent({
   const [referralDiscount, setReferralDiscount] = useState(0);
   const [referralCodeType, setReferralCodeType] = useState<string | null>(null);
   const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
 
   const totalDiscount = referralDiscount + voucherDiscount;
   const finalPrice = Math.max(0, program.price_vnd - totalDiscount);
@@ -66,9 +68,33 @@ export function CheckoutContent({
     setVoucherDiscount(valid ? discount : 0);
   }, []);
 
+  const handleSubmitted = useCallback(() => {
+    setSubmitted(true);
+  }, []);
+
   const discountLabel = referralCodeType === "affiliate"
     ? "Giảm từ đối tác"
     : "Giảm từ mã giới thiệu";
+
+  if (submitted) {
+    return (
+      <div className="mx-auto max-w-xl rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-sm">
+        <div className="mb-4 text-4xl">✅</div>
+        <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
+          Đăng ký thành công!
+        </h2>
+        <p className="mt-3 text-neutral-600">
+          Bạn sẽ được thông báo nếu được chọn tham gia đợt tiếp theo.
+        </p>
+        <Link
+          href="/app"
+          className="mt-6 inline-block text-sm font-medium text-primary hover:underline"
+        >
+          ← Về trang chủ
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="grid gap-8 lg:grid-cols-2">
@@ -86,6 +112,7 @@ export function CheckoutContent({
             priceVnd={program.price_vnd}
             onReferralChange={handleReferralChange}
             onVoucherChange={handleVoucherChange}
+            onSubmitted={handleSubmitted}
           />
         </div>
       </div>
@@ -141,11 +168,6 @@ export function CheckoutContent({
             <div className="mt-3 text-sm">
               <p className="font-medium text-neutral-700">
                 {cohort.name} — Bắt đầu {formatDate(cohort.start_date)}
-              </p>
-              <p className="mt-1 text-accent">
-                Số chỗ còn lại:{" "}
-                {Math.max(0, cohort.max_members - (cohort.current_members ?? 0))}/
-                {cohort.max_members} chỗ
               </p>
             </div>
           )}

@@ -5,16 +5,6 @@ import { hasMinDaysBeforeCohortForTrial } from "@/lib/trial/utils";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 
-function formatCountdown(trialEndsAt: string): string {
-  const end = new Date(trialEndsAt);
-  const now = new Date();
-  const diff = end.getTime() - now.getTime();
-  if (diff <= 0) return "0 ngày 0 giờ";
-  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-  return `${days} ngày ${hours} giờ`;
-}
-
 const PROGRAM_CARDS = [
   {
     slug: "bodix-21",
@@ -176,7 +166,7 @@ export default async function AppPage() {
   // Fetch all enrollments to determine state
   const { data: enrollments } = await supabase
     .from("enrollments")
-    .select("id, status, program_id, cohort_id, programs(slug, name)")
+    .select("id, status, program_id, cohort_id, started_at, current_day, programs(slug, name)")
     .eq("user_id", user.id)
     .order("enrolled_at", { ascending: false });
 
@@ -275,44 +265,73 @@ export default async function AppPage() {
 
   // --- State 5: Trial enrollment exists ---
   if (trialEnrollment) {
-    const trialEndsAt = profile?.trial_ends_at;
-    const now = new Date();
-    const trialActive = trialEndsAt && new Date(trialEndsAt) > now;
+    // Compute trial day status from enrollment.started_at (planned D1, midnight Asia/Ho_Chi_Minh).
+    const startedAtRaw = trialEnrollment.started_at as string | null;
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
 
-    if (trialActive) {
+    let heading = "Bạn đang trải nghiệm thử";
+    let subtext = "Khám phá bài tập và trải nghiệm chương trình BodiX.";
+    let countdownText: string | null = null;
+    let trialEnded = false;
+
+    if (startedAtRaw) {
+      const startDate = new Date(startedAtRaw);
+      startDate.setHours(0, 0, 0, 0);
+
+      if (today < startDate) {
+        // Chưa đến D1 — bắt đầu từ ngày mai
+        heading = "Trải nghiệm thử bắt đầu từ ngày mai!";
+        subtext = "Sáng mai lúc 6:30, bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo.";
+        countdownText = "3 ngày trải nghiệm";
+      } else {
+        const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / 86400000);
+        const currentDay = Math.min(3, daysPassed + 1);
+        const daysRemaining = Math.max(0, 3 - daysPassed);
+
+        if (daysRemaining > 0) {
+          heading = `Bạn đang trải nghiệm thử — Ngày ${currentDay}/3`;
+          subtext = "Khám phá bài tập và trải nghiệm chương trình BodiX.";
+          countdownText = `Còn ${daysRemaining} ngày trải nghiệm`;
+        } else {
+          trialEnded = true;
+          heading = "3 ngày trải nghiệm đã kết thúc";
+          subtext = "Chờ thông báo từ BodiX!";
+        }
+      }
+    }
+
+    if (trialEnded) {
       return (
         <div className="space-y-8">
-          <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
+          <div className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 sm:p-6">
             <h2 className="font-heading text-lg font-semibold text-primary">
-              Bạn đang trong 3 ngày trải nghiệm miễn phí
+              {heading}
             </h2>
-            <p className="mt-2 text-neutral-600">
-              Khám phá bài tập và trải nghiệm chương trình BodiX.
-            </p>
-            <p className="mt-4 text-sm font-medium text-primary">
-              Còn {formatCountdown(trialEndsAt)} trải nghiệm
-            </p>
-            <Link
-              href="/app/trial"
-              className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-            >
-              Xem bài tập hôm nay
-            </Link>
+            <p className="mt-2 text-neutral-600">{subtext}</p>
           </div>
         </div>
       );
     }
 
-    // Trial expired
     return (
       <div className="space-y-8">
-        <div className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 sm:p-6">
+        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <h2 className="font-heading text-lg font-semibold text-primary">
-            Thời gian trải nghiệm đã hết
+            {heading}
           </h2>
-          <p className="mt-2 text-neutral-600">
-            Chờ thông báo từ BodiX khi đợt tiếp theo mở.
-          </p>
+          <p className="mt-2 text-neutral-600">{subtext}</p>
+          {countdownText && (
+            <p className="mt-4 text-sm font-medium text-primary">
+              {countdownText}
+            </p>
+          )}
+          <Link
+            href="/app/trial"
+            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+          >
+            Xem bài tập hôm nay
+          </Link>
         </div>
       </div>
     );
@@ -391,10 +410,10 @@ export default async function AppPage() {
     <div className="space-y-8">
       <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
         <h2 className="font-heading text-lg font-semibold text-primary">
-          Chào mừng {displayName}!
+          Trải nghiệm thử
         </h2>
-        <p className="mt-2 text-neutral-600">
-          Bắt đầu hành trình 21 ngày thay đổi thật sự.
+        <p className="mt-2 text-sm text-neutral-600">
+          Bạn chưa đăng ký chương trình nào cả.
         </p>
       </div>
 

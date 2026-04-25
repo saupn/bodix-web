@@ -32,7 +32,6 @@ export type GiftBookSection =
 interface DashboardShellProps {
   children: React.ReactNode;
   giftSection?: GiftBookSection | null;
-  unpaidBanner?: React.ReactNode;
   profile: {
     full_name: string | null;
     avatar_url: string | null;
@@ -73,7 +72,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, giftSection, unpaidBanner, profile, userEmail, userId, hasActiveProgram, streak, rescue, isAffiliate }: DashboardShellProps) {
+export function DashboardShell({ children, giftSection, profile, userEmail, userId, hasActiveProgram, streak, rescue, isAffiliate }: DashboardShellProps) {
   const router = useRouter();
   const { success: toastSuccess } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -284,7 +283,7 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
         {/* Content */}
         <main id="main-content" className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto" tabIndex={-1}>
           {giftSection && (
-            <div className="mb-6 rounded-2xl bg-[#2D4A3E]/5 p-6">
+            <div className="mb-6 rounded-2xl border border-neutral-200 bg-white p-6 shadow-sm">
               <h3 className="font-heading text-lg font-semibold text-[#2D4A3E]">
                 📚 Tặng Sách cho bạn bè
               </h3>
@@ -320,12 +319,16 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
 
               {activeGift && (
                   <div className="mt-4 space-y-4">
-                    <p className="text-sm font-medium text-neutral-800">
-                      Còn lại: {activeGift.remaining}/{activeGift.total} suất
+                    <p className="text-neutral-800">
+                      Còn lại:{" "}
+                      <span className="text-2xl font-bold text-[#2D4A3E]">
+                        {activeGift.remaining}/{activeGift.total}
+                      </span>{" "}
+                      suất
                     </p>
-                    <div className="h-2 w-full overflow-hidden rounded-full bg-neutral-200/80">
+                    <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
                       <div
-                        className="h-full rounded-full bg-[#2D4A3E] transition-all"
+                        className="h-full rounded-full bg-[#2D4A3E]/20 transition-all"
                         style={{ width: `${activeGift.pct}%` }}
                       />
                     </div>
@@ -415,7 +418,6 @@ export function DashboardShell({ children, giftSection, unpaidBanner, profile, u
               </div>
             </div>
           )}
-          {unpaidBanner}
           {rescue && (
             <div className="mb-6">
               <RescueBanner

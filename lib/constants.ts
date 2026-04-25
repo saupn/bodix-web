@@ -8,7 +8,7 @@ export const REFERRAL_BASE =
 export const GIFT_BOOK_TITLE = "Sách Tại sao nhịn ăn không giúp bạn gọn hơn";
 
 export const GIFT_BOOK_DESCRIPTION =
-  "Sách Tại sao nhịn ăn không giúp bạn gọn hơn - Thực ra cần ba thứ - và không phải thứ bạn đang nghĩ. Đây là hướng dẫn thực tế cho phụ nữ bận rộn. Hoàn toàn miễn phí.";
+  "Sách Tại sao nhịn ăn không giúp bạn gọn hơn - Thực ra cần ba thứ - và không phải thứ bạn đang nghĩ. Đây là hướng dẫn thực tế cho phụ nữ bận rộn. Bạn được nhận MIỄN PHÍ!";
 
 export const SITE = {
   name: "BodiX",

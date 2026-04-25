@@ -37,11 +37,13 @@ export default async function CheckoutPage({
 
   if (!program) redirect("/app/programs");
 
+  const todayStr = new Date().toISOString().split("T")[0];
   const { data: cohort } = await supabase
     .from("cohorts")
     .select("id, name, start_date, max_members, current_members")
     .eq("program_id", program.id)
     .in("status", ["upcoming", "active"])
+    .gte("start_date", todayStr)
     .order("start_date", { ascending: true })
     .limit(1)
     .maybeSingle();

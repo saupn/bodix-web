@@ -2,7 +2,10 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { downloadGuideLeadSchema, safeParseBody } from "@/lib/validation/schemas";
 
-const DOWNLOAD_URL = "/guides/bodix-fuel-guide.pdf";
+const STORAGE_BUCKET = "guides";
+const STORAGE_PATH = "bodix-fuel-guide.pdf";
+const FALLBACK_URL = "/guides/bodix-fuel-guide.pdf";
+const SIGNED_URL_TTL_SECONDS = 3600;
 
 function stripHtml(s: string): string {
   return s
@@ -86,5 +89,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, downloadUrl: DOWNLOAD_URL });
+  // Generate signed URL from Supabase Storage; fallback to local /public path if storage unavailable.
+  let downloadUrl = FALLBACK_URL;
+  try {
+    const { data: signed, error: signedError } = await service.storage
+      .from(STORAGE_BUCKET)
+      .createSignedUrl(STORAGE_PATH, SIGNED_URL_TTL_SECONDS);
+    if (signedError) {
+      console.warn("[download-guide] signed url failed, falling back:", signedError.message);
+    } else if (signed?.signedUrl) {
+      downloadUrl = signed.signedUrl;
+    }
+  } catch (err) {
+    console.warn("[download-guide] storage error, falling back:", err);
+  }
+
+  return NextResponse.json({ success: true, downloadUrl });
 }

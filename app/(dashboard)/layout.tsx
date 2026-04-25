@@ -116,10 +116,6 @@ export default async function DashboardLayout({
     }
   }
 
-  const showUnpaidBanner =
-    profile?.onboarding_completed === true &&
-    profile?.payment_status !== "paid";
-
   return (
     <DashboardShell
       giftSection={
@@ -142,21 +138,6 @@ export default async function DashboardLayout({
               kind: "need_code" as const,
               fullName: profile.full_name ?? null,
             }
-      }
-      unpaidBanner={
-        showUnpaidBanner ? (
-          <div className="sticky top-0 z-20 flex items-center justify-between gap-4 border-b border-amber-200 bg-amber-50 px-4 py-3">
-            <p className="text-sm font-medium text-amber-900">
-              Hoàn tất thanh toán để bắt đầu chương trình
-            </p>
-            <a
-              href={`/checkout?program=${profile?.bodix_program || "bodix21"}`}
-              className="shrink-0 rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700"
-            >
-              Thanh toán ngay →
-            </a>
-          </div>
-        ) : null
       }
       profile={{
         full_name: profile?.full_name ?? null,

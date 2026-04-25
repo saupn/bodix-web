@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Building2, Wallet, Ticket } from "lucide-react";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
@@ -17,6 +16,7 @@ interface CheckoutFormProps {
   priceVnd: number;
   onReferralChange?: (valid: boolean, discount: number, codeType?: string, referrerName?: string) => void;
   onVoucherChange?: (valid: boolean, discount: number) => void;
+  onSubmitted?: () => void;
 }
 
 export function CheckoutForm({
@@ -28,8 +28,8 @@ export function CheckoutForm({
   priceVnd,
   onReferralChange,
   onVoucherChange,
+  onSubmitted,
 }: CheckoutFormProps) {
-  const router = useRouter();
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
   const [referralCode, setReferralCode] = useState("");
   const [referralValid, setReferralValid] = useState<{
@@ -191,10 +191,7 @@ export function CheckoutForm({
         return;
       }
 
-      if (data.redirect) {
-        router.push(data.redirect);
-        router.refresh();
-      }
+      onSubmitted?.();
     } catch {
       setError("Không thể kết nối. Vui lòng thử lại.");
     } finally {

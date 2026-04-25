@@ -5,7 +5,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
-import { GIFT_BOOK_DESCRIPTION } from "@/lib/constants";
+import { GIFT_BOOK_TITLE } from "@/lib/constants";
 
 const PDF_PATH = "/guides/bodix-fuel-guide.pdf";
 
@@ -101,9 +101,11 @@ function TangSachContent() {
               <a
                 href={downloadUrl}
                 download
+                target="_blank"
+                rel="noopener noreferrer"
                 className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-[#2D4A3E] px-6 py-4 font-semibold text-white hover:bg-[#243d32]"
               >
-                📥 Tải Sách
+                📥 Tải sách
               </a>
               <div className="my-8 h-px w-full bg-neutral-200" />
               <div className="rounded-xl border-2 border-[#2D4A3E]/20 bg-[#2D4A3E]/5 p-6 text-left">
@@ -111,7 +113,7 @@ function TangSachContent() {
                   Muốn thay đổi cơ thể trong 21 ngày?
                 </p>
                 <p className="mt-2 text-sm text-neutral-600">
-                  Tập thử 3 ngày miễn phí. Không cần nhập thẻ ngân hàng.
+                  Tập thử 3 ngày miễn phí. Sau đó chúng tôi sẽ chỉ chọn một số được tham gia.
                 </p>
                 <Link
                   href={signupHref}
@@ -124,7 +126,7 @@ function TangSachContent() {
           ) : !fromCode ? (
             <div className="text-center">
               <h1 className="font-heading text-2xl font-bold text-[#2D4A3E]">
-                Sách Tại sao nhịn ăn không giúp bạn gọn hơn
+                Sách <strong className="font-extrabold">Tại sao nhịn ăn không giúp bạn gọn hơn</strong>
               </h1>
               <p className="mt-3 text-neutral-600">
                 Bạn cần link tặng từ một thành viên BodiX để nhận cẩm nang.
@@ -142,7 +144,8 @@ function TangSachContent() {
                 {displayReferrer} muốn tặng bạn một món quà
               </h1>
               <p className="mt-3 text-center text-sm text-neutral-600 leading-relaxed">
-                {GIFT_BOOK_DESCRIPTION}
+                <strong className="font-bold text-[#2D4A3E]">{GIFT_BOOK_TITLE}</strong>
+                {" "}- Thực ra cần ba thứ - và không phải thứ bạn đang nghĩ. Đây là hướng dẫn thực tế cho phụ nữ bận rộn. Bạn được nhận MIỄN PHÍ!
               </p>
 
               <form onSubmit={handleSubmit} className="mt-8 space-y-4">
@@ -160,9 +163,6 @@ function TangSachContent() {
                     disabled={loading}
                     className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 focus:border-[#2D4A3E] focus:outline-none focus:ring-2 focus:ring-[#2D4A3E]/20 disabled:opacity-50"
                   />
-                  <p className="mt-1 text-xs text-neutral-500">
-                    Để nhận thông báo về chương trình BodiX qua Zalo
-                  </p>
                 </div>
                 <div>
                   <label className="mb-1.5 block text-sm font-medium text-neutral-700">

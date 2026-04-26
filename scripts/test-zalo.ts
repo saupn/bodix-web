@@ -54,7 +54,10 @@ async function checkOAInfo() {
   console.log("\n── Kiểm tra OA Info ──");
   const token = await getToken();
 
-  const res = await fetch("https://openapi.zalo.me/v3.0/oa/getoa", {
+  // OA info vẫn nằm ở v2.0 (Zalo chưa migrate endpoint này lên v3 — chỉ messaging
+  // endpoints như /oa/message/cs là v3). Gọi v3.0/oa/getoa sẽ trả 404.
+  // Docs: https://developers.zalo.me/docs/api/official-account-api/cau-hinh-oa/lay-thong-tin-oa-post-4012
+  const res = await fetch("https://openapi.zalo.me/v2.0/oa/getoa", {
     headers: { access_token: token },
   });
   const data = await res.json();
@@ -75,8 +78,13 @@ async function checkOAInfo() {
 
 async function getFollowers() {
   console.log("\n── Danh sách Followers ──");
+  console.log("   ⚠️  API /oa/user/getlist đã bị Zalo ngưng (deprecated).");
+  console.log("   Lấy UID từ Supabase: profiles.channel_user_id WHERE preferred_channel='zalo'.\n");
+
   const token = await getToken();
 
+  // Endpoint cũ. Giữ lại để thử nếu Zalo có rollback, nhưng khả năng cao trả lỗi.
+  // Thay thế: query DB profiles thay vì gọi Zalo API.
   const res = await fetch(
     "https://openapi.zalo.me/v3.0/oa/user/getlist",
     {
@@ -99,10 +107,28 @@ async function getFollowers() {
       info(`  ${i + 1}. ${uid}`);
     });
     return users.map((u: any) => u.user_id ?? u);
-  } else {
-    fail(`Zalo API error ${data.error}: ${data.message}`);
+  }
+
+  // Fallback: lấy UID từ Supabase (channel_user_id của profiles đã verify Zalo).
+  fail(`Zalo API error ${data.error}: ${data.message}`);
+  info("Đang fallback sang DB...");
+  const { data: profiles, error: dbError } = await supabase
+    .from("profiles")
+    .select("channel_user_id, full_name")
+    .eq("preferred_channel", "zalo")
+    .not("channel_user_id", "is", null)
+    .limit(10);
+
+  if (dbError || !profiles?.length) {
+    fail(`Không có profile nào với channel_user_id: ${dbError?.message ?? "empty"}`);
     return [];
   }
+
+  ok(`Lấy ${profiles.length} UID từ profiles:`);
+  profiles.forEach((p: { channel_user_id: string; full_name: string | null }, i: number) => {
+    info(`  ${i + 1}. ${p.channel_user_id} (${p.full_name ?? "—"})`);
+  });
+  return profiles.map((p: { channel_user_id: string }) => p.channel_user_id);
 }
 
 // ─── 3. Send CS Message ──────────────────────────────────────────────────────

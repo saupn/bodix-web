@@ -17,6 +17,7 @@ const NAV_LINKS_BASE = [
   { href: "/app/programs", label: "Chương trình tập", icon: Dumbbell },
   { href: "/app/review/history", label: "Review", icon: FileText },
   { href: "/app/referral", label: "Giới thiệu bạn bè", icon: Gift },
+  { href: "/app/affiliate", label: "Đối tác", icon: Handshake },
   { href: "/app/community", label: "Cộng đồng", icon: Users, badgeKey: "community" },
   { href: "/app/progress", label: "Tiến độ", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
@@ -231,7 +232,6 @@ export function DashboardShell({ children, giftSection, profile, trialStartedAt,
             {NAV_LINKS_BASE.map((link) => (
               <NavLink key={link.href} {...link} />
             ))}
-            <NavLink href="/app/affiliate" label="Đối tác" icon={Handshake} />
           </nav>
 
           <div className="border-t border-neutral-200 pt-4">

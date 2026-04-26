@@ -48,7 +48,7 @@ export function RescueBanner({
                   Hôm nay thử nhẹ nhàng nhé
                 </p>
                 <p className="mt-1 text-sm text-amber-800/90">
-                  Chọn Light mode — {lightDuration} phút là đủ để giữ nhịp
+                  Chọn Light mode – {lightDuration} phút là đủ để giữ nhịp
                 </p>
               </div>
             </div>

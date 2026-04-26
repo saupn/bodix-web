@@ -11,7 +11,7 @@ const cards = [
     emoji: "👥",
     title: "Không tập một mình",
     description:
-      "Bạn tập cùng đợt với những người khác. Thấy họ hoàn thành — bạn cũng muốn hoàn thành.",
+      "Bạn tập cùng đợt với những người khác. Thấy họ hoàn thành – bạn cũng muốn hoàn thành.",
   },
   {
     emoji: "🆘",
@@ -32,7 +32,7 @@ export function Philosophy() {
     <section id="why-different" className="py-12 md:py-20 lg:py-24 bg-secondary">
       <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
-          title="Vì sao 90% người tập bỏ giữa chừng — và BodiX giải quyết điều đó"
+          title="Vì sao 90% người tập bỏ giữa chừng – và BodiX giải quyết điều đó"
         />
         <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 sm:grid-cols-2 md:grid-cols-4">
           {cards.map(({ emoji, title, description }) => (

@@ -46,7 +46,7 @@ export interface ReferralPrompt {
 const PROMPTS: Partial<Record<string, ReferralPrompt>> = {
   streak_7: {
     show: true,
-    message: '7 ngày liên tiếp! Giới thiệu bạn bè cùng tập — bạn nhận 50k credit!',
+    message: '7 ngày liên tiếp! Giới thiệu bạn bè cùng tập – bạn nhận 50k credit!',
     timing: 'after_celebration',
     cta: 'Chia sẻ ngay',
     cta_href: '/app/referral',
@@ -64,7 +64,7 @@ const PROMPTS: Partial<Record<string, ReferralPrompt>> = {
 
   halfway: {
     show: true,
-    message: 'Nửa đường rồi! Chia sẻ hành trình — mã giới thiệu trong túi.',
+    message: 'Nửa đường rồi! Chia sẻ hành trình – mã giới thiệu trong túi.',
     timing: 'after_reflection',
     cta: 'Xem mã của tôi',
     cta_href: '/app/referral',
@@ -135,7 +135,7 @@ export const SHARE_PLATFORMS: SharePlatform[] = [
     label: 'Chia sẻ Zalo',
     buildUrl: (_message, referralLink) =>
       `https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent(
-        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+        "Tập cùng mình trên BodiX – giảm 10% khi đăng ký!"
       )}`,
   },
   {

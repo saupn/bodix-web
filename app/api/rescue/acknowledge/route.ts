@@ -71,11 +71,11 @@ export async function POST(request: NextRequest) {
     ])
 
     if (interventionUpdate.error) {
-      console.error('[rescue/acknowledge] return — intervention update:', interventionUpdate.error)
+      console.error('[rescue/acknowledge] return – intervention update:', interventionUpdate.error)
       return NextResponse.json({ error: 'Không thể cập nhật.' }, { status: 500 })
     }
     if (signalResolve.error) {
-      console.error('[rescue/acknowledge] return — signal resolve:', signalResolve.error)
+      console.error('[rescue/acknowledge] return – signal resolve:', signalResolve.error)
       // Non-fatal — intervention was updated, signals can be resolved later
     }
 
@@ -101,11 +101,11 @@ export async function POST(request: NextRequest) {
   ])
 
   if (interventionUpdate.error) {
-    console.error('[rescue/acknowledge] pause — intervention update:', interventionUpdate.error)
+    console.error('[rescue/acknowledge] pause – intervention update:', interventionUpdate.error)
     return NextResponse.json({ error: 'Không thể cập nhật.' }, { status: 500 })
   }
   if (enrollmentUpdate.error) {
-    console.error('[rescue/acknowledge] pause — enrollment update:', enrollmentUpdate.error)
+    console.error('[rescue/acknowledge] pause – enrollment update:', enrollmentUpdate.error)
     return NextResponse.json({ error: 'Không thể tạm dừng chương trình.' }, { status: 500 })
   }
 

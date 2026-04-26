@@ -116,7 +116,7 @@ export default function ProgressPage() {
           {stats.program_name}
         </h1>
         <p className="mt-2 text-sm text-neutral-600">
-          Ngày {stats.current_day}/{stats.total_days} —{" "}
+          Ngày {stats.current_day}/{stats.total_days} –{" "}
           <span className="font-medium text-primary">
             {stats.completion_rate}% hoàn thành
           </span>
@@ -211,7 +211,7 @@ export default function ProgressPage() {
                     " border-2 border-primary bg-primary/5 text-primary font-bold";
                 } else if (day.status === "rest_day") {
                   cellClass += " bg-neutral-50 text-neutral-300";
-                  content = "—";
+                  content = "–";
                 } else {
                   // upcoming
                   cellClass += " bg-neutral-50 text-neutral-300";

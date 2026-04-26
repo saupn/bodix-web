@@ -90,12 +90,12 @@ export async function GET(request: NextRequest) {
 
     return {
       id: p.id,
-      full_name: p.full_name ?? "—",
-      email: emailMap.get(p.id) ?? "—",
-      phone: p.phone ?? "—",
-      status: activeEnrollment?.status ?? (userEnrollments.length ? "inactive" : "—"),
-      program: prog?.name ?? "—",
-      cohort: cohort?.name ?? "—",
+      full_name: p.full_name ?? "–",
+      email: emailMap.get(p.id) ?? "–",
+      phone: p.phone ?? "–",
+      status: activeEnrollment?.status ?? (userEnrollments.length ? "inactive" : "–"),
+      program: prog?.name ?? "–",
+      cohort: cohort?.name ?? "–",
       streak,
       risk,
       joined: p.created_at,

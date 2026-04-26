@@ -5,7 +5,7 @@ const steps = [
     emoji: "💪",
     title: "Thứ 2–6: Phiên tập chính",
     description:
-      "Chọn Hard (3 lượt, 25 phút), Light (2 lượt, 18 phút), hoặc Easy (1 lượt, 10 phút) — tùy cảm giác hôm đó.",
+      "Chọn Hard (3 lượt, 25 phút), Light (2 lượt, 18 phút), hoặc Easy (1 lượt, 10 phút) – tùy cảm giác hôm đó.",
   },
   {
     emoji: "🧘",

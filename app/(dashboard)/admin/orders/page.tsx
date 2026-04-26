@@ -164,9 +164,9 @@ export default function AdminOrdersPage() {
                   <td className="whitespace-nowrap px-4 py-3 font-mono font-medium">
                     {o.order_code}
                   </td>
-                  <td className="px-4 py-3">{o.full_name || "—"}</td>
-                  <td className="px-4 py-3">{o.email || "—"}</td>
-                  <td className="px-4 py-3">{o.phone || "—"}</td>
+                  <td className="px-4 py-3">{o.full_name || "–"}</td>
+                  <td className="px-4 py-3">{o.email || "–"}</td>
+                  <td className="px-4 py-3">{o.phone || "–"}</td>
                   <td className="px-4 py-3">{o.program}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-right font-medium">
                     {formatPrice(o.amount)}

@@ -62,7 +62,7 @@ export function NextCohortBanner() {
         </>
       ) : (
         <p className="text-sm text-cyan-50/95">
-          Đợt tập mới sắp mở — đăng ký để nhận thông báo!
+          Đợt tập mới sắp mở – đăng ký để nhận thông báo!
         </p>
       )}
     </div>

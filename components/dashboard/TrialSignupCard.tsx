@@ -52,11 +52,11 @@ export function TrialSignupCard({
   return (
     <div className="rounded-2xl border-2 border-primary/30 bg-white p-6 shadow-md sm:p-8">
       <h3 className="font-heading text-xl font-bold text-primary sm:text-2xl">
-        BodiX 21 — 21 ngày thay đổi thật sự
+        BodiX 21 – 21 ngày thay đổi thật sự
       </h3>
       <p className="mt-3 text-neutral-600">
         Mỗi ngày chỉ 7-21 phút. Tập tại nhà, không cần dụng cụ.
-        Bạn chọn cường độ phù hợp — cả 3 mức đều tính hoàn thành.
+        Bạn chọn cường độ phù hợp – cả 3 mức đều tính hoàn thành.
       </p>
 
       <div className="mt-6 space-y-3">
@@ -75,7 +75,7 @@ export function TrialSignupCard({
         {!canTrial && (
           <p className="text-sm text-neutral-600 leading-relaxed">
             {nextCohortDate
-              ? `Đợt sắp tới bắt đầu ${nextCohortDate.split("-").reverse().join("/")} — khoảng cách từ ngày mai đến ngày cohort chưa đủ 3 ngày cho tập thử. Bạn vui lòng chờ đợt cohort tiếp theo nhé.`
+              ? `Đợt sắp tới bắt đầu ${nextCohortDate.split("-").reverse().join("/")} – khoảng cách từ ngày mai đến ngày cohort chưa đủ 3 ngày cho tập thử. Bạn vui lòng chờ đợt cohort tiếp theo nhé.`
               : "Chưa có đợt tập tiếp theo phù hợp. Vui lòng quay lại sau."}
           </p>
         )}

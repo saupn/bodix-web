@@ -11,7 +11,7 @@ const REFERRAL_BASE =
       ? `${process.env.NEXT_PUBLIC_APP_URL}/r`
       : "https://bodix.fit/r";
 const SHARE_MESSAGE = (code: string) =>
-  `Mình đang tập BodiX — chương trình fitness hoàn thành được, không phải chỉ bắt đầu! 💪\nDùng mã ${code} để giảm 10% chương trình đầu tiên.\n👉 ${REFERRAL_BASE}/${code}`;
+  `Mình đang tập BodiX – chương trình fitness hoàn thành được, không phải chỉ bắt đầu! 💪\nDùng mã ${code} để giảm 10% chương trình đầu tiên.\n👉 ${REFERRAL_BASE}/${code}`;
 
 const STATUS_LABEL: Record<string, string> = {
   clicked: "Đã click",
@@ -72,7 +72,7 @@ interface TrackingData {
 }
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "–";
   const d = new Date(dateStr);
   return d.toLocaleDateString("vi-VN", {
     day: "numeric",
@@ -128,7 +128,7 @@ export default function ReferralPage() {
   const shareZalo = () => {
     window.open(
       `https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent(
-        "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+        "Tập cùng mình trên BodiX – giảm 10% khi đăng ký!"
       )}`,
       "_blank",
       "noopener,noreferrer"
@@ -174,7 +174,7 @@ export default function ReferralPage() {
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Giới thiệu bạn bè — Nhận thưởng! 🎁
+          Giới thiệu bạn bè – Nhận thưởng! 🎁
         </h1>
         <p className="mt-2 text-neutral-600">
           Mỗi bạn bè đăng ký qua link của bạn, bạn nhận 100.000đ credit
@@ -344,7 +344,7 @@ export default function ReferralPage() {
                     <td className="py-3 text-right font-medium">
                       {row.reward != null
                         ? `${row.reward.toLocaleString("vi-VN")} đ`
-                        : "—"}
+                        : "–"}
                     </td>
                   </tr>
                 ))}

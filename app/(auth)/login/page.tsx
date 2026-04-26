@@ -35,6 +35,13 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  // Forgot-password flow
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [resetEmail, setResetEmail] = useState("");
+  const [resetSent, setResetSent] = useState(false);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [resetLoading, setResetLoading] = useState(false);
+
   const handleEmailLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -62,6 +69,36 @@ export default function LoginPage() {
       setError("Đã xảy ra lỗi. Vui lòng thử lại.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSendReset = async () => {
+    setResetError(null);
+    setResetSent(false);
+    if (!resetEmail.trim()) {
+      setResetError("Vui lòng nhập email.");
+      return;
+    }
+    setResetLoading(true);
+    try {
+      const supabase = createClient();
+      const redirectTo =
+        typeof window !== "undefined"
+          ? `${window.location.origin}/reset-password`
+          : "https://bodix.fit/reset-password";
+      const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
+        resetEmail.trim(),
+        { redirectTo }
+      );
+      if (resetErr) {
+        setResetError("Không gửi được. Kiểm tra lại email.");
+        return;
+      }
+      setResetSent(true);
+    } catch {
+      setResetError("Không gửi được. Kiểm tra lại email.");
+    } finally {
+      setResetLoading(false);
     }
   };
 
@@ -147,7 +184,64 @@ export default function LoginPage() {
                 className="w-full rounded-lg border border-neutral-300 bg-white px-4 py-3 text-neutral-800 placeholder-neutral-400 transition-colors focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 disabled:opacity-50"
                 suppressHydrationWarning
               />
+              <div className="mt-1.5 text-right">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword((v) => !v);
+                    setResetSent(false);
+                    setResetError(null);
+                    if (!resetEmail) setResetEmail(email);
+                  }}
+                  className="text-sm text-primary hover:underline"
+                >
+                  Quên mật khẩu?
+                </button>
+              </div>
             </div>
+
+            {showForgotPassword && (
+              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+                <p className="mb-2 text-sm text-neutral-600">
+                  Nhập email để nhận link đặt lại mật khẩu
+                </p>
+                <input
+                  type="email"
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  placeholder="Email"
+                  className="mb-3 w-full rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm text-neutral-800 placeholder-neutral-400 focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
+                  suppressHydrationWarning
+                />
+                <button
+                  type="button"
+                  onClick={handleSendReset}
+                  disabled={resetLoading}
+                  className="w-full rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light hover:bg-primary-dark disabled:opacity-50"
+                >
+                  {resetLoading ? "Đang gửi..." : "Gửi link đặt lại mật khẩu"}
+                </button>
+                {resetSent && (
+                  <p className="mt-2 text-sm text-green-600">
+                    Đã gửi! Kiểm tra email.
+                  </p>
+                )}
+                {resetError && (
+                  <p className="mt-2 text-sm text-red-600">{resetError}</p>
+                )}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowForgotPassword(false);
+                    setResetSent(false);
+                    setResetError(null);
+                  }}
+                  className="mt-2 text-sm text-neutral-500 hover:text-neutral-700"
+                >
+                  ← Quay lại đăng nhập
+                </button>
+              </div>
+            )}
 
             <button
               type="submit"

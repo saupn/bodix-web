@@ -288,7 +288,7 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
                 📚 Tặng Sách cho bạn bè
               </h3>
               <p className="mt-2 text-sm text-neutral-600">
-                Chia sẻ sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn bè — hoàn toàn miễn phí.
+                Chia sẻ sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn bè – hoàn toàn miễn phí.
               </p>
 
               {giftSection.kind === "need_code" && (
@@ -358,7 +358,7 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
                         onClick={() =>
                           window.open(
                             `https://zalo.me/share?url=${encodeURIComponent(activeGift.link)}&title=${encodeURIComponent(
-                              "Tặng bạn Cẩm nang Khởi động BodiX — miễn phí!",
+                              "Tặng bạn Cẩm nang Khởi động BodiX – miễn phí!",
                             )}`,
                             "_blank",
                             "noopener,noreferrer",

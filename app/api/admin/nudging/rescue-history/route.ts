@@ -35,14 +35,14 @@ export async function GET(request: NextRequest) {
     .select("id, full_name, email")
     .in("id", userIds);
   const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.id, p.full_name?.trim() || p.email || "—"])
+    (profiles ?? []).map((p) => [p.id, p.full_name?.trim() || p.email || "–"])
   );
 
   const rows = (data ?? []).map((r) => ({
     id: r.id,
     user_id: r.user_id,
     enrollment_id: r.enrollment_id,
-    userName: profileMap.get(r.user_id) ?? "—",
+    userName: profileMap.get(r.user_id) ?? "–",
     trigger_reason: r.trigger_reason,
     risk_score_at_trigger: r.risk_score_at_trigger,
     action_taken: r.action_taken,

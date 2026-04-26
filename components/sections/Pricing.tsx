@@ -8,7 +8,7 @@ const PRICING_CARDS = [
     name: "BodiX 21",
     duration: "21 ngày",
     price: "499.000đ",
-    perDay: "~24.000đ/ngày — rẻ hơn ly trà sữa",
+    perDay: "~24.000đ/ngày – rẻ hơn ly trà sữa",
     badge: "⭐ Phổ biến nhất",
     badgeStyle: "bg-primary text-white",
     features: [
@@ -42,7 +42,7 @@ const PRICING_CARDS = [
     name: "BodiX 12W",
     duration: "12 tuần",
     price: "1.999.000đ",
-    perDay: "~24.000đ/ngày — tiết kiệm nhất",
+    perDay: "~24.000đ/ngày – tiết kiệm nhất",
     badge: "🔥 Lột xác toàn diện",
     badgeStyle: "bg-orange-100 text-orange-800",
     features: [

@@ -139,11 +139,11 @@ export default function AdminUsersPage() {
                           {u.risk}
                         </span>
                       ) : (
-                        "—"
+                        "–"
                       )}
                     </td>
                     <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
-                      {u.joined ? new Date(u.joined).toLocaleDateString("vi-VN") : "—"}
+                      {u.joined ? new Date(u.joined).toLocaleDateString("vi-VN") : "–"}
                     </td>
                   </tr>
                 ))}

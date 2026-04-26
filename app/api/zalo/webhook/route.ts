@@ -693,7 +693,7 @@ async function handleCheckin(
 
   // Phản hồi thông thường theo loại check-in
   const CHECKIN_RESPONSES: Record<'hard' | 'light' | 'easy' | 'recovery', string> = {
-    hard: '💪 Tuyệt vời! 3 lượt — bạn thật sự nghiêm túc!',
+    hard: '💪 Tuyệt vời! 3 lượt – bạn thật sự nghiêm túc!',
     light: '👏 Giỏi lắm! 2 lượt là rất tốt rồi!',
     easy: '✅ Hoàn thành! 1 lượt cũng là chiến thắng!',
     recovery: '🧘 Recovery xong! Cơ thể cảm ơn bạn đó.',

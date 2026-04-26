@@ -236,7 +236,7 @@ export default function MidProgramPage() {
       <div className="mx-auto max-w-2xl px-4 pb-12 pt-6">
         <div className="rounded-xl border-2 border-green-300 bg-green-50 p-8 text-center">
           <p className="text-xl font-semibold text-green-800">
-            Nửa đường xong! Nửa còn lại — cùng đi tiếp! 🚀
+            Nửa đường xong! Nửa còn lại – cùng đi tiếp! 🚀
           </p>
         </div>
         {beforePhotoPreview && midpointPhotoPreview && (
@@ -281,7 +281,7 @@ export default function MidProgramPage() {
           🎯 Nhìn lại nửa hành trình
         </h1>
         <p className="mt-2 text-neutral-600">
-          Bạn đã đi được {current}/{total} ngày — hơn nửa đường rồi!
+          Bạn đã đi được {current}/{total} ngày – hơn nửa đường rồi!
         </p>
         <div className="mt-4 h-3 overflow-hidden rounded-full bg-neutral-200">
           <div
@@ -443,7 +443,7 @@ export default function MidProgramPage() {
             Đánh giá lại mục tiêu
           </h2>
           <p className="mt-4 text-neutral-700">
-            Mục tiêu ban đầu: <strong>{context.original_goal ?? "—"}</strong>
+            Mục tiêu ban đầu: <strong>{context.original_goal ?? "–"}</strong>
           </p>
           <p className="mt-4 font-medium text-neutral-800">
             Mục tiêu này vẫn đúng chứ?

@@ -13,7 +13,7 @@ export const GIFT_BOOK_DESCRIPTION =
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
-  slogan: "Thay đổi vóc dáng tại nhà — không cần phòng tập hay PT",
+  slogan: "Thay đổi vóc dáng tại nhà – không cần phòng tập hay PT",
   targetAudience: "Phụ nữ Việt Nam, 25-45 tuổi",
 } as const;
 
@@ -141,7 +141,7 @@ export const FAQS = [
   {
     question: "Nếu một hôm tôi quá mệt, không thể tập được thì sao?",
     answer:
-      "Đó chính là lý do BodiX có chế độ Easy — chỉ 1 lượt, ~7 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
+      "Đó chính là lý do BodiX có chế độ Easy – chỉ 1 lượt, ~7 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
   },
   {
     question:
@@ -170,7 +170,7 @@ export const CTA_PROGRAMS = [
 export const FOOTER_DATA = {
   brand: {
     name: "BodiX",
-    tagline: "Completion First Fitness — Dành cho phụ nữ Việt Nam",
+    tagline: "Completion First Fitness – Dành cho phụ nữ Việt Nam",
   },
   columns: [
     {

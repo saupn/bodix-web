@@ -76,7 +76,7 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-500">Họ tên</dt>
             <dd className="mt-1 text-neutral-800">
-              {profile?.full_name || user.user_metadata?.full_name || "—"}
+              {profile?.full_name || user.user_metadata?.full_name || "–"}
             </dd>
           </div>
           <div>
@@ -86,7 +86,7 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-500">Số điện thoại</dt>
             <dd className="mt-1 flex items-center gap-2 text-neutral-800">
-              {profile?.phone ? maskPhone(profile.phone) : "—"}
+              {profile?.phone ? maskPhone(profile.phone) : "–"}
               {profile?.phone_verified && (
                 <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
                   ✓ Đã xác minh
@@ -97,13 +97,13 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-500">Ngày sinh</dt>
             <dd className="mt-1 text-neutral-800">
-              {profile?.date_of_birth ? formatDate(profile.date_of_birth) : "—"}
+              {profile?.date_of_birth ? formatDate(profile.date_of_birth) : "–"}
             </dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-neutral-500">Giới tính</dt>
             <dd className="mt-1 text-neutral-800">
-              {profile?.gender ? (GENDER_LABEL[profile.gender] ?? profile.gender) : "—"}
+              {profile?.gender ? (GENDER_LABEL[profile.gender] ?? profile.gender) : "–"}
             </dd>
           </div>
           <div>
@@ -111,7 +111,7 @@ export default async function ProfilePage() {
             <dd className="mt-1 text-neutral-800">
               {Array.isArray(profile?.fitness_goal) && profile.fitness_goal.length > 0
                 ? profile.fitness_goal.join(", ")
-                : "—"}
+                : "–"}
             </dd>
           </div>
         </dl>
@@ -145,7 +145,7 @@ export default async function ProfilePage() {
                   <p className="mt-0.5 text-xs text-neutral-500">
                     Còn {(v.remaining_amount ?? 0).toLocaleString("vi-VN")}đ
                     {v.expires_at && (
-                      <> — HSD: {new Date(v.expires_at).toLocaleDateString("vi-VN")}</>
+                      <> – HSD: {new Date(v.expires_at).toLocaleDateString("vi-VN")}</>
                     )}
                   </p>
                 </div>
@@ -175,7 +175,7 @@ export default async function ProfilePage() {
             href="/app/affiliate"
             className="inline-flex items-center rounded-lg border-2 border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
           >
-            Trở thành Đối tác — Nhận 40% hoa hồng &rarr;
+            Trở thành Đối tác – Nhận 40% hoa hồng &rarr;
           </Link>
         </div>
       )}

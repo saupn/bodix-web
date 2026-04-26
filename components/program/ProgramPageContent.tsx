@@ -206,7 +206,7 @@ export function ProgramPageContent() {
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          {program.name} — {cohortName}
+          {program.name} – {cohortName}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <div className="h-2 flex-1 min-w-[120px] max-w-xs overflow-hidden rounded-full bg-neutral-200">
@@ -312,7 +312,7 @@ export function ProgramPageContent() {
           {data.today_workout && data.today_workout.workout_type !== "review" && (
             <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 shadow-md">
               <h2 className="font-heading text-xl font-bold text-primary">
-                Ngày {program_day} — {data.today_workout.title}
+                Ngày {program_day} – {data.today_workout.title}
               </h2>
               <div className="mt-2 flex flex-wrap gap-2">
                 <span className="text-sm text-accent">

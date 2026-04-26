@@ -33,7 +33,7 @@ export async function GET(
     return NextResponse.json({ error: "User không tồn tại." }, { status: 404 });
   }
 
-  let email = "—";
+  let email = "–";
   try {
     const { data: authUser } = await service.auth.admin.getUserById(userId);
     if (authUser?.user?.email) email = authUser.user.email;
@@ -66,8 +66,8 @@ export async function GET(
 
   const enrollmentsList = (enrollments as unknown as Array<{ id: string; status: string; current_day: number; programs: { name: string } | null; cohorts: { name: string } | null }>).map((e) => ({
     status: e.status,
-    program: (e.programs as { name: string })?.name ?? "—",
-    cohort: (e.cohorts as { name: string })?.name ?? "—",
+    program: (e.programs as { name: string })?.name ?? "–",
+    cohort: (e.cohorts as { name: string })?.name ?? "–",
     day: e.current_day ?? 0,
     streak: streakMap.get(e.id) ?? 0,
     risk: riskMap.get(e.id) ?? 0,
@@ -75,9 +75,9 @@ export async function GET(
 
   return NextResponse.json({
     id: profile.id,
-    full_name: profile.full_name ?? "—",
+    full_name: profile.full_name ?? "–",
     email,
-    phone: profile.phone ?? "—",
+    phone: profile.phone ?? "–",
     joined: profile.created_at,
     enrollments: enrollmentsList,
   });

@@ -228,7 +228,7 @@ export function DashboardHomeContent({
               Bài tập hôm nay
             </h2>
             <p className="mt-2 font-medium text-neutral-800">
-              Ngày {trial.day}/3 — Tập thử
+              Ngày {trial.day}/3 – Tập thử
             </p>
             <p className="mt-1 text-neutral-700">{trial.workout.title}</p>
             <div className="mt-2 flex gap-2 text-sm text-neutral-600">
@@ -353,7 +353,7 @@ export function DashboardHomeContent({
             Bài tập hôm nay
           </h2>
           <p className="mt-2 font-medium text-neutral-800">
-            Ngày {programDay} — {program.today_workout.title}
+            Ngày {programDay} – {program.today_workout.title}
           </p>
           <div className="mt-2 flex gap-2 text-sm text-neutral-600">
             <span>{program.today_workout.duration_minutes} phút</span>

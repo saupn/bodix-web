@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
           .in('program_id', programIds)
           .then(() => null) as unknown as string[]
       )
-      .then(() => null), // placeholder — fetched below
+      .then(() => null), // placeholder – fetched below
 
     service
       .from('enrollments')

@@ -371,7 +371,7 @@ export default function AdminAffiliatePage() {
     <div className="min-h-screen bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="font-heading text-2xl font-bold text-primary">
-          Admin — Affiliate
+          Admin – Affiliate
         </h1>
 
         <div className="mt-6 flex gap-2 border-b border-neutral-200">
@@ -431,7 +431,7 @@ export default function AdminAffiliatePage() {
                           )}
                           {!a.partner_type && Array.isArray(a.social_channels) && (
                             <p className="text-sm text-neutral-600">
-                              Social: {(a.social_channels as { platform?: string; followers?: number }[]).map((c) => `${c.platform ?? ''} (${c.followers ?? 0})`).join(", ") || "—"}
+                              Social: {(a.social_channels as { platform?: string; followers?: number }[]).map((c) => `${c.platform ?? ''} (${c.followers ?? 0})`).join(", ") || "–"}
                             </p>
                           )}
                           {a.motivation && (
@@ -515,7 +515,7 @@ export default function AdminAffiliatePage() {
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{a.affiliate_tier}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">
-                          {a.code?.commission_rate ?? "—"}%
+                          {a.code?.commission_rate ?? "–"}%
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">
                           {a.code?.conversions ?? 0}
@@ -635,7 +635,7 @@ export default function AdminAffiliatePage() {
                           {w.bank_name} {w.bank_account} ({w.bank_account_name})
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
-                          {w.requested_at ? new Date(w.requested_at).toLocaleString("vi-VN") : "—"}
+                          {w.requested_at ? new Date(w.requested_at).toLocaleString("vi-VN") : "–"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{w.status}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -741,7 +741,7 @@ export default function AdminAffiliatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-heading font-semibold text-primary">
-              Duyệt affiliate — {modalApprove.full_name}
+              Duyệt affiliate – {modalApprove.full_name}
             </h3>
             <label className="mt-4 block text-sm font-medium">
               Commission rate (%)
@@ -783,7 +783,7 @@ export default function AdminAffiliatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-heading font-semibold text-primary">
-              Từ chối — {modalReject.full_name}
+              Từ chối – {modalReject.full_name}
             </h3>
             <label className="mt-4 block text-sm font-medium">
               Lý do (tùy chọn)
@@ -824,7 +824,7 @@ export default function AdminAffiliatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-heading font-semibold text-primary">
-              Điều chỉnh commission — {modalCommission.full_name}
+              Điều chỉnh commission – {modalCommission.full_name}
             </h3>
             <label className="mt-4 block text-sm font-medium">
               Commission rate (%)
@@ -866,7 +866,7 @@ export default function AdminAffiliatePage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-heading font-semibold text-primary">
-              Nâng tier — {modalTier.full_name}
+              Nâng tier – {modalTier.full_name}
             </h3>
             <label className="mt-4 block text-sm font-medium">
               Tier

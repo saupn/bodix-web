@@ -125,20 +125,20 @@ export async function POST(request: NextRequest) {
       if (stats.completed === 5 && stats.hard === 5) {
         dynamicMsg = "Tuần hoàn hảo! Bạn thuộc nhóm rất ít người làm được điều này.";
       } else if (stats.completed === 5) {
-        dynamicMsg = "5/5 — bạn không bỏ buổi nào. Đó là kỷ luật thật sự.";
+        dynamicMsg = "5/5 – bạn không bỏ buổi nào. Đó là kỷ luật thật sự.";
       } else if (stats.completed === 4) {
-        dynamicMsg = "4/5 — gần hoàn hảo! 1 buổi thiếu không làm mất đi 4 buổi bạn đã làm.";
+        dynamicMsg = "4/5 – gần hoàn hảo! 1 buổi thiếu không làm mất đi 4 buổi bạn đã làm.";
       } else if (stats.completed === 3) {
-        dynamicMsg = "3/5 — quá nửa rồi. Tuần tới thử thêm 1 buổi nhé?";
+        dynamicMsg = "3/5 – quá nửa rồi. Tuần tới thử thêm 1 buổi nhé?";
       } else if (stats.completed >= 1) {
-        dynamicMsg = "Tuần này khó khăn — nhưng bạn vẫn ở đây. Đó đã là khác biệt.";
+        dynamicMsg = "Tuần này khó khăn – nhưng bạn vẫn ở đây. Đó đã là khác biệt.";
       } else {
-        dynamicMsg = "Tuần này bạn nghỉ ngơi. Không sao — tuần tới là cơ hội mới.";
+        dynamicMsg = "Tuần này bạn nghỉ ngơi. Không sao – tuần tới là cơ hội mới.";
       }
 
       // Bonus messages
       if (stats.easy > 0) {
-        dynamicMsg += "\nViệc chọn 1 lượt những ngày khó — đó là thông minh, không phải yếu đuối.";
+        dynamicMsg += "\nViệc chọn 1 lượt những ngày khó – đó là thông minh, không phải yếu đuối.";
       }
       if (currentStreak >= 14) {
         dynamicMsg += `\nStreak ${currentStreak} ngày! Cơ thể bạn đang thay đổi từ bên trong.`;

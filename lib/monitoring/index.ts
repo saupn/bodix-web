@@ -48,7 +48,7 @@ export function trackZaloAPIError(
     userId: string
     nudgeType: string
     templateId?: string
-    phone?: string       // full phone passed in — only suffix logged
+    phone?: string       // full phone passed in – only suffix logged
     enrollmentId?: string
   },
 ): void {

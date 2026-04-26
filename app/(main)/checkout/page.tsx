@@ -101,7 +101,7 @@ Nội dung: ${orderCode}`;
     return (
       <div className="mx-auto max-w-md rounded-2xl border-2 border-[#2D4A3E]/20 bg-white p-8 text-center">
         <h2 className="font-heading text-xl font-bold text-[#2D4A3E]">
-          ✅ Đã đăng ký — Chờ xác nhận
+          ✅ Đã đăng ký – Chờ xác nhận
         </h2>
         <p className="mt-4 text-neutral-600">
           Cảm ơn! Đăng ký của bạn đã được ghi nhận.

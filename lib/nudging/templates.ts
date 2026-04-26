@@ -24,7 +24,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'mr_3',
         title: '🔥 Streak {current_streak} ngày',
-        body: 'Bạn đang giữ chuỗi {current_streak} ngày liên tiếp! Tiếp tục nào — ngày {day_number} đang đợi.',
+        body: 'Bạn đang giữ chuỗi {current_streak} ngày liên tiếp! Tiếp tục nào – ngày {day_number} đang đợi.',
       },
       {
         id: 'mr_4',
@@ -54,7 +54,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'ec_3',
         title: 'Hôm nay thế nào?',
-        body: 'Dù Hard, Light, hay Easy — mỗi ngày bạn check-in đều đáng tự hào. ✅',
+        body: 'Dù Hard, Light, hay Easy – mỗi ngày bạn check-in đều đáng tự hào. ✅',
       },
     ],
   },
@@ -64,7 +64,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'rs_1',
         title: 'Mọi thứ ổn chứ?',
-        body: '{name} ơi, hôm qua bạn chưa tập. Không sao cả! Hôm nay thử Light mode — chỉ {light_duration} phút nhẹ nhàng nhé 🌿',
+        body: '{name} ơi, hôm qua bạn chưa tập. Không sao cả! Hôm nay thử Light mode – chỉ {light_duration} phút nhẹ nhàng nhé 🌿',
       },
       {
         id: 'rs_2',
@@ -79,12 +79,12 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'ru_1',
         title: 'Đừng dừng lại ở đây',
-        body: '{name}, bạn đã đi được {completed_days} ngày rồi. Đừng để streak đứt! Chỉ cần 10 phút Recovery hôm nay — giữ nhịp là đủ. 🙏',
+        body: '{name}, bạn đã đi được {completed_days} ngày rồi. Đừng để streak đứt! Chỉ cần 10 phút Recovery hôm nay – giữ nhịp là đủ. 🙏',
       },
       {
         id: 'ru_2',
         title: 'BodiX nhớ bạn',
-        body: '2 ngày rồi chưa gặp bạn. Chúng tôi biết cuộc sống bận rộn. Quay lại với bài 10 phút thôi nhé — mọi thứ vẫn ở đây chờ bạn.',
+        body: '2 ngày rồi chưa gặp bạn. Chúng tôi biết cuộc sống bận rộn. Quay lại với bài 10 phút thôi nhé – mọi thứ vẫn ở đây chờ bạn.',
       },
     ],
   },
@@ -94,7 +94,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'rc_1',
         title: 'Bạn vẫn ở đây',
-        body: '{name}, bạn đã hoàn thành {completed_days}/{total_days} ngày. Hành trình vẫn đang chờ. Không cần bắt đầu lại — chỉ cần bước tiếp. Quay lại bất cứ lúc nào. ❤️',
+        body: '{name}, bạn đã hoàn thành {completed_days}/{total_days} ngày. Hành trình vẫn đang chờ. Không cần bắt đầu lại – chỉ cần bước tiếp. Quay lại bất cứ lúc nào. ❤️',
       },
     ],
   },

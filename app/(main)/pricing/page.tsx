@@ -3,7 +3,7 @@ import { PROGRAMS, formatPrice } from "@/lib/config/pricing";
 
 const FEATURES = [
   "Tin nhắn nhắc tập qua Zalo mỗi ngày",
-  "3 cường độ: Hard / Light / Easy — cả 3 đều tính hoàn thành",
+  "3 cường độ: Hard / Light / Easy – cả 3 đều tính hoàn thành",
   "Rescue protocol khi bạn muốn bỏ cuộc",
 ];
 

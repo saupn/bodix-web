@@ -79,7 +79,7 @@ export async function POST(request: NextRequest) {
   }
   if (expectedDate < yesterday) {
     return NextResponse.json(
-      { error: 'Grace period đã hết — chỉ check-in được hôm nay hoặc hôm qua.' },
+      { error: 'Grace period đã hết – chỉ check-in được hôm nay hoặc hôm qua.' },
       { status: 400 }
     )
   }

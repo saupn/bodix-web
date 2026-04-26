@@ -31,7 +31,7 @@ export function ComebackCard({
             Chào mừng quay lại! 🎉
           </p>
           <p className="mt-1 text-sm text-neutral-700">
-            Dừng lại rồi quay lại — đó là sức mạnh, không phải yếu đuối.
+            Dừng lại rồi quay lại – đó là sức mạnh, không phải yếu đuối.
           </p>
           <p className="mt-2 text-sm font-medium text-primary">
             Streak mới: 🔥 {currentStreak} ngày

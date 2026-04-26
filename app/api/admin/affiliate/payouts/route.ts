@@ -83,7 +83,7 @@ export async function GET(request: NextRequest) {
     ...s,
     items: s.items.map((i) => ({
       ...i,
-      affiliate_name: profileMap.get(i.user_id)?.full_name ?? "—",
+      affiliate_name: profileMap.get(i.user_id)?.full_name ?? "–",
     })),
   }));
 

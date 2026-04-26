@@ -10,7 +10,7 @@ const PROGRAM_CARDS = [
     name: "BodiX 21",
     duration: "21 ngày",
     price: "499.000đ",
-    perDay: "~24.000đ/ngày — rẻ hơn ly trà sữa",
+    perDay: "~24.000đ/ngày – rẻ hơn ly trà sữa",
     badge: "⭐ Phổ biến nhất",
     note: null,
     features: [
@@ -44,7 +44,7 @@ const PROGRAM_CARDS = [
     name: "BodiX 12W",
     duration: "12 tuần",
     price: "1.999.000đ",
-    perDay: "~24.000đ/ngày — tiết kiệm nhất",
+    perDay: "~24.000đ/ngày – tiết kiệm nhất",
     badge: "🔥 Lột xác toàn diện",
     note: "Cường độ cao, phù hợp người đã tập ít nhất 6 tuần",
     features: [
@@ -60,11 +60,11 @@ const PROGRAM_CARDS = [
 
 const UPGRADE_BANNERS: Record<string, { message: string; targetSlug: string }> = {
   "bodix-21": {
-    message: "🎉 Chúc mừng hoàn thành BodiX 21! Tiếp tục với BodiX 6W — giảm 15%!",
+    message: "🎉 Chúc mừng hoàn thành BodiX 21! Tiếp tục với BodiX 6W – giảm 15%!",
     targetSlug: "bodix-6w",
   },
   "bodix-6w": {
-    message: "🎉 Chúc mừng hoàn thành BodiX 6W! Tiếp tục với BodiX 12W — giảm 15%!",
+    message: "🎉 Chúc mừng hoàn thành BodiX 6W! Tiếp tục với BodiX 12W – giảm 15%!",
     targetSlug: "bodix-12w",
   },
 };

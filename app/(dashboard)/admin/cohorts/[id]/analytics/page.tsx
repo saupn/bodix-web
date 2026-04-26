@@ -284,7 +284,7 @@ export default function CohortAnalyticsPage() {
               <tbody className="divide-y divide-neutral-200">
                 {sortedMembers.map((m) => (
                   <tr key={m.enrollment_id} className="hover:bg-neutral-50">
-                    <td className="whitespace-nowrap px-4 py-2 text-sm">{m.full_name ?? "—"}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-sm">{m.full_name ?? "–"}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.current_day}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.current_streak}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.completion_rate}%</td>
@@ -294,7 +294,7 @@ export default function CohortAnalyticsPage() {
                       </span>
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm text-neutral-600">
-                      {m.last_checkin ? new Date(m.last_checkin).toLocaleDateString("vi-VN") : "—"}
+                      {m.last_checkin ? new Date(m.last_checkin).toLocaleDateString("vi-VN") : "–"}
                     </td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.status}</td>
                   </tr>

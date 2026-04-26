@@ -256,7 +256,7 @@ export function TrialPageContent() {
             }
             className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
           >
-            Đăng ký đầy đủ — {program ? formatPrice(program.price_vnd) : "Liên hệ"}
+            Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
           </Link>
           {countdown && (
             <p className="text-center text-sm text-neutral-500 sm:text-left">
@@ -334,7 +334,7 @@ function WorkoutCard({
           <p className="mt-1 text-xs text-accent">{workout.duration_minutes} phút</p>
         </>
       ) : (
-        <p className="mt-1 text-sm text-neutral-500">—</p>
+        <p className="mt-1 text-sm text-neutral-500">–</p>
       )}
 
       {isUnlocked ? (

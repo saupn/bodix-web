@@ -24,7 +24,7 @@ export async function GET() {
     .select("id, full_name, email")
     .in("id", userIds);
   const profileMap = new Map(
-    (profiles ?? []).map((p) => [p.id, p.full_name?.trim() || p.email || "—"])
+    (profiles ?? []).map((p) => [p.id, p.full_name?.trim() || p.email || "–"])
   );
 
   const programIds = [...new Set((enrollments ?? []).map((e) => e.program_id).filter(Boolean))];
@@ -84,8 +84,8 @@ export async function GET() {
     rows.push({
       id: e.id,
       user_id: e.user_id,
-      userName: profileMap.get(e.user_id) ?? "—",
-      programName: programMap.get(e.program_id) ?? "—",
+      userName: profileMap.get(e.user_id) ?? "–",
+      programName: programMap.get(e.program_id) ?? "–",
       day: e.current_day ?? 0,
       streak: streak?.current_streak ?? 0,
       riskScore: score,

@@ -167,7 +167,7 @@ export function CheckoutContent({
           {cohort && (
             <div className="mt-3 text-sm">
               <p className="font-medium text-neutral-700">
-                {cohort.name} — Bắt đầu {formatDate(cohort.start_date)}
+                {cohort.name} – Bắt đầu {formatDate(cohort.start_date)}
               </p>
             </div>
           )}

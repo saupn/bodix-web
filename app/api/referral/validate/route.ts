@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
     valid: true,
     code,
     code_type: referralCode.code_type,
-    referrer_name: firstName,  // first name only — no last name, no ID, no email
+    referrer_name: firstName,  // first name only – no last name, no ID, no email
     reward_description: rewardDescription,
     referee_reward_type: referralCode.referee_reward_type,
     referee_reward_value: referralCode.referee_reward_value,

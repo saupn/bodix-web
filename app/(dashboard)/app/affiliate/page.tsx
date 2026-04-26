@@ -64,7 +64,7 @@ interface DashboardData {
 }
 
 function formatDate(dateStr: string): string {
-  if (!dateStr) return "—";
+  if (!dateStr) return "–";
   return new Date(dateStr).toLocaleDateString("vi-VN", {
     day: "numeric",
     month: "short",
@@ -73,12 +73,12 @@ function formatDate(dateStr: string): string {
 }
 
 const TIPS = [
-  "Chia sẻ link kèm trải nghiệm cá nhân — người thật, kết quả thật.",
+  "Chia sẻ link kèm trải nghiệm cá nhân – người thật, kết quả thật.",
   "Post vào nhóm Facebook/Zalo fitness, gym, chạy bộ.",
-  "Kể câu chuyện 21 ngày của bạn trên story — chân thực hơn quảng cáo.",
+  "Kể câu chuyện 21 ngày của bạn trên story – chân thực hơn quảng cáo.",
   "Gửi link trực tiếp cho bạn bè bạn nghĩ sẽ phù hợp.",
   "Ghim link BodiX trong bio TikTok, Instagram.",
-  "Mỗi tuần chia sẻ 1 bài tập ngắn + link — đều đặn hơn viral.",
+  "Mỗi tuần chia sẻ 1 bài tập ngắn + link – đều đặn hơn viral.",
 ];
 
 export default function AffiliatePage() {
@@ -108,7 +108,7 @@ export default function AffiliatePage() {
     ? `${REFERRAL_BASE}?ref=${dashboard.code.code}`
     : "";
   const shareMessage = dashboard?.code
-    ? `Mình đang tập BodiX — chương trình fitness hoàn thành được! 💪\nDùng link của mình để giảm 10%.\n👉 ${partnerLink}`
+    ? `Mình đang tập BodiX – chương trình fitness hoàn thành được! 💪\nDùng link của mình để giảm 10%.\n👉 ${partnerLink}`
     : "";
 
   useEffect(() => {
@@ -239,7 +239,7 @@ export default function AffiliatePage() {
       <div className="mx-auto max-w-2xl space-y-8 pb-16">
         <div>
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-            Trở thành Đối tác — Nhận {COMMISSION_RATE}% hoa hồng
+            Trở thành Đối tác – Nhận {COMMISSION_RATE}% hoa hồng
           </h1>
           <p className="mt-2 text-neutral-600">
             Chia sẻ BodiX, nhận {COMMISSION_RATE}% tiền mặt cho mỗi đơn hàng qua link của bạn.
@@ -337,7 +337,7 @@ export default function AffiliatePage() {
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Dashboard Đối tác — {displayName}
+          Dashboard Đối tác – {displayName}
         </h1>
         <div className="mt-2 flex flex-wrap items-center gap-3">
           <span className="rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
@@ -415,7 +415,7 @@ export default function AffiliatePage() {
           <div className="mt-4 flex flex-wrap gap-2">
             <a
               href={`https://zalo.me/share?url=${encodeURIComponent(partnerLink)}&title=${encodeURIComponent(
-                "Tập cùng mình trên BodiX — giảm 10% khi đăng ký!"
+                "Tập cùng mình trên BodiX – giảm 10% khi đăng ký!"
               )}`}
               target="_blank"
               rel="noopener noreferrer"

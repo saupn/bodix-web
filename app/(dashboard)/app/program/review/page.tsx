@@ -346,7 +346,7 @@ export default function SundayReviewPage() {
       {/* Page header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Review Chủ nhật — Tuần {weekNum}
+          Review Chủ nhật – Tuần {weekNum}
         </h1>
         <p className="mt-2 text-neutral-600">
           ~25 phút dành cho bản thân. Xem lại tuần qua, lắng nghe cơ thể, và chuẩn bị cho tuần mới.
@@ -426,7 +426,7 @@ export default function SundayReviewPage() {
               onClick={() => goToSection(2)}
               className="w-full rounded-xl bg-primary px-4 py-3.5 font-semibold text-white transition-colors hover:bg-primary-dark"
             >
-              Đã xem — Tiếp tục →
+              Đã xem – Tiếp tục →
             </button>
           </div>
         )}
@@ -476,7 +476,7 @@ export default function SundayReviewPage() {
             {/* Body map */}
             <div>
               <h3 className="font-heading font-semibold text-primary mb-1">
-                Body Scan — Cơ thể bạn hôm nay
+                Body Scan – Cơ thể bạn hôm nay
               </h3>
               <p className="text-sm text-neutral-500 mb-4">
                 Chạm vào từng vùng và chọn cảm giác
@@ -586,7 +586,7 @@ export default function SundayReviewPage() {
                   <p className="text-2xl font-bold text-primary">
                     {ws.avg_feeling != null
                       ? ws.avg_feeling.toFixed(1)
-                      : "—"}
+                      : "–"}
                   </p>
                   <p className="text-xs text-neutral-500">cảm giác TB</p>
                 </div>

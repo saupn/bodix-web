@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
   }
 
   const programName =
-    PROGRAMS[order.program as ProgramSlug]?.name ?? order.program ?? "—";
+    PROGRAMS[order.program as ProgramSlug]?.name ?? order.program ?? "–";
   const priceLabel =
-    typeof order.amount === "number" ? formatPrice(order.amount) : "—";
+    typeof order.amount === "number" ? formatPrice(order.amount) : "–";
 
   const result = await notifyAdmins({
     type: "system",
     title: "Đơn hàng mới",
-    body: `${userName} — ${programName} — ${priceLabel}`,
+    body: `${userName} – ${programName} – ${priceLabel}`,
     data: {
       kind: "order_created",
       order_id: String(order.id),

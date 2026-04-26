@@ -130,9 +130,9 @@ export default function FunnelAnalyticsPage() {
                           <tr key={s.step} className="border-b border-neutral-100">
                             <td className="px-4 py-2 text-sm">{s.label}</td>
                             <td className="px-4 py-2 text-right text-sm">{s.count}</td>
-                            <td className="px-4 py-2 text-right text-sm">{b?.count ?? "—"}</td>
+                            <td className="px-4 py-2 text-right text-sm">{b?.count ?? "–"}</td>
                             <td className={`px-4 py-2 text-right text-sm ${delta >= 0 ? "text-green-600" : "text-red-600"}`}>
-                              {b != null ? (delta >= 0 ? `+${delta}` : delta) : "—"}
+                              {b != null ? (delta >= 0 ? `+${delta}` : delta) : "–"}
                             </td>
                           </tr>
                         )

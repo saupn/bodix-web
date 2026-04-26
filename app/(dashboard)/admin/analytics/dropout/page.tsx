@@ -116,7 +116,7 @@ export default function DropoutAnalyticsPage() {
                 <p className="text-lg font-bold text-primary">Day {h.day_number}</p>
                 <p className="text-sm text-neutral-600">{h.signal_count} signals</p>
                 <p className="mt-2 text-xs text-amber-700">
-                  Gợi ý: {SIGNAL_HINTS[h.top_signal ?? ""] ?? h.top_signal ?? "—"}
+                  Gợi ý: {SIGNAL_HINTS[h.top_signal ?? ""] ?? h.top_signal ?? "–"}
                 </p>
               </div>
             ))}

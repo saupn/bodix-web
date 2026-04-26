@@ -61,7 +61,7 @@ export async function GET(
           .eq('cohort_id', cohortId)
           .then(() => null) as unknown as string[]
       )
-      .then(() => null),  // placeholder — handled separately below
+      .then(() => null),  // placeholder – handled separately below
   ])
 
   // Weekly feeling: fetch enrollment IDs first, then reviews

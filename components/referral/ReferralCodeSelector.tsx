@@ -128,7 +128,7 @@ export function ReferralCodeSelector({
   const showResult = selectedCode && !error;
 
   const shareMessage = displayCode
-    ? `Mình đang tập với BodiX — chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: https://bodix.fit?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
+    ? `Mình đang tập với BodiX – chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: https://bodix.fit?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
     : "";
 
   const shareZaloUrl = displayCode
@@ -179,16 +179,29 @@ export function ReferralCodeSelector({
               <div>
                 <p className="font-semibold text-neutral-900">🎁 Giới thiệu bạn bè</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
-                  <li>Mỗi bạn bè đăng ký qua link → bạn nhận voucher 100.000đ</li>
-                  <li>Bạn bè được giảm 10% khi đăng ký</li>
+                  <li>
+                    Mỗi bạn bè đăng ký qua link → bạn nhận voucher{" "}
+                    <span className="text-lg font-bold text-primary">100.000đ</span>
+                  </li>
+                  <li>
+                    Bạn bè được giảm{" "}
+                    <span className="text-lg font-bold text-primary">10%</span> khi đăng ký
+                  </li>
                   <li>Voucher dùng cho BodiX hoặc tặng tiếp cho người khác</li>
                 </ul>
               </div>
               <div>
-                <p className="font-semibold text-neutral-900">💰 Chương trình Cộng tác viên</p>
+                <p className="font-semibold text-neutral-900">💰 Chương trình Đối tác</p>
                 <p className="mt-1 text-neutral-600">(Dành cho người muốn kiếm thu nhập từ BodiX)</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
-                  <li>Hoa hồng 40% tiền mặt cho mỗi đơn đăng ký</li>
+                  <li>
+                    Hoa hồng{" "}
+                    <span className="text-lg font-bold text-primary">40%</span> tiền mặt cho mỗi đơn đăng ký
+                  </li>
+                  <li>
+                    Người đăng ký qua link đối tác được giảm{" "}
+                    <span className="text-lg font-bold text-primary">10%</span>
+                  </li>
                   <li>Đăng ký 1 click trong Dashboard sau khi đăng nhập</li>
                   <li>Theo dõi thu nhập realtime</li>
                   <li>
@@ -218,7 +231,7 @@ export function ReferralCodeSelector({
 
       <div>
         <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
-          Mời bạn bè tập cùng — nhận quà từ BodiX!
+          Mời bạn bè tập cùng – nhận quà từ BodiX!
         </h2>
         <p className="mt-1 text-sm text-neutral-600">
           Khi bạn bè đăng ký qua link của bạn, cả hai đều nhận ưu đãi. Chọn mã riêng theo tên bạn để bắt đầu.
@@ -302,9 +315,18 @@ export function ReferralCodeSelector({
       )}
 
       {showResult && (
-        <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4">
-          <p className="text-sm font-medium text-primary">Tin nhắn giới thiệu của bạn</p>
-          <p className="mt-1 whitespace-pre-wrap text-sm text-neutral-700">{shareMessage}</p>
+        <div>
+          <p className="mb-2 text-sm font-medium text-neutral-700">
+            Tin nhắn giới thiệu của bạn
+          </p>
+          <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-800">
+            <p>Mình đang tập với BodiX – chương trình 21 ngày thay đổi thật sự.</p>
+            <p className="mt-1">Bạn được giảm 10% khi đăng ký qua link này:</p>
+            <p className="mt-1 break-all font-medium text-primary">
+              https://bodix.fit?ref={displayCode}
+            </p>
+            <p className="mt-1">Tập thử 3 ngày miễn phí!</p>
+          </div>
           <div className="mt-3 flex flex-wrap gap-2">
             <button
               type="button"

@@ -124,7 +124,7 @@ export default function RevenueAnalyticsPage() {
           <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
             <p className="text-xs text-neutral-500">MoM Growth</p>
             <p className={`text-xl font-bold ${(s.mom_growth_percent ?? 0) >= 0 ? "text-green-600" : "text-red-600"}`}>
-              {s.mom_growth_percent != null ? `${s.mom_growth_percent}%` : "—"}
+              {s.mom_growth_percent != null ? `${s.mom_growth_percent}%` : "–"}
             </p>
           </div>
           <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">

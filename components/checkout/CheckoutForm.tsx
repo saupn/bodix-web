@@ -290,7 +290,7 @@ export function CheckoutForm({
         )}
         {!referralValidating && referralValid?.valid && referralLabel && (
           <p className="mt-1 text-sm text-success">
-            ✓ {referralLabel} — Giảm {referralValid.discount_amount?.toLocaleString("vi-VN")}đ
+            ✓ {referralLabel} – Giảm {referralValid.discount_amount?.toLocaleString("vi-VN")}đ
           </p>
         )}
         {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (

@@ -276,7 +276,7 @@ export default function ReviewHistoryPage() {
   timeline.push({
     type: "current",
     date: new Date().toISOString().slice(0, 10),
-    label: `📍 Ngày ${currentDay}/${totalDays} — Đang ở đây`,
+    label: `📍 Ngày ${currentDay}/${totalDays} – Đang ở đây`,
   });
 
   const chartData = Array.from(

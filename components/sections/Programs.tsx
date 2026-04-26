@@ -7,7 +7,7 @@ export function Programs() {
     <section id="programs" className="py-12 md:py-20 lg:py-24 bg-secondary">
       <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
-          title="3 hành trình — Chọn hành trình phù hợp với bạn"
+          title="3 hành trình – Chọn hành trình phù hợp với bạn"
         />
         <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
           {PROGRAMS.map((program) => (

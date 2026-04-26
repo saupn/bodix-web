@@ -100,7 +100,7 @@ export async function POST(request: NextRequest) {
       balance_after: newBalance,
       transaction_type: 'withdrawal',
       withdrawal_status: 'pending',
-      description: `Yêu cầu rút tiền — ${affiliate.bank_name ?? ''} ${affiliate.bank_account_number}`,
+      description: `Yêu cầu rút tiền – ${affiliate.bank_name ?? ''} ${affiliate.bank_account_number}`,
     })
     .select('id')
     .single()

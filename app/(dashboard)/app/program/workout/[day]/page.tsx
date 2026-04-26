@@ -42,9 +42,9 @@ const WORKOUT_TYPE_LABEL: Record<string, string> = {
 };
 
 const MODE_DESCRIPTIONS: Record<string, string> = {
-  hard: "Đầy đủ cường độ — cho ngày bạn tràn đầy năng lượng",
-  light: "Giảm cường độ — cho ngày bạn cần nhẹ nhàng hơn",
-  recovery: "Phục hồi — stretching và thư giãn",
+  hard: "Đầy đủ cường độ – cho ngày bạn tràn đầy năng lượng",
+  light: "Giảm cường độ – cho ngày bạn cần nhẹ nhàng hơn",
+  recovery: "Phục hồi – stretching và thư giãn",
 };
 
 const FEELING_OPTIONS = [
@@ -249,7 +249,7 @@ export default function ProgramWorkoutPage() {
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Ngày {day} — {workout.title}
+          Ngày {day} – {workout.title}
         </h1>
         {workout.description && (
           <p className="mt-1 text-sm text-neutral-400">{workout.description}</p>
@@ -303,7 +303,7 @@ export default function ProgramWorkoutPage() {
                     : "border-2 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
                 }`}
               >
-                {emoji} {opt.label} — {rounds} lượt (~{dur} phút)
+                {emoji} {opt.label} – {rounds} lượt (~{dur} phút)
               </button>
             );
           })}
@@ -358,7 +358,7 @@ export default function ProgramWorkoutPage() {
                       ? `${ex.sets ?? 1} × ${ex.duration_seconds}s`
                       : ex.sets != null
                       ? `${ex.sets} sets`
-                      : "—"}
+                      : "–"}
                   </p>
                 </div>
               </li>
@@ -389,11 +389,11 @@ export default function ProgramWorkoutPage() {
               <span className="font-medium text-success">✓ Đã hoàn thành</span>
               {completedData && (
                 <>
-                  <span className="text-neutral-500">—</span>
+                  <span className="text-neutral-500">–</span>
                   <span className="text-neutral-600 capitalize">
                     {completedData.mode}
                   </span>
-                  <span className="text-neutral-500">—</span>
+                  <span className="text-neutral-500">–</span>
                   <span>
                     {FEELING_OPTIONS.find((f) => f.value === completedData.feeling)
                       ?.emoji}{" "}

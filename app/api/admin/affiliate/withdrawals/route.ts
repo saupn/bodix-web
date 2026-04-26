@@ -70,12 +70,12 @@ export async function GET(request: NextRequest) {
     const status = w.withdrawal_status ?? "pending";
     return {
       id: w.id,
-      affiliate_name: profile?.full_name ?? "—",
+      affiliate_name: profile?.full_name ?? "–",
       user_id: w.user_id,
       amount: Math.abs(w.amount),
-      bank_name: bank?.bank_name ?? "—",
-      bank_account: bank?.bank_account_number ?? "—",
-      bank_account_name: bank?.bank_account_name ?? "—",
+      bank_name: bank?.bank_name ?? "–",
+      bank_account: bank?.bank_account_number ?? "–",
+      bank_account_name: bank?.bank_account_name ?? "–",
       requested_at: w.created_at,
       status,
     };

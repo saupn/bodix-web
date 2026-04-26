@@ -61,7 +61,7 @@ export async function GET(request: NextRequest) {
     id: c.id,
     code: c.code,
     user_id: c.user_id,
-    user_name: profileMap.get(c.user_id)?.full_name ?? "—",
+    user_name: profileMap.get(c.user_id)?.full_name ?? "–",
     code_type: c.code_type,
     clicks: c.total_clicks ?? 0,
     signups: c.total_signups ?? 0,

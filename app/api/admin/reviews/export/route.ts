@@ -286,7 +286,7 @@ function generateScript(input: ScriptInput): string {
   const lines: string[] = [];
 
   // PHẦN 1 — MỞ ĐẦU
-  lines.push("PHẦN 1 — MỞ ĐẦU (~30 giây)");
+  lines.push("PHẦN 1 – MỞ ĐẦU (~30 giây)");
   lines.push(
     `"Chào mừng các bạn đến với Review Tuần ${weekNumber} của ${cohortName}."`
   );
@@ -297,19 +297,19 @@ function generateScript(input: ScriptInput): string {
   } else if (pct5 >= 50) {
     completionComment = "Đa số các bạn đã hoàn thành rất tốt.";
   } else if (pct5 >= 30) {
-    completionComment = "Có tiến bộ — nhưng chúng ta có thể làm tốt hơn.";
+    completionComment = "Có tiến bộ – nhưng chúng ta có thể làm tốt hơn.";
   } else {
     completionComment =
-      "Tuần này hơi khó khăn — nhưng quan trọng là các bạn vẫn ở đây.";
+      "Tuần này hơi khó khăn – nhưng quan trọng là các bạn vẫn ở đây.";
   }
 
   lines.push(
-    `"Tuần này, ${pct5}% thành viên đã hoàn thành đủ 5 buổi tập — ${completionComment}"`
+    `"Tuần này, ${pct5}% thành viên đã hoàn thành đủ 5 buổi tập – ${completionComment}"`
   );
 
   if (maxStreak >= 7 && maxStreakUser) {
     lines.push(
-      `"Streak cao nhất tuần này là ${maxStreak} ngày từ ${maxStreakUser} — xin chúc mừng!"`
+      `"Streak cao nhất tuần này là ${maxStreak} ngày từ ${maxStreakUser} – xin chúc mừng!"`
     );
   }
   lines.push("");
@@ -334,7 +334,7 @@ function generateScript(input: ScriptInput): string {
   }
 
   if (questionsByCategory.size > 0) {
-    lines.push("PHẦN 2 — GIẢI ĐÁP CÂU HỎI (~3-5 phút)");
+    lines.push("PHẦN 2 – GIẢI ĐÁP CÂU HỎI (~3-5 phút)");
 
     const categoryOrder = [
       "form_check",
@@ -372,43 +372,43 @@ function generateScript(input: ScriptInput): string {
       }
 
       for (const q of catQuestions) {
-        lines.push(`  - "${q.content}" — ${q.user_name}`);
+        lines.push(`  - "${q.content}" – ${q.user_name}`);
         lines.push("    → [Gợi ý trả lời: ...]");
       }
     }
     lines.push("");
   } else {
-    lines.push("PHẦN 2 — GIẢI ĐÁP CÂU HỎI");
-    lines.push("(Không có câu hỏi tuần này — có thể bỏ qua phần này)");
+    lines.push("PHẦN 2 – GIẢI ĐÁP CÂU HỎI");
+    lines.push("(Không có câu hỏi tuần này – có thể bỏ qua phần này)");
     lines.push("");
   }
 
   // PHẦN 3 — NHẬN XÉT CHUNG
-  lines.push("PHẦN 3 — NHẬN XÉT CHUNG (~1 phút)");
+  lines.push("PHẦN 3 – NHẬN XÉT CHUNG (~1 phút)");
   if (weekNumber === 1) {
     lines.push(
-      `"Tuần đầu tiên luôn là tuần quan trọng nhất. Các bạn đã bước qua rào cản lớn nhất — đó là bắt đầu."`
+      `"Tuần đầu tiên luôn là tuần quan trọng nhất. Các bạn đã bước qua rào cản lớn nhất – đó là bắt đầu."`
     );
     lines.push(
-      `"Tuần tới, hãy tập trung vào việc duy trì thói quen. Không cần hoàn hảo — chỉ cần đều đặn."`
+      `"Tuần tới, hãy tập trung vào việc duy trì thói quen. Không cần hoàn hảo – chỉ cần đều đặn."`
     );
   } else if (weekNumber === 2) {
     lines.push(
-      `"Tuần 2 là lúc cơ thể bắt đầu quen dần. Nếu bạn thấy bớt đau cơ hơn tuần 1 — đó là dấu hiệu tốt."`
+      `"Tuần 2 là lúc cơ thể bắt đầu quen dần. Nếu bạn thấy bớt đau cơ hơn tuần 1 – đó là dấu hiệu tốt."`
     );
     lines.push(
-      `"Hãy bắt đầu chú ý đến form nhiều hơn — vì giờ cơ thể đã đủ sức để tập đúng hơn."`
+      `"Hãy bắt đầu chú ý đến form nhiều hơn – vì giờ cơ thể đã đủ sức để tập đúng hơn."`
     );
   } else if (weekNumber === 3) {
     lines.push(
-      `"Tuần 3 — đây là thời điểm mà nhiều người bắt đầu cảm thấy 'bình thường hóa' việc tập. Đó chính là thói quen đang hình thành."`
+      `"Tuần 3 – đây là thời điểm mà nhiều người bắt đầu cảm thấy 'bình thường hóa' việc tập. Đó chính là thói quen đang hình thành."`
     );
     lines.push(
-      `"Streak trung bình hiện tại là ${avgStreak} ngày — với ${totalMembers} thành viên, đó là con số đáng tự hào."`
+      `"Streak trung bình hiện tại là ${avgStreak} ngày – với ${totalMembers} thành viên, đó là con số đáng tự hào."`
     );
   } else {
     lines.push(
-      `"Chúng ta đã ở tuần ${weekNumber}. Nhìn lại chặng đường ${weekNumber} tuần, các bạn đã thay đổi rất nhiều — dù có thể chưa nhận ra."`
+      `"Chúng ta đã ở tuần ${weekNumber}. Nhìn lại chặng đường ${weekNumber} tuần, các bạn đã thay đổi rất nhiều – dù có thể chưa nhận ra."`
     );
     lines.push(
       `"Streak trung bình: ${avgStreak} ngày. ${completed5}/${totalMembers} người hoàn thành đủ 5 buổi. Đó là kỷ luật."`
@@ -417,7 +417,7 @@ function generateScript(input: ScriptInput): string {
   lines.push("");
 
   // PHẦN 4 — PREVIEW TUẦN TỚI
-  lines.push("PHẦN 4 — PREVIEW TUẦN TỚI (~30 giây)");
+  lines.push("PHẦN 4 – PREVIEW TUẦN TỚI (~30 giây)");
   lines.push(
     `"Tuần ${weekNumber + 1}, chúng ta sẽ..."`
   );

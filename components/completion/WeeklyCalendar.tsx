@@ -111,7 +111,7 @@ function DayCell({ dayNumber, totalDays, data, isCurrentDay }: DayCellProps) {
   if (dayNumber > totalDays) {
     return (
       <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-100/50 text-neutral-300 sm:h-12 sm:w-12">
-        —
+        –
       </div>
     );
   }

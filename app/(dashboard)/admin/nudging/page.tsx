@@ -231,7 +231,7 @@ export default function AdminNudgingPage() {
     <div className="min-h-screen bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="font-heading text-2xl font-bold text-primary">
-          Admin — Hệ thống Nudging
+          Admin – Hệ thống Nudging
         </h1>
 
         <div className="mt-6 flex gap-2 border-b border-neutral-200">
@@ -388,7 +388,7 @@ export default function AdminNudgingPage() {
                           {row.daysMissed}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
-                          {row.lastCheckin ?? "—"}
+                          {row.lastCheckin ?? "–"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{row.status}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-right">
@@ -512,16 +512,16 @@ export default function AdminNudgingPage() {
                           <td className="whitespace-nowrap px-4 py-3 text-sm">{r.nudge_type}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-sm">{r.channel}</td>
                           <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
-                            {r.sent_at ? new Date(r.sent_at).toLocaleString("vi-VN") : "—"}
+                            {r.sent_at ? new Date(r.sent_at).toLocaleString("vi-VN") : "–"}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            {r.delivered ? "✓" : "—"}
+                            {r.delivered ? "✓" : "–"}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            {r.opened ? "✓" : "—"}
+                            {r.opened ? "✓" : "–"}
                           </td>
                           <td className="whitespace-nowrap px-4 py-3 text-sm">
-                            {r.led_to_checkin ? "✓" : "—"}
+                            {r.led_to_checkin ? "✓" : "–"}
                           </td>
                         </tr>
                       ))}
@@ -660,14 +660,14 @@ export default function AdminNudgingPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.userName}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.trigger_reason}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">
-                          {r.risk_score_at_trigger ?? "—"}
+                          {r.risk_score_at_trigger ?? "–"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.action_taken}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.outcome}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
                           {r.created_at
                             ? new Date(r.created_at).toLocaleString("vi-VN")
-                            : "—"}
+                            : "–"}
                         </td>
                       </tr>
                     ))}
@@ -684,7 +684,7 @@ export default function AdminNudgingPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
           <div className="w-full max-w-md rounded-xl bg-white p-6 shadow-xl">
             <h3 className="font-heading font-semibold text-primary">
-              Can thiệp thủ công — {modalEnrollment.userName}
+              Can thiệp thủ công – {modalEnrollment.userName}
             </h3>
             <p className="mt-1 text-sm text-neutral-600">
               {modalEnrollment.programName} • Ngày {modalEnrollment.day}

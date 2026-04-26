@@ -155,7 +155,7 @@ export default function AdminReviewsPage() {
           <option value="">Tất cả cohort</option>
           {cohorts.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.programs?.name || "Program"} — {c.start_date}
+              {c.programs?.name || "Program"} – {c.start_date}
             </option>
           ))}
         </select>
@@ -323,14 +323,14 @@ function QuestionsTab({ cohortId, week }: { cohortId: string; week: string }) {
                   <td className="whitespace-nowrap px-3 py-2">
                     {new Date(q.created_at).toLocaleDateString("vi-VN")}
                   </td>
-                  <td className="px-3 py-2">{q.profiles?.full_name || "—"}</td>
+                  <td className="px-3 py-2">{q.profiles?.full_name || "–"}</td>
                   <td className="px-3 py-2">{MESSAGE_TYPE_ICONS[q.message_type] || "📝"}</td>
                   <td className="px-3 py-2">
                     <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${CATEGORY_CONFIG[q.category]?.color || "bg-neutral-100"}`}>
                       {CATEGORY_CONFIG[q.category]?.label || q.category}
                     </span>
                   </td>
-                  <td className="max-w-xs truncate px-3 py-2">{q.content || "—"}</td>
+                  <td className="max-w-xs truncate px-3 py-2">{q.content || "–"}</td>
                   <td className="px-3 py-2">
                     {q.media_url ? (
                       <a
@@ -342,7 +342,7 @@ function QuestionsTab({ cohortId, week }: { cohortId: string; week: string }) {
                         Xem
                       </a>
                     ) : (
-                      "—"
+                      "–"
                     )}
                   </td>
                   <td className="px-3 py-2">
@@ -513,7 +513,7 @@ function VideosTab({
             <option value="">Chọn cohort</option>
             {cohorts.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.programs?.name || "Program"} — {c.start_date}
+                {c.programs?.name || "Program"} – {c.start_date}
               </option>
             ))}
           </select>
@@ -540,7 +540,7 @@ function VideosTab({
             type="text"
             value={formTitle}
             onChange={(e) => setFormTitle(e.target.value)}
-            placeholder="Tiêu đề (VD: Review Tuần 1 — Cohort #3)"
+            placeholder="Tiêu đề (VD: Review Tuần 1 – Cohort #3)"
             className="rounded-lg border border-neutral-300 px-3 py-2 text-sm sm:col-span-2"
           />
           <textarea
@@ -604,8 +604,8 @@ function VideosTab({
                 <div className="space-y-1">
                   <p className="font-medium">{v.title}</p>
                   <p className="text-xs text-neutral-500">
-                    Tuần {v.week_number} | {v.programs?.name || "—"} |{" "}
-                    {v.duration_minutes ? `${v.duration_minutes} phút` : "—"}
+                    Tuần {v.week_number} | {v.programs?.name || "–"} |{" "}
+                    {v.duration_minutes ? `${v.duration_minutes} phút` : "–"}
                   </p>
                   {v.topics_covered?.length > 0 && (
                     <div className="flex flex-wrap gap-1">
@@ -881,7 +881,7 @@ function VideoExportTab({
   const buildSummaryText = () => {
     if (!stats) return "";
     return [
-      `REVIEW TUẦN ${stats.week_number} — ${stats.cohort_name}`,
+      `REVIEW TUẦN ${stats.week_number} – ${stats.cohort_name}`,
       `Số thành viên: ${stats.total_members}`,
       `Hoàn thành 5/5: ${stats.completed_5} người (${stats.pct_5}%)`,
       `Hoàn thành 3-4/5: ${stats.completed_3_4} người (${stats.pct_3_4}%)`,
@@ -910,7 +910,7 @@ function VideoExportTab({
       lines.push("");
       lines.push(`${emoji} ${label} (${catQs.length} câu):`);
       catQs.forEach((q, i) => {
-        lines.push(`${i + 1}. "${q.content}" — ${q.user_name}`);
+        lines.push(`${i + 1}. "${q.content}" – ${q.user_name}`);
       });
     }
 
@@ -920,7 +920,7 @@ function VideoExportTab({
   const buildSelectedQuestionsText = () => {
     const selected = questions.filter((q) => selectedQuestions.has(q.id) && q.content);
     if (selected.length === 0) return "";
-    return selected.map((q, i) => `${i + 1}. "${q.content}" — ${q.user_name}`).join("\n");
+    return selected.map((q, i) => `${i + 1}. "${q.content}" – ${q.user_name}`).join("\n");
   };
 
   // ── Group questions by category ──
@@ -948,7 +948,7 @@ function VideoExportTab({
             <option value="">Chọn cohort</option>
             {cohorts.map((c) => (
               <option key={c.id} value={c.id}>
-                {c.programs?.name || "Program"} — {c.start_date}
+                {c.programs?.name || "Program"} – {c.start_date}
               </option>
             ))}
           </select>
@@ -977,7 +977,7 @@ function VideoExportTab({
       {/* Header + Selectors */}
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="text-lg font-semibold">
-          Chuẩn bị nội dung dựng video — Tuần {exportWeek}
+          Chuẩn bị nội dung dựng video – Tuần {exportWeek}
         </h2>
         <select
           value={exportCohort}
@@ -987,7 +987,7 @@ function VideoExportTab({
           <option value="">Chọn cohort</option>
           {cohorts.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.programs?.name || "Program"} — {c.start_date}
+              {c.programs?.name || "Program"} – {c.start_date}
             </option>
           ))}
         </select>
@@ -1024,7 +1024,7 @@ function VideoExportTab({
             </div>
             <div className="rounded-lg bg-neutral-50 p-4 font-mono text-sm leading-relaxed">
               <p className="font-bold">
-                REVIEW TUẦN {stats.week_number} — {stats.cohort_name}
+                REVIEW TUẦN {stats.week_number} – {stats.cohort_name}
               </p>
               <p>Số thành viên: {stats.total_members}</p>
               <p>
@@ -1116,7 +1116,7 @@ function VideoExportTab({
                               className="mt-0.5 rounded border-neutral-300"
                             />
                             <span>
-                              {i + 1}. &ldquo;{q.content}&rdquo; — {q.user_name}
+                              {i + 1}. &ldquo;{q.content}&rdquo; – {q.user_name}
                               {q.media_url && (
                                 <a
                                   href={q.media_url}
@@ -1150,7 +1150,7 @@ function VideoExportTab({
               </button>
             </div>
             <p className="text-xs text-neutral-500">
-              Script chỉ là gợi ý — hãy chỉnh sửa trước khi dựng video.
+              Script chỉ là gợi ý – hãy chỉnh sửa trước khi dựng video.
             </p>
             <div className="rounded-lg bg-blue-50 p-4 font-mono text-sm leading-relaxed whitespace-pre-wrap">
               {script || "Không có dữ liệu để tạo script."}

@@ -68,8 +68,8 @@ export async function GET(request: NextRequest) {
   const codeMap = new Map((codesRes.data ?? []).map((c) => [c.id, c]));
 
   const conversions = trackings.map((t) => {
-    const referrerName = profileMap.get(t.referrer_id)?.full_name ?? "—";
-    const referredName = t.referred_id ? (profileMap.get(t.referred_id)?.full_name ?? "—") : "—";
+    const referrerName = profileMap.get(t.referrer_id)?.full_name ?? "–";
+    const referredName = t.referred_id ? (profileMap.get(t.referred_id)?.full_name ?? "–") : "–";
     const amount = t.conversion_amount ?? 0;
     const code = t.referral_code_id ? codeMap.get(t.referral_code_id) : null;
     const discountPct = code?.referee_reward_type === "discount_percent" ? (code.referee_reward_value ?? 0) : 0;
@@ -81,7 +81,7 @@ export async function GET(request: NextRequest) {
       date: t.converted_at ?? t.signed_up_at ?? t.clicked_at,
       referrer_name: referrerName,
       referee_name: referredName,
-      program: programMap.get(t.program_id) ?? "—",
+      program: programMap.get(t.program_id) ?? "–",
       amount,
       discount,
       reward: t.status === "converted" || t.status === "completed" ? reward : 0,

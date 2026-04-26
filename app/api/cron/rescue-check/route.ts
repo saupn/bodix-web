@@ -24,7 +24,7 @@ function buildL2Message(name: string, completedDays: number): string {
   return (
     `${name} ơi, bạn đã đi được ${completedDays} ngày rồi.\n` +
     `Mình hiểu có lúc bận hoặc mệt.\n` +
-    `Chỉ cần 1 lượt — 7 phút — chuỗi ngày tập vẫn giữ.\n` +
+    `Chỉ cần 1 lượt – 7 phút – chuỗi ngày tập vẫn giữ.\n` +
     `Quan trọng là không dừng lại nha.\n` +
     `Nhắn 1 nếu bạn muốn tiếp tục!`
   );
@@ -196,7 +196,7 @@ export async function GET(request: NextRequest) {
             {
               type: 'rescueDay3',
               title: `${displayName} ơi, mình nhớ bạn 💚`,
-              body: `Bạn đã đi được ${completedDays} ngày — chỉ 1 lượt là quay lại ngay!`,
+              body: `Bạn đã đi được ${completedDays} ngày – chỉ 1 lượt là quay lại ngay!`,
               data: {
                 days_missed: String(daysMissed),
                 completed_days: String(completedDays),
@@ -232,7 +232,7 @@ export async function GET(request: NextRequest) {
           await insertSupportSystemMessage(
             supabase,
             profile.id,
-            `${displayName} ơi, mình nhớ bạn 💚\nBạn đã đi được ${completedDays} ngày — chỉ 1 lượt là quay lại ngay!`,
+            `${displayName} ơi, mình nhớ bạn 💚\nBạn đã đi được ${completedDays} ngày – chỉ 1 lượt là quay lại ngay!`,
           );
         } else {
           stats.errors++;
@@ -262,7 +262,7 @@ export async function GET(request: NextRequest) {
               {
                 type: 'system',
                 title: `Buddy ${userFullName} cần bạn động viên`,
-                body: `${userFullName} đã nghỉ ${daysMissed} ngày — nhắn hoặc gọi cho bạn ấy nha 🙏`,
+                body: `${userFullName} đã nghỉ ${daysMissed} ngày – nhắn hoặc gọi cho bạn ấy nha 🙏`,
                 data: {
                   days_missed: String(daysMissed),
                   buddy_id: buddy.id,

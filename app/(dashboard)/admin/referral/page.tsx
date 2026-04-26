@@ -161,7 +161,7 @@ export default function AdminReferralPage() {
     <div className="min-h-screen bg-neutral-50">
       <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
         <h1 className="font-heading text-2xl font-bold text-primary">
-          Admin — Referral & Affiliate
+          Admin – Referral & Affiliate
         </h1>
 
         <div className="mt-6 flex gap-2 border-b border-neutral-200">
@@ -223,7 +223,7 @@ export default function AdminReferralPage() {
                     <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                       <p className="text-sm text-neutral-500">Voucher đã phát</p>
                       <p className="mt-1 text-2xl font-bold text-primary">
-                        {voucherStats ? voucherStats.total_issued : "—"}
+                        {voucherStats ? voucherStats.total_issued : "–"}
                       </p>
                     </div>
                     <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -231,19 +231,19 @@ export default function AdminReferralPage() {
                       <p className="mt-1 text-2xl font-bold text-primary">
                         {voucherStats
                           ? `${voucherStats.outstanding_amount.toLocaleString("vi-VN")}đ`
-                          : "—"}
+                          : "–"}
                       </p>
                     </div>
                     <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                       <p className="text-sm text-neutral-500">Voucher đã dùng</p>
                       <p className="mt-1 text-2xl font-bold text-primary">
-                        {voucherStats ? voucherStats.used_count : "—"}
+                        {voucherStats ? voucherStats.used_count : "–"}
                       </p>
                     </div>
                     <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
                       <p className="text-sm text-neutral-500">Voucher hết hạn</p>
                       <p className="mt-1 text-2xl font-bold text-primary">
-                        {voucherStats ? voucherStats.expired_count : "—"}
+                        {voucherStats ? voucherStats.expired_count : "–"}
                       </p>
                     </div>
                   </div>
@@ -372,7 +372,7 @@ export default function AdminReferralPage() {
                           {r.revenue.toLocaleString("vi-VN")}đ
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">
-                          {r.is_active ? "✓" : "—"}
+                          {r.is_active ? "✓" : "–"}
                         </td>
                       </tr>
                     ))}
@@ -484,7 +484,7 @@ export default function AdminReferralPage() {
                         <td className="whitespace-nowrap px-4 py-3 text-sm text-neutral-600">
                           {r.date
                             ? new Date(r.date).toLocaleString("vi-VN")
-                            : "—"}
+                            : "–"}
                         </td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.referrer_name}</td>
                         <td className="whitespace-nowrap px-4 py-3 text-sm">{r.referee_name}</td>

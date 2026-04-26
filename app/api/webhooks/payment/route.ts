@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
   const isStripe = request.headers.has('stripe-signature')
   const isVNPay = new URL(request.url).searchParams.has('vnp_ResponseCode')
 
-  console.log(`[webhooks/payment] received — provider: ${isStripe ? 'stripe' : isVNPay ? 'vnpay' : 'unknown'}`)
+  console.log(`[webhooks/payment] received – provider: ${isStripe ? 'stripe' : isVNPay ? 'vnpay' : 'unknown'}`)
 
   // Placeholder: luôn trả 200 để provider không retry liên tục
   return NextResponse.json({

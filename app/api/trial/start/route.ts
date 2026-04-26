@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       {
         error:
-          'Đợt tập sắp tới quá gần — không đủ 3 ngày cho tập thử. Vui lòng chờ đợt cohort tiếp theo.',
+          'Đợt tập sắp tới quá gần – không đủ 3 ngày cho tập thử. Vui lòng chờ đợt cohort tiếp theo.',
         code: 'cohort_too_soon',
       },
       { status: 409 }

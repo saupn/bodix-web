@@ -642,7 +642,7 @@ export default function CommunityPage() {
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <h1 className="font-heading text-2xl font-bold text-primary">
-              Bảng tin — {boardData.cohort_name}
+              Bảng tin – {boardData.cohort_name}
             </h1>
             <button
               type="button"

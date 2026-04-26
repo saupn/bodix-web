@@ -6,7 +6,7 @@ export const WORKOUT_VIDEOS = {
     nameVi: 'Nền tảng thân dưới',
     vimeoUrl: 'https://vimeo.com/1169317064/e0a82f5344',
     duration: 7,
-    focus: 'Mông, đùi, bắp chân — xây dựng nền tảng vững chắc',
+    focus: 'Mông, đùi, bắp chân – xây dựng nền tảng vững chắc',
   },
   B: {
     id: 'B',
@@ -14,7 +14,7 @@ export const WORKOUT_VIDEOS = {
     nameVi: 'Thân trên & Tư thế',
     vimeoUrl: 'https://vimeo.com/1169317210/227fb73582',
     duration: 7,
-    focus: 'Vai, tay, ngực — cải thiện tư thế hàng ngày',
+    focus: 'Vai, tay, ngực – cải thiện tư thế hàng ngày',
   },
   C: {
     id: 'C',
@@ -22,7 +22,7 @@ export const WORKOUT_VIDEOS = {
     nameVi: 'Cardio nhẹ nhàng',
     vimeoUrl: 'https://vimeo.com/1169317274/42f46543a5',
     duration: 7,
-    focus: 'Tim mạch, sức bền — không tác động mạnh khớp',
+    focus: 'Tim mạch, sức bền – không tác động mạnh khớp',
   },
   D: {
     id: 'D',
@@ -30,7 +30,7 @@ export const WORKOUT_VIDEOS = {
     nameVi: 'Cơ trung tâm & Cân bằng',
     vimeoUrl: 'https://vimeo.com/1169317372/4fb61db503',
     duration: 7,
-    focus: 'Bụng, lưng, cơ sâu — ổn định cơ thể',
+    focus: 'Bụng, lưng, cơ sâu – ổn định cơ thể',
   },
   E: {
     id: 'E',
@@ -38,7 +38,7 @@ export const WORKOUT_VIDEOS = {
     nameVi: 'Toàn thân linh hoạt',
     vimeoUrl: 'https://vimeo.com/1169317406/e53a1410d5',
     duration: 7,
-    focus: 'Kết hợp toàn thân — chuyển động liên tục',
+    focus: 'Kết hợp toàn thân – chuyển động liên tục',
   },
   F: {
     id: 'F',
@@ -58,7 +58,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Sức mạnh thân dưới',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Đùi, mông — tăng sức mạnh, tạo đường nét',
+    focus: 'Đùi, mông – tăng sức mạnh, tạo đường nét',
   },
   'B+': {
     id: 'B+',
@@ -66,7 +66,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Sức mạnh thân trên',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Vai, tay, lưng — nâng cao sức mạnh',
+    focus: 'Vai, tay, lưng – nâng cao sức mạnh',
   },
   'C+': {
     id: 'C+',
@@ -74,7 +74,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Cardio đốt mỡ',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Cường độ cao hơn — đốt cháy calo tối đa',
+    focus: 'Cường độ cao hơn – đốt cháy calo tối đa',
   },
   'D+': {
     id: 'D+',
@@ -82,7 +82,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Cơ trung tâm & Thể lực',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Bụng, lưng nâng cao — xây dựng thể lực',
+    focus: 'Bụng, lưng nâng cao – xây dựng thể lực',
   },
   'E+': {
     id: 'E+',
@@ -90,7 +90,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Toàn thân sức mạnh',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Toàn thân cường độ cao — explosive movements',
+    focus: 'Toàn thân cường độ cao – explosive movements',
   },
   'F+': {
     id: 'F+',
@@ -98,7 +98,7 @@ export const ADVANCED_VIDEOS = {
     nameVi: 'Đốt cháy tối đa',
     vimeoUrl: null as string | null,
     duration: 7,
-    focus: 'Tổng hợp cường độ cao nhất — thử thách giới hạn',
+    focus: 'Tổng hợp cường độ cao nhất – thử thách giới hạn',
   },
 } as const;
 

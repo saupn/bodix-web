@@ -3,7 +3,7 @@ import { SectionHeading } from "@/components/ui/SectionHeading";
 
 const FOR_YOU_ITEMS = [
   "Bạn muốn tập tại nhà, không cần đến phòng gym",
-  "Bạn đã từng tập rồi bỏ — nhiều lần",
+  "Bạn đã từng tập rồi bỏ – nhiều lần",
   "Bạn bận rộn nhưng muốn dành 10-25 phút mỗi ngày cho bản thân",
   "Bạn muốn có người đồng hành, không tập một mình",
   "Bạn muốn thấy kết quả, không chỉ \"tập cho có\"",
@@ -29,7 +29,7 @@ export function Comparison() {
         </div>
         <div className="mt-8 sm:mt-10 max-w-2xl mx-auto rounded-lg bg-secondary-light p-4 sm:p-5 text-center">
           <p className="text-sm text-neutral-900 leading-relaxed">
-            Chương trình hiện tại dành cho Nữ. Phiên bản Nam sắp ra mắt —{" "}
+            Chương trình hiện tại dành cho Nữ. Phiên bản Nam sắp ra mắt –{" "}
             <Link
               href="/signup"
               className="font-medium text-primary hover:underline"

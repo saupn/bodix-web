@@ -86,11 +86,11 @@ function buildMainMessage(
 ): string {
   const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
   const weekStartTip = isWeekStart
-    ? '\n\n💡 Tuần này có thắc mắc gì — nhắn mình bất cứ lúc nào nha!'
+    ? '\n\n💡 Tuần này có thắc mắc gì – nhắn mình bất cứ lúc nào nha!'
     : '';
 
   return (
-    `Hi ${name}! 🌸 Ngày ${dayNumber}/${totalDays} — hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
+    `Hi ${name}! 🌸 Ngày ${dayNumber}/${totalDays} – hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
     `▶️ Xem video: https://bodix.fit/app/program/workout/${dayNumber}\n` +
@@ -112,11 +112,11 @@ function buildRecoveryMessage(
   isWeekStart: boolean,
 ): string {
   const weekStartTip = isWeekStart
-    ? '\n\n💡 Tuần này có thắc mắc gì — nhắn mình bất cứ lúc nào nha!'
+    ? '\n\n💡 Tuần này có thắc mắc gì – nhắn mình bất cứ lúc nào nha!'
     : '';
 
   return (
-    `Hi ${name}! 🧘 Ngày ${dayNumber}/${totalDays} — hôm nay nhẹ nhàng thôi nha.\n` +
+    `Hi ${name}! 🧘 Ngày ${dayNumber}/${totalDays} – hôm nay nhẹ nhàng thôi nha.\n` +
     `\n` +
     `Recovery giúp cơ thể phục hồi. 1 lượt (~7 phút).\n` +
     `\n` +
@@ -140,11 +140,11 @@ function buildTrialMainMessage(
 ): string {
   const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
   const weekTip = isWeekStart
-    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha — đang tập thử mà, thoải mái đi!'
+    ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha – đang tập thử mà, thoải mái đi!'
     : '';
 
   return (
-    `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
+    `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
     `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
@@ -154,7 +154,7 @@ function buildTrialMainMessage(
     `  2 → 2 lượt (~14 phút)\n` +
     `  1 → 1 lượt (~7 phút)\n` +
     `\n` +
-    `Cả 3 đều tính hoàn thành — cứ từ từ, quan trọng là bạn không bỏ cuộc! 💪` +
+    `Cả 3 đều tính hoàn thành – cứ từ từ, quan trọng là bạn không bỏ cuộc! 💪` +
     weekTip
   );
 }
@@ -169,7 +169,7 @@ function buildTrialRecoveryMessage(
     : '';
 
   return (
-    `Chào ${name}! 🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — hôm nay cho cơ thể phục hồi nhẹ nhàng thôi nha.\n` +
+    `Chào ${name}! 🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – hôm nay cho cơ thể phục hồi nhẹ nhàng thôi nha.\n` +
     `\n` +
     `Recovery ~7 phút một lượt.\n` +
     `\n` +
@@ -295,7 +295,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       // Lớp 1: in-memory dedup — nếu vì lý do gì đó user đã được gửi trong cùng run
       if (sentUserIds.has(userId)) {
         console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
-        skip(userId, 'trial: DEDUP in-memory — already sent in this run');
+        skip(userId, 'trial: DEDUP in-memory – already sent in this run');
         continue;
       }
 
@@ -374,8 +374,8 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
       // Chat mirror — hiện trong BodiX Support history (app user)
       const chatContent = isRecovery
-        ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — Recovery\nHôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)`
-        : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử — ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
+        ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
+        : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
 
       // BƯỚC 1: Ưu tiên Zalo
       let zaloDone = false;
@@ -417,10 +417,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       if (fcmToken) {
         try {
           const pushTitle = isRecovery
-            ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử — Recovery 🧘`
-            : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử — ${workout.title}`;
+            ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery 🧘`
+            : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}`;
           const pushBody = isRecovery
-            ? 'Hôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)'
+            ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
             : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
           const result = await sendFcmMessage(
@@ -551,7 +551,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     // Lớp 1: in-memory dedup — quan trọng nhất cho case user có cả trial và active enrollment
     if (sentUserIds.has(userId)) {
       console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
-      skip(userId, 'active: DEDUP in-memory — already sent in trial loop or earlier');
+      skip(userId, 'active: DEDUP in-memory – already sent in trial loop or earlier');
       continue;
     }
 
@@ -618,8 +618,8 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     // Chat mirror — hiện trong BodiX Support history (app user)
     const chatContent = isRecovery
-      ? `🧘 Ngày ${dayNumber}/${config.totalDays} — Recovery\nHôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)`
-      : `📅 Ngày ${dayNumber}/${config.totalDays} — ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
+      ? `🧘 Ngày ${dayNumber}/${config.totalDays} – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
+      : `📅 Ngày ${dayNumber}/${config.totalDays} – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
 
     // BƯỚC 1: Ưu tiên Zalo
     let zaloDone = false;
@@ -661,10 +661,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     if (fcmToken) {
       try {
         const pushTitle = isRecovery
-          ? `Ngày ${dayNumber}/${config.totalDays} — Recovery 🧘`
-          : `Ngày ${dayNumber}/${config.totalDays} — ${workout.title}`;
+          ? `Ngày ${dayNumber}/${config.totalDays} – Recovery 🧘`
+          : `Ngày ${dayNumber}/${config.totalDays} – ${workout.title}`;
         const pushBody = isRecovery
-          ? 'Hôm nay nhẹ nhàng — 1 lượt Recovery (~7 phút)'
+          ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
           : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
         const result = await sendFcmMessage(

@@ -293,7 +293,7 @@ export default function NotificationsPage() {
                 Nhận hỗ trợ khi bạn bỏ lỡ nhiều ngày
               </p>
               <p className="mt-2 text-xs font-medium text-primary">
-                Khuyên bật — đây là tính năng giúp bạn không bỏ cuộc
+                Khuyên bật – đây là tính năng giúp bạn không bỏ cuộc
               </p>
             </div>
             <Toggle

@@ -2,7 +2,7 @@
 
 ## Tổng quan
 BodiX là nền tảng fitness theo triết lý Completion-first. Ba chương trình:
-- **BodiX 21** — 21 ngày, 990.000đ (`bodix-21`)
+- **BodiX 21** — 21 ngày, 499.000đ (`bodix-21`)
 - **BodiX 6W** — 42 ngày, 1.990.000đ (`bodix-6w`)
 - **BodiX 12W** — 84 ngày, 3.490.000đ (`bodix-12w`)
 

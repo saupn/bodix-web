@@ -185,7 +185,7 @@ insert into public.programs (slug, name, description, duration_days, price_vnd, 
   'BodiX 21',
   'Chương trình khởi đầu 21 ngày. Không đủ để thay đổi cơ thể, nhưng đủ để thay đổi cách bạn nhìn chính mình.',
   21,
-  990000,
+  499000,
   1,
   '[
     "5 buổi chính + 1 Recovery mỗi tuần",

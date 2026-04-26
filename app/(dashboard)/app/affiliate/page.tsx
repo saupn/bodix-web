@@ -264,8 +264,8 @@ export default function AffiliatePage() {
             <tbody>
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 21</td>
-                <td className="py-2.5 text-right">990.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">396.000đ</td>
+                <td className="py-2.5 text-right">499.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">199.600đ</td>
               </tr>
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 6W</td>

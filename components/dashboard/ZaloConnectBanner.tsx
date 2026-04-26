@@ -52,7 +52,7 @@ export function ZaloConnectBanner({ phoneVerified }: { phoneVerified: boolean })
         <button
           type="button"
           onClick={handleDismiss}
-          className="rounded-lg p-1.5 text-neutral-400 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
+          className="rounded-lg p-1.5 text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-neutral-600"
           aria-label="Đóng"
         >
           <X className="h-4 w-4" />

@@ -203,7 +203,7 @@ First-time setup — add all environment variables in **Vercel Dashboard → Pro
 - [ ] Storage buckets created (`progress-photos`, `backups`)
 - [ ] Supabase Auth settings configured (JWT expiry, refresh token)
 - [ ] Edge Functions deployed + secrets set
-- [ ] Supabase Auth redirect URL set to `https://bodix.vn/auth/callback`
+- [ ] Supabase Auth redirect URL set to `https://bodix.fit/auth/callback`
 - [ ] UptimeRobot monitors configured (see Monitoring section)
 - [ ] Vercel Analytics enabled (Dashboard → Project → Settings → Analytics)
 
@@ -239,8 +239,8 @@ Add two monitors at [uptimerobot.com](https://uptimerobot.com):
 
 | Monitor | Type | URL | Interval |
 |---------|------|-----|----------|
-| BodiX Homepage | HTTP(S) | `https://bodix.vn` | 5 min |
-| BodiX Health Check | Keyword | `https://bodix.vn/api/health` | 5 min |
+| BodiX Homepage | HTTP(S) | `https://bodix.fit` | 5 min |
+| BodiX Health Check | Keyword | `https://bodix.fit/api/health` | 5 min |
 
 For the keyword monitor, set keyword to `"status":"ok"`.
 

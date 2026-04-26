@@ -1,6 +1,6 @@
 # BodiX API Reference
 
-Base URL: `https://bodix.vn` (production) | `http://localhost:3000` (dev)
+Base URL: `https://bodix.fit` (production) | `http://localhost:3000` (dev)
 
 All authenticated routes require a valid Supabase session cookie (set automatically by browser/Flutter via `supabase_flutter`). Include `Authorization: Bearer <access_token>` header for Flutter.
 
@@ -780,7 +780,7 @@ Get or auto-create personal referral code.
 ```json
 {
   "code": "BODIX-A7K3",
-  "referral_link": "https://bodix.vn/r/BODIX-A7K3",
+  "referral_link": "https://bodix.fit/r/BODIX-A7K3",
   "stats": { "total_clicks": 12, "total_signups": 3, "total_conversions": 1 }
 }
 ```
@@ -900,7 +900,7 @@ Get full affiliate dashboard data.
 ```json
 {
   "profile": { "tier": "basic", "is_approved": true, "commission_rate": 15, "full_name": "..." },
-  "code": { "code": "MINHBODIX", "link": "https://bodix.vn/p/MINHBODIX" },
+  "code": { "code": "MINHBODIX", "link": "https://bodix.fit/p/MINHBODIX" },
   "stats": {
     "total_clicks": 120, "total_signups": 20, "total_conversions": 8,
     "total_revenue": 7920000, "total_earned": 1188000,

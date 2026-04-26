@@ -171,10 +171,14 @@ export default function SignupPage() {
 
     try {
       const supabase = createClient();
+      // Prefer NEXT_PUBLIC_APP_URL (e.g. https://bodix.fit) so production never falls back
+      // to a stale Supabase Site URL. window.location.origin is the dev fallback.
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${baseUrl}/auth/callback`,
         },
       });
 

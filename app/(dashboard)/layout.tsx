@@ -88,15 +88,6 @@ export default async function DashboardLayout({
   const myStats = hasActiveProgram ? await getMyStats(supabase) : null;
   const rescueStatus = hasActiveProgram ? await getRescueStatus(supabase) : null;
 
-  // Check if user is an affiliate (for nav menu)
-  const { data: affiliateProfile } = await service
-    .from("affiliate_profiles")
-    .select("id, is_approved")
-    .eq("user_id", user.id)
-    .eq("is_approved", true)
-    .maybeSingle();
-  const isAffiliate = !!affiliateProfile;
-
   // Gift section: fallback — nếu profile.referral_code null, kiểm tra referral_codes table
   // (user cũ có thể đã tạo code qua /api/referral/code trước khi profiles.referral_code được backfill)
   let referralCode: string | null = profile.referral_code ?? null;
@@ -144,6 +135,9 @@ export default async function DashboardLayout({
         avatar_url: null,
         trial_ends_at: profile?.trial_ends_at ?? null,
       }}
+      trialStartedAt={
+        enrollments.find((e) => e.status === "trial")?.started_at ?? null
+      }
       userEmail={user.email ?? ""}
       userId={user.id}
       hasActiveProgram={hasActiveProgram}
@@ -168,7 +162,6 @@ export default async function DashboardLayout({
             }
           : null
       }
-      isAffiliate={isAffiliate}
     >
       {children}
     </DashboardShell>

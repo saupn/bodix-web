@@ -169,7 +169,7 @@ export default function MidProgramPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -325,7 +325,7 @@ export default function MidProgramPage() {
                   disabled={uploadingBefore || !context.enrollment_id}
                   className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 transition-colors hover:border-primary/50"
                 >
-                  <Camera className="h-10 w-10 text-neutral-400" />
+                  <Camera className="h-10 w-10 text-neutral-600" />
                   <span className="mt-2 text-sm">
                     {uploadingBefore ? "Đang upload..." : "Upload ảnh ngày 1"}
                   </span>
@@ -370,7 +370,7 @@ export default function MidProgramPage() {
                   disabled={uploadingMidpoint || !context.enrollment_id || !context.halfway_week}
                   className="flex aspect-[3/4] w-full flex-col items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 bg-neutral-50 transition-colors hover:border-primary/50"
                 >
-                  <Camera className="h-10 w-10 text-neutral-400" />
+                  <Camera className="h-10 w-10 text-neutral-600" />
                   <span className="mt-2 text-sm">
                     {uploadingMidpoint ? "Đang upload..." : "Chụp ảnh hôm nay"}
                   </span>
@@ -390,7 +390,7 @@ export default function MidProgramPage() {
               />
             </div>
           </div>
-          <p className="mt-3 text-xs text-neutral-500">
+          <p className="mt-3 text-xs text-neutral-600">
             Ảnh chỉ bạn mới thấy. Bạn có thể chọn chia sẻ sau.
           </p>
         </section>
@@ -403,7 +403,7 @@ export default function MidProgramPage() {
           <p className="mt-4 font-medium text-neutral-800">
             Bạn đánh giá tiến bộ tổng thể thế nào?
           </p>
-          <p className="mb-2 text-xs text-neutral-500">
+          <p className="mb-2 text-xs text-neutral-600">
             Chưa thay đổi ←→ Thay đổi rất lớn
           </p>
           <input

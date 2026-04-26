@@ -320,7 +320,7 @@ Shared utility: `supabase/functions/_shared/supabase-admin.ts`.
 |----------|-------|
 | `NEXT_PUBLIC_SUPABASE_URL` | URL Supabase project |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Anon key (safe to expose) |
-| `NEXT_PUBLIC_APP_URL` | https://bodix.vn |
+| `NEXT_PUBLIC_APP_URL` | https://bodix.fit |
 | `NEXT_PUBLIC_SENTRY_DSN` | Sentry DSN (read-only, safe to expose) |
 
 ### Server-only (never NEXT_PUBLIC_)
@@ -335,8 +335,8 @@ Shared utility: `supabase/functions/_shared/supabase-admin.ts`.
 | `STRIPE_SECRET_KEY` | Stripe secret key |
 | `STRIPE_WEBHOOK_SECRET` | Stripe webhook secret |
 | `RESEND_API_KEY` | Resend email API key |
-| `FROM_EMAIL` | noreply@bodix.vn |
-| `FOUNDER_EMAIL` | founder@bodix.vn |
+| `FROM_EMAIL` | noreply@bodix.fit |
+| `FOUNDER_EMAIL` | founder@bodix.fit |
 | `INTERNAL_API_SECRET` | Bảo vệ `/api/referral/anti-fraud` và internal routes |
 
 ### Build-time only

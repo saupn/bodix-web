@@ -64,7 +64,7 @@ export default async function ProfilePage() {
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
           Hồ sơ
         </h1>
-        <p className="mt-1 text-neutral-500">Thông tin tài khoản của bạn.</p>
+        <p className="mt-1 text-neutral-600">Thông tin tài khoản của bạn.</p>
       </div>
 
       {/* Thông tin cá nhân */}
@@ -74,17 +74,17 @@ export default async function ProfilePage() {
         </h2>
         <dl className="space-y-4">
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Họ tên</dt>
+            <dt className="text-sm font-medium text-neutral-600">Họ tên</dt>
             <dd className="mt-1 text-neutral-800">
               {profile?.full_name || user.user_metadata?.full_name || "–"}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Email</dt>
+            <dt className="text-sm font-medium text-neutral-600">Email</dt>
             <dd className="mt-1 text-neutral-800">{user.email}</dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Số điện thoại</dt>
+            <dt className="text-sm font-medium text-neutral-600">Số điện thoại</dt>
             <dd className="mt-1 flex items-center gap-2 text-neutral-800">
               {profile?.phone ? maskPhone(profile.phone) : "–"}
               {profile?.phone_verified && (
@@ -95,19 +95,19 @@ export default async function ProfilePage() {
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Ngày sinh</dt>
+            <dt className="text-sm font-medium text-neutral-600">Ngày sinh</dt>
             <dd className="mt-1 text-neutral-800">
               {profile?.date_of_birth ? formatDate(profile.date_of_birth) : "–"}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Giới tính</dt>
+            <dt className="text-sm font-medium text-neutral-600">Giới tính</dt>
             <dd className="mt-1 text-neutral-800">
               {profile?.gender ? (GENDER_LABEL[profile.gender] ?? profile.gender) : "–"}
             </dd>
           </div>
           <div>
-            <dt className="text-sm font-medium text-neutral-500">Mục tiêu</dt>
+            <dt className="text-sm font-medium text-neutral-600">Mục tiêu</dt>
             <dd className="mt-1 text-neutral-800">
               {Array.isArray(profile?.fitness_goal) && profile.fitness_goal.length > 0
                 ? profile.fitness_goal.join(", ")
@@ -130,7 +130,7 @@ export default async function ProfilePage() {
           )}
         </div>
         {!vouchers?.length ? (
-          <p className="py-4 text-center text-sm text-neutral-500">
+          <p className="py-4 text-center text-sm text-neutral-600">
             Chưa có voucher nào. Giới thiệu bạn bè để nhận voucher 100K!
           </p>
         ) : (
@@ -142,7 +142,7 @@ export default async function ProfilePage() {
               >
                 <div>
                   <p className="font-mono text-sm font-semibold text-primary">{v.code}</p>
-                  <p className="mt-0.5 text-xs text-neutral-500">
+                  <p className="mt-0.5 text-xs text-neutral-600">
                     Còn {(v.remaining_amount ?? 0).toLocaleString("vi-VN")}đ
                     {v.expires_at && (
                       <> – HSD: {new Date(v.expires_at).toLocaleDateString("vi-VN")}</>

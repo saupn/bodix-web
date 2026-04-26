@@ -147,7 +147,7 @@ export default function ReviewHistoryPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -361,7 +361,7 @@ export default function ReviewHistoryPage() {
               >
                 <div className="absolute left-2 top-1.5 h-4 w-4 rounded-full bg-primary" />
                 <div className="min-w-0 flex-1 rounded-lg border border-neutral-100 bg-neutral-50/50 p-3">
-                  <p className="text-xs text-neutral-500">{item.date}</p>
+                  <p className="text-xs text-neutral-600">{item.date}</p>
                   <p className="mt-1 font-medium text-neutral-800">{item.label}</p>
                   {item.type === "photo" && item.photo?.signed_url && (
                     <img
@@ -451,7 +451,7 @@ export default function ReviewHistoryPage() {
                 >
                   So sánh
                 </button>
-                <p className="mt-1 text-center text-xs text-neutral-500">
+                <p className="mt-1 text-center text-xs text-neutral-600">
                   {photo.photo_type === "before" && "Ngày 1"}
                   {photo.photo_type === "after" && "Kết thúc"}
                   {photo.photo_type === "midpoint" && (photo.week_number ? `Giữa tuần ${photo.week_number}` : "Giữa chương trình")}

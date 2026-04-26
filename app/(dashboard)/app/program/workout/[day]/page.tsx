@@ -204,7 +204,7 @@ export default function ProgramWorkoutPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -252,7 +252,7 @@ export default function ProgramWorkoutPage() {
           Ngày {day} – {workout.title}
         </h1>
         {workout.description && (
-          <p className="mt-1 text-sm text-neutral-400">{workout.description}</p>
+          <p className="mt-1 text-sm text-neutral-600">{workout.description}</p>
         )}
         <div className="mt-2 flex flex-wrap gap-2">
           <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-primary">
@@ -299,7 +299,7 @@ export default function ProgramWorkoutPage() {
                   mode === opt.key
                     ? "border-2 border-primary bg-primary text-secondary-light shadow-md"
                     : isCompleted
-                    ? "border-2 border-neutral-100 bg-neutral-50 text-neutral-400"
+                    ? "border-2 border-neutral-100 bg-neutral-50 text-neutral-600"
                     : "border-2 border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
                 }`}
               >
@@ -325,7 +325,7 @@ export default function ProgramWorkoutPage() {
         return (
           <div className="aspect-video overflow-hidden rounded-xl border-2 border-neutral-200 bg-neutral-100">
             <div className="flex h-full w-full items-center justify-center">
-              <div className="flex flex-col items-center gap-2 text-neutral-400">
+              <div className="flex flex-col items-center gap-2 text-neutral-600">
                 <Play className="h-14 w-14" strokeWidth={1.5} />
                 <span className="text-sm">Video bài tập sẽ được cập nhật</span>
               </div>
@@ -351,7 +351,7 @@ export default function ProgramWorkoutPage() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="font-medium text-neutral-800">{ex.name}</span>
-                  <p className="mt-0.5 text-sm text-neutral-500">
+                  <p className="mt-0.5 text-sm text-neutral-600">
                     {ex.reps != null
                       ? `${ex.sets ?? 1} × ${ex.reps} reps`
                       : ex.duration_seconds != null
@@ -364,7 +364,7 @@ export default function ProgramWorkoutPage() {
               </li>
             ))
           ) : (
-            <li className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-500">
+            <li className="rounded-xl border border-neutral-200 bg-neutral-50 px-4 py-8 text-center text-sm text-neutral-600">
               Chưa có bài tập cho chế độ này
             </li>
           )}
@@ -389,11 +389,11 @@ export default function ProgramWorkoutPage() {
               <span className="font-medium text-success">✓ Đã hoàn thành</span>
               {completedData && (
                 <>
-                  <span className="text-neutral-500">–</span>
+                  <span className="text-neutral-600">–</span>
                   <span className="text-neutral-600 capitalize">
                     {completedData.mode}
                   </span>
-                  <span className="text-neutral-500">–</span>
+                  <span className="text-neutral-600">–</span>
                   <span>
                     {FEELING_OPTIONS.find((f) => f.value === completedData.feeling)
                       ?.emoji}{" "}

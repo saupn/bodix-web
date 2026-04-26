@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { hasMinDaysBeforeCohortForTrial } from "@/lib/trial/utils";
+import { formatDateVn } from "@/lib/date/vietnam";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 
@@ -92,15 +93,15 @@ function ProgramCardGrid({ cta, ctaHref }: { cta: string; ctaHref: (slug: string
             <h3 className="font-heading text-xl font-bold text-primary">
               {card.name}
             </h3>
-            <p className="mt-1 text-sm text-neutral-500">{card.duration}</p>
+            <p className="mt-1 text-sm text-neutral-600">{card.duration}</p>
             <p className="mt-4 text-2xl font-bold text-neutral-900">
               {card.price}
             </p>
-            <p className="mt-1 text-sm text-neutral-500">{card.perDay}</p>
+            <p className="mt-1 text-sm text-neutral-600">{card.perDay}</p>
           </div>
 
           {card.note && (
-            <p className="mt-3 text-center text-xs italic text-neutral-500">
+            <p className="mt-3 text-center text-xs italic text-neutral-600">
               {card.note}
             </p>
           )}
@@ -206,10 +207,10 @@ export default async function AppPage() {
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
             Thanh toán xác nhận!
           </h2>
-          <p className="mt-3 text-neutral-600">
+          <p className="mt-3 text-neutral-700">
             Bạn sẽ được thông báo ngày bắt đầu.
             {cohortStartDate && (
-              <> Dự kiến: <span className="font-semibold text-primary">{cohortStartDate}</span>.</>
+              <> Dự kiến: <span className="font-semibold text-primary">{formatDateVn(cohortStartDate)}</span>.</>
             )}
           </p>
           <p className="mt-2 text-neutral-600">
@@ -265,38 +266,38 @@ export default async function AppPage() {
 
   // --- State 5: Trial enrollment exists ---
   if (trialEnrollment) {
-    // Compute trial day status from enrollment.started_at (planned D1, midnight Asia/Ho_Chi_Minh).
-    const startedAtRaw = trialEnrollment.started_at as string | null;
+    // Compute trial day status from enrollment.started_at (D1 = startDate, midnight Asia/Ho_Chi_Minh).
+    const startedAtRaw = (trialEnrollment.started_at as string | null) ?? null;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    let heading = "Bạn đang trải nghiệm thử";
-    let subtext = "Khám phá bài tập và trải nghiệm chương trình BodiX.";
+    let heading = "Trải nghiệm thử";
+    let subtext = "Bắt đầu từ ngày mai. Sáng mai lúc 6:30, bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo.";
     let countdownText: string | null = null;
     let trialEnded = false;
+    let showWorkoutLink = false;
 
     if (startedAtRaw) {
       const startDate = new Date(startedAtRaw);
       startDate.setHours(0, 0, 0, 0);
 
-      if (today < startDate) {
-        // Chưa đến D1 — bắt đầu từ ngày mai
-        heading = "Trải nghiệm thử bắt đầu từ ngày mai!";
-        subtext = "Sáng mai lúc 6:30, bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo.";
-        countdownText = "3 ngày trải nghiệm";
-      } else {
-        const daysPassed = Math.floor((today.getTime() - startDate.getTime()) / 86400000);
-        const currentDay = Math.min(3, daysPassed + 1);
-        const daysRemaining = Math.max(0, 3 - daysPassed);
+      if (today >= startDate) {
+        // Trial đã bắt đầu — startDate = ngày 1
+        const currentDay = Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1;
+        const daysRemaining = Math.max(0, 3 - currentDay);
 
-        if (daysRemaining > 0) {
-          heading = `Bạn đang trải nghiệm thử – Ngày ${currentDay}/3`;
-          subtext = "Khám phá bài tập và trải nghiệm chương trình BodiX.";
-          countdownText = `Còn ${daysRemaining} ngày trải nghiệm`;
+        if (currentDay <= 3) {
+          heading = `Đang trải nghiệm thử – Ngày ${Math.min(currentDay, 3)}/3`;
+          subtext = "Xem bài tập hôm nay.";
+          countdownText =
+            daysRemaining > 0
+              ? `Hoặc tiếp tục trải nghiệm, còn ${daysRemaining} ngày`
+              : "Hôm nay là ngày cuối";
+          showWorkoutLink = true;
         } else {
-          trialEnded = true;
           heading = "3 ngày trải nghiệm đã kết thúc";
           subtext = "Chờ thông báo từ BodiX!";
+          trialEnded = true;
         }
       }
     }
@@ -308,7 +309,7 @@ export default async function AppPage() {
             <h2 className="font-heading text-lg font-semibold text-primary">
               {heading}
             </h2>
-            <p className="mt-2 text-neutral-600">{subtext}</p>
+            <p className="mt-2 text-neutral-700">{subtext}</p>
           </div>
         </div>
       );
@@ -320,18 +321,20 @@ export default async function AppPage() {
           <h2 className="font-heading text-lg font-semibold text-primary">
             {heading}
           </h2>
-          <p className="mt-2 text-neutral-600">{subtext}</p>
+          <p className="mt-2 text-neutral-700">{subtext}</p>
           {countdownText && (
             <p className="mt-4 text-sm font-medium text-primary">
               {countdownText}
             </p>
           )}
-          <Link
-            href="/app/trial"
-            className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-          >
-            Xem bài tập hôm nay
-          </Link>
+          {showWorkoutLink && (
+            <Link
+              href="/app/trial"
+              className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+            >
+              Xem bài tập hôm nay
+            </Link>
+          )}
         </div>
       </div>
     );

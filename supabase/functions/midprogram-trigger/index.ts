@@ -28,7 +28,7 @@ import { sendZaloZNS } from '../_shared/zalo.ts'
 
 const BATCH_SIZE = 50
 const FUNCTION_SECRET = Deno.env.get('MIDPROGRAM_TRIGGER_SECRET') ?? ''
-const REVIEW_URL = 'https://bodix.vn/app/review/midprogram'
+const REVIEW_URL = 'https://bodix.fit/app/review/midprogram'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 

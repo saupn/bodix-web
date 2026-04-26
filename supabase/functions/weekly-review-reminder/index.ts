@@ -28,7 +28,7 @@ import { sendZaloZNS } from '../_shared/zalo.ts'
 
 const BATCH_SIZE = 50
 const FUNCTION_SECRET = Deno.env.get('WEEKLY_REVIEW_REMINDER_SECRET') ?? ''
-const REVIEW_URL = 'https://bodix.vn/app/review/weekly'
+const REVIEW_URL = 'https://bodix.fit/app/review/weekly'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 

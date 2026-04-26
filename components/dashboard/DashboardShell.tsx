@@ -37,6 +37,8 @@ interface DashboardShellProps {
     avatar_url: string | null;
     trial_ends_at: string | null;
   };
+  /** Trial enrollment.started_at (ISO). Used to compute "Còn N ngày" pill correctly. */
+  trialStartedAt?: string | null;
   userEmail: string;
   userId: string;
   hasActiveProgram?: boolean;
@@ -50,15 +52,29 @@ interface DashboardShellProps {
     recoveryDuration: number;
     interventionId: string;
   } | null;
-  isAffiliate?: boolean;
 }
 
-function getTrialDaysLeft(trialEndsAt: string | null): number | null {
-  if (!trialEndsAt) return null;
-  const end = new Date(trialEndsAt);
-  const now = new Date();
-  if (end <= now) return 0;
-  return Math.ceil((end.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+/**
+ * Trial countdown anchored to enrollment.started_at (D1 = startDate, midnight ICT).
+ * Returns null when trial chưa bắt đầu hoặc đã kết thúc.
+ */
+function getTrialPillText(startedAt: string | null | undefined): string | null {
+  if (!startedAt) return null;
+  const startDate = new Date(startedAt);
+  startDate.setHours(0, 0, 0, 0);
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (today < startDate) {
+    return "Bắt đầu từ ngày mai";
+  }
+
+  const currentDay = Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1;
+  if (currentDay > 3) return null;
+  const daysRemaining = Math.max(0, 3 - currentDay);
+  return daysRemaining > 0
+    ? `Dùng thử: còn ${daysRemaining} ngày`
+    : "Dùng thử: hôm nay là ngày cuối";
 }
 
 function getInitials(name: string | null, email: string): string {
@@ -72,7 +88,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, giftSection, profile, userEmail, userId, hasActiveProgram, streak, rescue, isAffiliate }: DashboardShellProps) {
+export function DashboardShell({ children, giftSection, profile, trialStartedAt, userEmail, userId, hasActiveProgram, streak, rescue }: DashboardShellProps) {
   const router = useRouter();
   const { success: toastSuccess } = useToast();
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -134,8 +150,7 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
   }, [userId]);
 
   const displayName = profile.full_name?.trim() || userEmail || "bạn";
-  const trialDays = getTrialDaysLeft(profile.trial_ends_at);
-  const isInTrial = trialDays !== null && trialDays > 0;
+  const trialPillText = getTrialPillText(trialStartedAt ?? null);
 
   const activeGift =
     giftSection?.kind === "active"
@@ -216,9 +231,7 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
             {NAV_LINKS_BASE.map((link) => (
               <NavLink key={link.href} {...link} />
             ))}
-            {isAffiliate && (
-              <NavLink href="/app/affiliate" label="Đối tác" icon={Handshake} />
-            )}
+            <NavLink href="/app/affiliate" label="Đối tác" icon={Handshake} />
           </nav>
 
           <div className="border-t border-neutral-200 pt-4">
@@ -259,9 +272,9 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
               />
             )}
             <NotificationBell userId={userId} />
-            {isInTrial && (
+            {trialPillText && (
               <span className="hidden sm:inline-flex items-center rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                Dùng thử: còn {trialDays} ngày
+                {trialPillText}
               </span>
             )}
             <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary/10 text-sm font-semibold text-primary">
@@ -333,11 +346,11 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
                       />
                     </div>
                     <div className="rounded-lg border border-neutral-200 bg-white p-4">
-                      <p className="text-xs font-medium text-neutral-500">Mã của bạn</p>
+                      <p className="text-xs font-medium text-neutral-600">Mã của bạn</p>
                       <p className="mt-1 font-mono text-lg font-bold tracking-wider text-[#2D4A3E]">
                         {activeGift.referralCode}
                       </p>
-                      <p className="mt-3 text-xs font-medium text-neutral-500">Link tặng</p>
+                      <p className="mt-3 text-xs font-medium text-neutral-600">Link tặng</p>
                       <p className="mt-1 break-all font-mono text-sm text-neutral-900">
                         {activeGift.link.replace(/^https?:\/\//, "")}
                       </p>
@@ -398,7 +411,7 @@ export function DashboardShell({ children, giftSection, profile, userEmail, user
                 <button
                   type="button"
                   onClick={() => setReferralModalOpen(false)}
-                  className="absolute right-4 top-4 rounded-lg p-1 text-neutral-500 hover:bg-neutral-100"
+                  className="absolute right-4 top-4 rounded-lg p-1 text-neutral-600 hover:bg-neutral-100"
                   aria-label="Đóng"
                 >
                   ✕

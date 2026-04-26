@@ -24,7 +24,7 @@ import { createAdminClient } from '../_shared/supabase-admin.ts'
 const FUNCTION_SECRET = Deno.env.get('WEEKLY_REPORT_SECRET') ?? ''
 const FOUNDER_EMAIL   = Deno.env.get('FOUNDER_EMAIL') ?? ''
 const RESEND_API_KEY  = Deno.env.get('RESEND_API_KEY') ?? ''
-const FROM_EMAIL      = Deno.env.get('FROM_EMAIL') ?? 'noreply@bodix.vn'
+const FROM_EMAIL      = Deno.env.get('FROM_EMAIL') ?? 'noreply@bodix.fit'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -311,7 +311,7 @@ function buildHtmlEmail(
     <div style="background:#f9fafb;padding:16px 32px;border-top:1px solid #e5e7eb">
       <p style="margin:0;font-size:12px;color:#9ca3af">
         Generated automatically · ${new Date().toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })} ICT
-        · <a href="https://bodix.vn/admin/analytics" style="color:#6b7280">Xem full analytics</a>
+        · <a href="https://bodix.fit/admin/analytics" style="color:#6b7280">Xem full analytics</a>
       </p>
     </div>
 

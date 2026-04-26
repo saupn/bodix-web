@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
       if (!profile?.channel_user_id) continue;
 
       const displayName = profile.full_name || "Bạn";
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bodix.vn";
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit";
       const reviewPageUrl = `${appUrl}/app/review/video/${review_video_id}`;
 
       // Tin nhắn động theo kết quả

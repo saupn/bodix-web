@@ -13,10 +13,11 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { formatDateVn } from "@/lib/date/vietnam";
 
 const REFERRAL_BASE = "https://bodix.fit";
 const COMMISSION_RATE = 40;
-const MIN_WITHDRAWAL = 500_000;
+const MIN_WITHDRAWAL = 200_000;
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
   silver: "Silver",
@@ -65,20 +66,16 @@ interface DashboardData {
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "–";
-  return new Date(dateStr).toLocaleDateString("vi-VN", {
-    day: "numeric",
-    month: "short",
-    year: "numeric",
-  });
+  return formatDateVn(dateStr);
 }
 
 const TIPS = [
-  "Chia sẻ link kèm trải nghiệm cá nhân – người thật, kết quả thật.",
-  "Post vào nhóm Facebook/Zalo fitness, gym, chạy bộ.",
-  "Kể câu chuyện 21 ngày của bạn trên story – chân thực hơn quảng cáo.",
-  "Gửi link trực tiếp cho bạn bè bạn nghĩ sẽ phù hợp.",
-  "Ghim link BodiX trong bio TikTok, Instagram.",
-  "Mỗi tuần chia sẻ 1 bài tập ngắn + link – đều đặn hơn viral.",
+  "Chia sẻ câu chuyện thật của bạn – người thật, kết quả thật luôn thu hút hơn quảng cáo.",
+  "Nhắm tới phụ nữ 25–42 tuổi, từng tập rồi bỏ – đối tượng dễ đồng cảm với BodiX nhất.",
+  "Tặng sách miễn phí qua link tang-sach làm mồi để khởi đầu cuộc trò chuyện.",
+  "Đăng 2–3 bài/tuần, đều đặn quan trọng hơn viral.",
+  "Tận dụng Zalo – nhắn riêng cho từng bạn bè phù hợp, hiệu quả hơn đăng đại trà.",
+  "Nhấn mạnh \"Thử miễn phí 3 ngày, không mất gì\" – rào cản thấp = nhiều click hơn.",
 ];
 
 export default function AffiliatePage() {
@@ -228,7 +225,7 @@ export default function AffiliatePage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -239,11 +236,17 @@ export default function AffiliatePage() {
       <div className="mx-auto max-w-2xl space-y-8 pb-16">
         <div>
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-            Trở thành Đối tác – Nhận {COMMISSION_RATE}% hoa hồng
+            Trở thành Đối tác BodiX
           </h1>
-          <p className="mt-2 text-neutral-600">
-            Chia sẻ BodiX, nhận {COMMISSION_RATE}% tiền mặt cho mỗi đơn hàng qua link của bạn.
-            Người mua luôn được giảm 10%.
+          <p className="mt-2 text-neutral-700">
+            Nhận{" "}
+            <span className="font-bold text-primary">{COMMISSION_RATE}%</span>{" "}
+            hoa hồng tiền mặt cho mỗi đơn hàng qua link của bạn. Người mua qua
+            link đối tác được giảm{" "}
+            <span className="font-bold text-primary">10%</span>.
+          </p>
+          <p className="mt-1 text-sm text-neutral-700">
+            Thanh toán ngày 1 và 15 hàng tháng. Tối thiểu 200.000đ.
           </p>
         </div>
 
@@ -261,18 +264,18 @@ export default function AffiliatePage() {
             <tbody>
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 21</td>
-                <td className="py-2.5 text-right">499.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">~200.000đ</td>
+                <td className="py-2.5 text-right">990.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">396.000đ</td>
               </tr>
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 6W</td>
-                <td className="py-2.5 text-right">1.199.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">~480.000đ</td>
+                <td className="py-2.5 text-right">1.990.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">796.000đ</td>
               </tr>
               <tr>
                 <td className="py-2.5">BodiX 12W</td>
-                <td className="py-2.5 text-right">1.999.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">~800.000đ</td>
+                <td className="py-2.5 text-right">3.490.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">1.396.000đ</td>
               </tr>
             </tbody>
           </table>
@@ -482,7 +485,7 @@ export default function AffiliatePage() {
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 font-heading font-semibold text-primary">Lịch sử đơn hàng</h2>
         {!dashboard?.recent_conversions?.length ? (
-          <p className="py-8 text-center text-neutral-500">Chưa có đơn hàng</p>
+          <p className="py-8 text-center text-neutral-600">Chưa có đơn hàng</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">

@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "BodiX API",
-    "description": "Complete API collection for BodiX fitness platform. Set the `base_url` variable to https://bodix.vn (prod) or http://localhost:3000 (dev). Set `access_token` to a valid Supabase JWT.",
+    "description": "Complete API collection for BodiX fitness platform. Set the `base_url` variable to https://bodix.fit (prod) or http://localhost:3000 (dev). Set `access_token` to a valid Supabase JWT.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "variable": [

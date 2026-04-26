@@ -326,8 +326,8 @@ export function AffiliateRegistrationClient() {
         {/* Footer */}
         <p className="mt-8 text-center text-sm text-neutral-400">
           Có câu hỏi? Liên hệ{" "}
-          <a href="mailto:partner@bodix.vn" className="text-primary hover:underline">
-            partner@bodix.vn
+          <a href="mailto:partner@bodix.fit" className="text-primary hover:underline">
+            partner@bodix.fit
           </a>
         </p>
       </main>

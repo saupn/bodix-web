@@ -81,7 +81,7 @@ export default function ProgressPage() {
   if (loading || !stats) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -166,7 +166,7 @@ export default function ProgressPage() {
               <span className="mt-1 text-lg font-bold text-neutral-800">
                 {item.count}
               </span>
-              <span className="text-xs text-neutral-500">{item.label}</span>
+              <span className="text-xs text-neutral-600">{item.label}</span>
             </div>
           ))}
         </div>
@@ -183,7 +183,7 @@ export default function ProgressPage() {
           {["T2", "T3", "T4", "T5", "T6", "T7", "CN"].map((d) => (
             <div
               key={d}
-              className="text-center text-[10px] font-medium text-neutral-400"
+              className="text-center text-[10px] font-medium text-neutral-600"
             >
               {d}
             </div>
@@ -233,7 +233,7 @@ export default function ProgressPage() {
         </div>
 
         {/* Legend */}
-        <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-500">
+        <div className="mt-4 flex flex-wrap gap-4 text-xs text-neutral-600">
           <span className="flex items-center gap-1">
             <span className="inline-block h-3 w-3 rounded bg-green-100" /> Hoàn thành
           </span>
@@ -269,11 +269,11 @@ export default function ProgressPage() {
                 }`}
               >
                 <span className="flex h-10 items-center justify-center text-2xl">
-                  {achieved ? config.emoji : <Lock className="h-5 w-5 text-neutral-400" />}
+                  {achieved ? config.emoji : <Lock className="h-5 w-5 text-neutral-600" />}
                 </span>
                 <span
                   className={`mt-2 text-xs font-medium leading-tight ${
-                    achieved ? "text-primary" : "text-neutral-500"
+                    achieved ? "text-primary" : "text-neutral-600"
                   }`}
                 >
                   {config.label}

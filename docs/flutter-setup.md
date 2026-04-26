@@ -7,7 +7,7 @@
 ```
 Flutter App
     ├── Supabase Flutter SDK (auth, DB, realtime, storage)
-    └── HTTP calls to bodix.vn/api/* (business logic only)
+    └── HTTP calls to bodix.fit/api/* (business logic only)
 ```
 
 ---
@@ -56,7 +56,7 @@ BodiX uses phone OTP auth. The Flutter app calls the Next.js API (not Supabase A
 ```dart
 Future<void> sendOtp(String phone) async {
   final response = await http.post(
-    Uri.parse('https://bodix.vn/api/auth/send-otp'),
+    Uri.parse('https://bodix.fit/api/auth/send-otp'),
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode({'phone': phone}),
   );
@@ -72,7 +72,7 @@ Future<void> verifyOtp(String phone, String otp) async {
   // BodiX verifies OTP server-side, then uses Supabase Auth under the hood.
   // Call the API, then exchange for a Supabase session via signInWithOtp.
   final response = await http.post(
-    Uri.parse('https://bodix.vn/api/auth/verify-otp'),
+    Uri.parse('https://bodix.fit/api/auth/verify-otp'),
     headers: {'Content-Type': 'application/json'},
     body: jsonEncode({'phone': phone, 'otp': otp}),
   );
@@ -134,7 +134,7 @@ Future<Map<String, dynamic>> checkin({
   int? feeling,
 }) async {
   final response = await http.post(
-    Uri.parse('https://bodix.vn/api/checkin'),
+    Uri.parse('https://bodix.fit/api/checkin'),
     headers: await getAuthHeaders(),
     body: jsonEncode({
       'enrollment_id': enrollmentId,
@@ -310,7 +310,7 @@ Future<String> uploadProgressPhoto(File file, {
   final session = supabase.auth.currentSession!;
   final request = http.MultipartRequest(
     'POST',
-    Uri.parse('https://bodix.vn/api/photos/upload'),
+    Uri.parse('https://bodix.fit/api/photos/upload'),
   );
   request.headers['Authorization'] = 'Bearer ${session.accessToken}';
   request.files.add(await http.MultipartFile.fromPath('file', file.path));
@@ -328,7 +328,7 @@ Future<String> uploadProgressPhoto(File file, {
 ### Get Signed URL for Existing Photo (via Next.js)
 ```dart
 // Use /api/community/media?path=... for redirect to signed URL
-final url = Uri.parse('https://bodix.vn/api/community/media?path=$storagePath');
+final url = Uri.parse('https://bodix.fit/api/community/media?path=$storagePath');
 // Or directly via Supabase:
 final signedUrl = await supabase.storage
     .from('progress-photos')
@@ -408,7 +408,7 @@ Future<Map<String, dynamic>> apiCall(String path, {
     if (session != null) 'Authorization': 'Bearer ${session.accessToken}',
   };
 
-  final uri = Uri.parse('https://bodix.vn$path');
+  final uri = Uri.parse('https://bodix.fit$path');
   late http.Response response;
 
   if (method == 'GET') {
@@ -453,7 +453,7 @@ class AppConfig {
   );
   static const apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'https://bodix.vn',
+    defaultValue: 'https://bodix.fit',
   );
 }
 ```

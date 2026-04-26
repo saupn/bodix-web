@@ -378,7 +378,7 @@ export default function CommunityPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -455,7 +455,7 @@ export default function CommunityPage() {
             <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
               Hôm nay ai đã tập?
             </h1>
-            <p className="mt-1 text-sm text-neutral-500">{boardData.cohort_name}</p>
+            <p className="mt-1 text-sm text-neutral-600">{boardData.cohort_name}</p>
             <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-neutral-600">
@@ -478,7 +478,7 @@ export default function CommunityPage() {
                   ✅ Đã hoàn thành
                 </h2>
                 {completed.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-neutral-500">
+                  <p className="py-6 text-center text-sm text-neutral-600">
                     Chưa ai check-in hôm nay. Hãy là người đầu tiên!
                   </p>
                 ) : (
@@ -513,7 +513,7 @@ export default function CommunityPage() {
                               )}
                             </span>
                             {m.current_streak > 0 && (
-                              <p className="text-xs text-neutral-500">
+                              <p className="text-xs text-neutral-600">
                                 🔥{m.current_streak}
                               </p>
                             )}
@@ -535,7 +535,7 @@ export default function CommunityPage() {
                   Đang chờ...
                 </h2>
                 {pending.length === 0 ? (
-                  <p className="py-6 text-center text-sm text-neutral-500">
+                  <p className="py-6 text-center text-sm text-neutral-600">
                     Tất cả đã hoàn thành hôm nay! 🎉
                   </p>
                 ) : (
@@ -551,7 +551,7 @@ export default function CommunityPage() {
                               : "border-neutral-200"
                           }`}
                         >
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-sm font-medium text-neutral-400">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-full bg-neutral-100 text-sm font-medium text-neutral-600">
                             {m.avatar_url ? (
                               <img src={m.avatar_url} alt="" className="h-full w-full object-cover" />
                             ) : (
@@ -559,13 +559,13 @@ export default function CommunityPage() {
                             )}
                           </div>
                           <div className="min-w-0 flex-1">
-                            <span className="font-medium text-neutral-500">
+                            <span className="font-medium text-neutral-600">
                               {m.display_name}
                               {isMe && (
                                 <span className="ml-1.5 text-xs text-primary font-normal">(Bạn)</span>
                               )}
                             </span>
-                            <p className="text-xs text-neutral-400">Đang chờ...</p>
+                            <p className="text-xs text-neutral-600">Đang chờ...</p>
                           </div>
                         </li>
                       );
@@ -588,7 +588,7 @@ export default function CommunityPage() {
 
                   if (top10.length === 0) {
                     return (
-                      <p className="py-4 text-center text-sm text-neutral-500">
+                      <p className="py-4 text-center text-sm text-neutral-600">
                         Chưa có streak nào. Hãy bắt đầu!
                       </p>
                     );
@@ -611,7 +611,7 @@ export default function CommunityPage() {
                               {m.display_name}
                               {isMe && <span className="text-xs text-primary ml-1">(Bạn)</span>}
                             </span>
-                            <span className="shrink-0 font-mono text-xs text-neutral-500">
+                            <span className="shrink-0 font-mono text-xs text-neutral-600">
                               🔥{m.current_streak}
                             </span>
                           </li>
@@ -654,7 +654,7 @@ export default function CommunityPage() {
           </div>
 
           {postsLoading && posts.length === 0 ? (
-            <p className="py-12 text-center text-neutral-500">Đang tải...</p>
+            <p className="py-12 text-center text-neutral-600">Đang tải...</p>
           ) : posts.length === 0 ? (
             <div className="rounded-xl border border-neutral-200 bg-white p-12 text-center">
               <p className="text-neutral-600">
@@ -686,7 +686,7 @@ export default function CommunityPage() {
                     <div className="min-w-0 flex-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <span className="font-medium text-neutral-800">{post.display_name}</span>
-                        <span className="text-xs text-neutral-500">
+                        <span className="text-xs text-neutral-600">
                           {formatTimeAgo(post.created_at)}
                         </span>
                         <span className="rounded-full bg-neutral-100 px-2 py-0.5 text-xs">
@@ -725,7 +725,7 @@ export default function CommunityPage() {
                             >
                               <span>{r.emoji}</span>
                               {count > 0 && (
-                                <span className="text-xs text-neutral-500">{count}</span>
+                                <span className="text-xs text-neutral-600">{count}</span>
                               )}
                             </button>
                           );
@@ -806,7 +806,7 @@ export default function CommunityPage() {
                   ))}
                   {createMedia.length < 3 && (
                     <label className="flex h-20 w-20 cursor-pointer items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 hover:border-primary/50">
-                      <Camera className="h-6 w-6 text-neutral-400" />
+                      <Camera className="h-6 w-6 text-neutral-600" />
                       <input
                         type="file"
                         accept="image/jpeg,image/png,image/webp"

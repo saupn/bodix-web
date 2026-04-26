@@ -117,7 +117,7 @@ export default function WeeklyReviewPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -174,7 +174,7 @@ export default function WeeklyReviewPage() {
         <div className="space-y-6">
           <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
             <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-              <p className="text-xs text-neutral-500">Hoàn thành</p>
+              <p className="text-xs text-neutral-600">Hoàn thành</p>
               <p className="font-semibold text-primary">
                 {existing.week_completion_rate != null
                   ? `${Math.round(Number(existing.week_completion_rate))}%`
@@ -182,14 +182,14 @@ export default function WeeklyReviewPage() {
               </p>
             </div>
             <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-              <p className="text-xs text-neutral-500">Mode</p>
+              <p className="text-xs text-neutral-600">Mode</p>
               <p className="text-sm font-medium">
                 {Number(existing.week_hard_count ?? 0)}H / {Number(existing.week_light_count ?? 0)}L /{" "}
                 {Number(existing.week_recovery_count ?? 0)}R
               </p>
             </div>
             <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-              <p className="text-xs text-neutral-500">Cảm giác TB</p>
+              <p className="text-xs text-neutral-600">Cảm giác TB</p>
               <p className="text-xl">
                 {FEELING_EMOJI(
                   existing.avg_feeling != null ? Number(existing.avg_feeling) : null
@@ -231,19 +231,19 @@ export default function WeeklyReviewPage() {
               </p>
               {Boolean(existing.body_changes) && (
                 <p>
-                  <span className="text-neutral-500">Cơ thể:</span>{" "}
+                  <span className="text-neutral-600">Cơ thể:</span>{" "}
                   {String(existing.body_changes)}
                 </p>
               )}
               {Boolean(existing.biggest_challenge) && (
                 <p>
-                  <span className="text-neutral-500">Thử thách:</span>{" "}
+                  <span className="text-neutral-600">Thử thách:</span>{" "}
                   {String(existing.biggest_challenge)}
                 </p>
               )}
               {Boolean(existing.next_week_goal) && (
                 <p>
-                  <span className="text-neutral-500">Mục tiêu:</span>{" "}
+                  <span className="text-neutral-600">Mục tiêu:</span>{" "}
                   {String(existing.next_week_goal)}
                 </p>
               )}
@@ -264,19 +264,19 @@ export default function WeeklyReviewPage() {
           {stats && (
             <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
               <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-                <p className="text-xs text-neutral-500">Hoàn thành</p>
+                <p className="text-xs text-neutral-600">Hoàn thành</p>
                 <p className="font-semibold text-primary">
                   {stats.completed_count}/7 ngày ({stats.completion_rate}%)
                 </p>
               </div>
               <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-                <p className="text-xs text-neutral-500">Mode</p>
+                <p className="text-xs text-neutral-600">Mode</p>
                 <p className="text-sm font-medium">
                   {stats.hard_count}H / {stats.light_count}L / {stats.recovery_count}R
                 </p>
               </div>
               <div className="rounded-lg border border-neutral-200 bg-white p-3 text-center">
-                <p className="text-xs text-neutral-500">Cảm giác TB</p>
+                <p className="text-xs text-neutral-600">Cảm giác TB</p>
                 <p className="text-xl">{FEELING_EMOJI(stats.avg_feeling)}</p>
               </div>
             </div>
@@ -290,7 +290,7 @@ export default function WeeklyReviewPage() {
                   key={label}
                   className="flex flex-1 flex-col items-center rounded-lg border border-neutral-200 bg-white p-2"
                 >
-                  <span className="text-xs text-neutral-500">{label}</span>
+                  <span className="text-xs text-neutral-600">{label}</span>
                   <span className="mt-1 text-lg">
                     {stats.day_completed[i] ? "✅" : "❌"}
                   </span>
@@ -344,7 +344,7 @@ export default function WeeklyReviewPage() {
                 <p className="mb-2 font-medium text-neutral-800">
                   Mức độ mệt mỏi tuần này?
                 </p>
-                <p className="mb-3 text-xs text-neutral-500">
+                <p className="mb-3 text-xs text-neutral-600">
                   Kiệt sức → Tràn năng lượng
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -371,7 +371,7 @@ export default function WeeklyReviewPage() {
                 <p className="mb-2 font-medium text-neutral-800">
                   Bạn có thấy tiến bộ không?
                 </p>
-                <p className="mb-3 text-xs text-neutral-500">
+                <p className="mb-3 text-xs text-neutral-600">
                   Không thấy gì → Thay đổi lớn
                 </p>
                 <div className="flex flex-wrap gap-2">
@@ -419,7 +419,7 @@ export default function WeeklyReviewPage() {
               {/* 4. Cơ thể */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Cơ thể thay đổi gì tuần này? <span className="text-neutral-500">(tùy chọn)</span>
+                  Cơ thể thay đổi gì tuần này? <span className="text-neutral-600">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={bodyChanges}
@@ -433,7 +433,7 @@ export default function WeeklyReviewPage() {
               {/* 5. Thử thách */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Thử thách lớn nhất? <span className="text-neutral-500">(tùy chọn)</span>
+                  Thử thách lớn nhất? <span className="text-neutral-600">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={biggestChallenge}
@@ -447,7 +447,7 @@ export default function WeeklyReviewPage() {
               {/* 6. Mục tiêu */}
               <div>
                 <label className="mb-2 block font-medium text-neutral-800">
-                  Mục tiêu tuần tới? <span className="text-neutral-500">(tùy chọn)</span>
+                  Mục tiêu tuần tới? <span className="text-neutral-600">(tùy chọn)</span>
                 </label>
                 <textarea
                   value={nextWeekGoal}

@@ -116,7 +116,7 @@ export function BuddyCard() {
         <h3 className="font-heading text-sm font-semibold text-primary">
           Buddy
         </h3>
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-neutral-600">
           Khi tham gia chương trình chính thức, bạn sẽ được ghép đôi với một
           người đồng hành cùng đợt tập.
         </p>
@@ -144,10 +144,10 @@ export function BuddyCard() {
               {buddy.checked_in_today ? (
                 <span className="text-success font-medium">Đã tập ✅</span>
               ) : (
-                <span className="text-neutral-500">Chưa tập</span>
+                <span className="text-neutral-600">Chưa tập</span>
               )}
               {buddy.current_streak > 0 && (
-                <span className="text-neutral-500">
+                <span className="text-neutral-600">
                   🔥 {buddy.current_streak} ngày
                 </span>
               )}
@@ -174,7 +174,7 @@ export function BuddyCard() {
       <h3 className="font-heading text-sm font-semibold text-primary">
         👯 Tìm người đồng hành
       </h3>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-xs text-neutral-600">
         Buddy giúp bạn duy trì động lực. Chọn 1 người cùng đợt tập!
       </p>
 
@@ -189,7 +189,7 @@ export function BuddyCard() {
       </div>
 
       {searching && (
-        <p className="mt-2 text-xs text-neutral-400">Đang tìm...</p>
+        <p className="mt-2 text-xs text-neutral-600">Đang tìm...</p>
       )}
 
       {!searching && results.length > 0 && (
@@ -211,7 +211,7 @@ export function BuddyCard() {
       )}
 
       {!searching && results.length === 0 && !loading && (
-        <p className="mt-2 text-xs text-neutral-400">Không tìm thấy ai phù hợp.</p>
+        <p className="mt-2 text-xs text-neutral-600">Không tìm thấy ai phù hợp.</p>
       )}
 
       {results.length > 0 && (

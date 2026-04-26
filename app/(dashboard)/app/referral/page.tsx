@@ -29,7 +29,7 @@ const STATUS_CLASS: Record<string, string> = {
   trial_started: "bg-amber-100 text-amber-800",
   converted: "bg-green-100 text-green-800",
   completed: "bg-amber-200 text-amber-900",
-  expired: "bg-neutral-100 text-neutral-500",
+  expired: "bg-neutral-100 text-neutral-600",
   fraudulent: "bg-red-100 text-red-800",
 };
 
@@ -156,7 +156,7 @@ export default function ReferralPage() {
   if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -308,7 +308,7 @@ export default function ReferralPage() {
           Lịch sử giới thiệu
         </h2>
         {!trackingData?.history?.length ? (
-          <p className="py-8 text-center text-neutral-500">
+          <p className="py-8 text-center text-neutral-600">
             Chưa có ai dùng link của bạn
           </p>
         ) : (
@@ -381,7 +381,7 @@ export default function ReferralPage() {
                       {TX_TYPE_LABEL[tx.transaction_type] ?? tx.transaction_type}
                     </span>
                     {tx.description && (
-                      <span className="ml-2 text-neutral-500">
+                      <span className="ml-2 text-neutral-600">
                         {tx.description}
                       </span>
                     )}
@@ -399,7 +399,7 @@ export default function ReferralPage() {
             </ul>
           </div>
         ) : (
-          <p className="mt-4 text-sm text-neutral-500">
+          <p className="mt-4 text-sm text-neutral-600">
             Chưa có giao dịch credit
           </p>
         )}

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { formatDateVn } from "@/lib/date/vietnam";
 
 export function TrialSignupCard({
   canTrial,
@@ -73,9 +74,9 @@ export function TrialSignupCard({
           {loading ? "Đang đăng ký..." : "Đăng ký tập thử 3 ngày (miễn phí)"}
         </button>
         {!canTrial && (
-          <p className="text-sm text-neutral-600 leading-relaxed">
+          <p className="text-sm text-neutral-700 leading-relaxed">
             {nextCohortDate
-              ? `Đợt sắp tới bắt đầu ${nextCohortDate.split("-").reverse().join("/")} – khoảng cách từ ngày mai đến ngày cohort chưa đủ 3 ngày cho tập thử. Bạn vui lòng chờ đợt cohort tiếp theo nhé.`
+              ? `Đợt sắp tới bắt đầu ${formatDateVn(nextCohortDate)} – khoảng cách từ ngày mai đến ngày cohort chưa đủ 3 ngày cho tập thử. Bạn vui lòng chờ đợt cohort tiếp theo nhé.`
               : "Chưa có đợt tập tiếp theo phù hợp. Vui lòng quay lại sau."}
           </p>
         )}

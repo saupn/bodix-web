@@ -3,18 +3,10 @@
 import { useState, useCallback } from "react";
 import Link from "next/link";
 import { CheckoutForm } from "./CheckoutForm";
+import { formatDateVn as formatDate } from "@/lib/date/vietnam";
 
 function formatPrice(vnd: number): string {
   return new Intl.NumberFormat("vi-VN").format(vnd) + "đ";
-}
-
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("vi-VN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
 }
 
 interface Program {

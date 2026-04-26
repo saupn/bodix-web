@@ -168,15 +168,15 @@ export default async function ProgramsPage() {
                 <h3 className="font-heading text-xl sm:text-2xl font-bold text-primary">
                   {card.name}
                 </h3>
-                <p className="mt-1 text-sm text-neutral-500">{card.duration}</p>
+                <p className="mt-1 text-sm text-neutral-600">{card.duration}</p>
                 <p className="mt-4 text-2xl sm:text-3xl font-bold text-neutral-900">
                   {card.price}
                 </p>
-                <p className="mt-1 text-sm text-neutral-500">{card.perDay}</p>
+                <p className="mt-1 text-sm text-neutral-600">{card.perDay}</p>
               </div>
 
               {card.note && (
-                <p className="mt-3 text-center text-xs italic text-neutral-500">
+                <p className="mt-3 text-center text-xs italic text-neutral-600">
                   {card.note}
                 </p>
               )}
@@ -216,7 +216,7 @@ export default async function ProgramsPage() {
         })}
       </div>
 
-      <p className="mt-8 text-center text-sm text-neutral-500">
+      <p className="mt-8 text-center text-sm text-neutral-600">
         Thanh toán 1 lần. Không subscription. Không phí ẩn.
       </p>
       <p className="mt-4 text-center">

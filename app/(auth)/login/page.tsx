@@ -82,13 +82,12 @@ export default function LoginPage() {
     setResetLoading(true);
     try {
       const supabase = createClient();
-      const redirectTo =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/reset-password`
-          : "https://bodix.fit/reset-password";
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        (typeof window !== "undefined" ? window.location.origin : "https://bodix.fit");
       const { error: resetErr } = await supabase.auth.resetPasswordForEmail(
         resetEmail.trim(),
-        { redirectTo }
+        { redirectTo: `${baseUrl}/reset-password` }
       );
       if (resetErr) {
         setResetError("Không gửi được. Kiểm tra lại email.");
@@ -108,10 +107,14 @@ export default function LoginPage() {
 
     try {
       const supabase = createClient();
+      // Prefer NEXT_PUBLIC_APP_URL (e.g. https://bodix.fit) so production never falls back
+      // to a stale Supabase Site URL. window.location.origin is the dev fallback.
+      const baseUrl =
+        process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
       const { error: authError } = await supabase.auth.signInWithOAuth({
         provider: "google",
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          redirectTo: `${baseUrl}/auth/callback`,
         },
       });
 

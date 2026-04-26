@@ -279,7 +279,7 @@ export default function SundayReviewPage() {
   if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải Review Chủ nhật...</p>
+        <p className="text-neutral-600">Đang tải Review Chủ nhật...</p>
       </div>
     );
   }
@@ -326,7 +326,7 @@ export default function SundayReviewPage() {
               Streak: 🔥 {stats.streak.current_streak} ngày
             </p>
           )}
-          <p className="mt-4 text-sm text-neutral-400">Đang chuyển hướng...</p>
+          <p className="mt-4 text-sm text-neutral-600">Đang chuyển hướng...</p>
         </div>
       </div>
     );
@@ -381,7 +381,7 @@ export default function SundayReviewPage() {
           <h2 className="font-heading text-lg font-semibold text-primary">
             Video Review tuần
           </h2>
-          <span className="text-sm text-neutral-400">~10 phút</span>
+          <span className="text-sm text-neutral-600">~10 phút</span>
         </div>
 
         {activeSection >= 1 && (
@@ -453,7 +453,7 @@ export default function SundayReviewPage() {
           <h2 className="font-heading text-lg font-semibold text-primary">
             Lắng nghe cơ thể
           </h2>
-          <span className="text-sm text-neutral-400">~5 phút</span>
+          <span className="text-sm text-neutral-600">~5 phút</span>
         </div>
 
         {activeSection >= 2 && (
@@ -478,7 +478,7 @@ export default function SundayReviewPage() {
               <h3 className="font-heading font-semibold text-primary mb-1">
                 Body Scan – Cơ thể bạn hôm nay
               </h3>
-              <p className="text-sm text-neutral-500 mb-4">
+              <p className="text-sm text-neutral-600 mb-4">
                 Chạm vào từng vùng và chọn cảm giác
               </p>
 
@@ -574,13 +574,13 @@ export default function SundayReviewPage() {
                   <p className="text-2xl font-bold text-primary">
                     {ws.completed_count}/6
                   </p>
-                  <p className="text-xs text-neutral-500">ngày hoàn thành</p>
+                  <p className="text-xs text-neutral-600">ngày hoàn thành</p>
                 </div>
                 <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 text-center">
                   <p className="text-2xl font-bold text-primary">
                     {ws.hard_count}
                   </p>
-                  <p className="text-xs text-neutral-500">buổi Hard</p>
+                  <p className="text-xs text-neutral-600">buổi Hard</p>
                 </div>
                 <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-3 text-center">
                   <p className="text-2xl font-bold text-primary">
@@ -588,7 +588,7 @@ export default function SundayReviewPage() {
                       ? ws.avg_feeling.toFixed(1)
                       : "–"}
                   </p>
-                  <p className="text-xs text-neutral-500">cảm giác TB</p>
+                  <p className="text-xs text-neutral-600">cảm giác TB</p>
                 </div>
               </div>
             )}

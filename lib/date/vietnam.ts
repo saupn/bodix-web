@@ -39,6 +39,26 @@ export function calendarDaysBetween(startYmd: string, endYmd: string): number {
   return Math.floor((t1 - t0) / 86400000);
 }
 
+/**
+ * Định dạng ngày theo dd/MM/yyyy (vd: "11/05/2026").
+ * Chấp nhận ISO timestamp hoặc YYYY-MM-DD. Dùng manual format để nhất quán giữa các browser.
+ */
+export function formatDateVn(input: string | null | undefined): string {
+  if (!input) return "";
+  // Pure YYYY-MM-DD case (cohort.start_date thường ở dạng này) — tránh tạo Date object
+  // sẽ bị lệch theo timezone của browser.
+  const ymdMatch = /^(\d{4})-(\d{2})-(\d{2})/.exec(input);
+  if (ymdMatch) {
+    return `${ymdMatch[3]}/${ymdMatch[2]}/${ymdMatch[1]}`;
+  }
+  const d = new Date(input);
+  if (Number.isNaN(d.getTime())) return input;
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  return `${day}/${month}/${year}`;
+}
+
 export function addCalendarDays(ymd: string, delta: number): string {
   const p = parseYmd(ymd);
   if (!p) return ymd;

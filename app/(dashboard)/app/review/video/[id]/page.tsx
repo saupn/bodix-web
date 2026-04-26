@@ -37,7 +37,7 @@ export default async function ReviewVideoPage({
       {/* Topics */}
       {video.topics_covered?.length > 0 && (
         <div className="space-y-2">
-          <p className="text-sm font-medium text-neutral-500">Chủ đề trong video:</p>
+          <p className="text-sm font-medium text-neutral-600">Chủ đề trong video:</p>
           <div className="flex flex-wrap gap-2">
             {video.topics_covered.map((topic: string) => {
               const config: Record<string, { label: string; color: string }> = {
@@ -64,7 +64,7 @@ export default async function ReviewVideoPage({
 
       {/* Duration */}
       {video.duration_minutes && (
-        <p className="text-sm text-neutral-500">
+        <p className="text-sm text-neutral-600">
           Thời lượng: {video.duration_minutes} phút
         </p>
       )}

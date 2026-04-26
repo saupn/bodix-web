@@ -131,7 +131,7 @@ export default function AdminChartsSection({ charts }: { charts: ChartsData }) {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <p className="mt-2 text-xs text-neutral-500">
+            <p className="mt-2 text-xs text-neutral-600">
               D3, D7, D14 highlighted in red
             </p>
           </div>

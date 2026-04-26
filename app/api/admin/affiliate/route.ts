@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
-const REFERRAL_LINK_BASE = 'https://bodix.vn/ref'
+const REFERRAL_LINK_BASE = 'https://bodix.fit/ref'
 
 import { TIER_COMMISSION } from '@/lib/affiliate/config'
 

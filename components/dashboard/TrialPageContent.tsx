@@ -144,7 +144,7 @@ export function TrialPageContent() {
   if (loading || !data) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
-        <p className="text-neutral-500">Đang tải...</p>
+        <p className="text-neutral-600">Đang tải...</p>
       </div>
     );
   }
@@ -192,6 +192,11 @@ export function TrialPageContent() {
     workouts.map((w) => [w.day_number, w])
   );
 
+  // Days remaining = 3 - currentDay (where startDate = ngày 1).
+  // When trialExp = 0 (chưa bắt đầu) we show a different banner; the "còn X ngày" pill
+  // only makes sense once the trial is running.
+  const daysRemaining = trialExp > 0 ? Math.max(0, 3 - trialExp) : null;
+
   return (
     <div className="pb-24 sm:pb-8">
       <div className="space-y-6">
@@ -199,26 +204,32 @@ export function TrialPageContent() {
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
             Trải nghiệm {program?.name ?? "chương trình"}
           </h1>
-          {countdown && (
-            <span className="mt-2 inline-block rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
-              Còn {countdown.days} ngày {countdown.hours} giờ dùng thử
-            </span>
+          {trialExp > 0 ? (
+            <>
+              {daysRemaining !== null && daysRemaining > 0 && (
+                <span className="mt-2 inline-block rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
+                  Còn {daysRemaining} ngày trải nghiệm
+                </span>
+              )}
+              <p className="mt-2 text-neutral-700">
+                Đang trải nghiệm thử – Ngày {Math.min(trialExp, 3)}/3
+              </p>
+            </>
+          ) : (
+            <p className="mt-2 text-neutral-700">
+              Trải nghiệm thử bắt đầu từ ngày mai
+            </p>
           )}
-          <p className="mt-2 text-neutral-600">
-            {trialExp > 0
-              ? `Ngày ${Math.min(trialExp, 3)}/3 trải nghiệm`
-              : "Chương trình tập thử chưa bắt đầu"}
-          </p>
         </div>
 
         {data.bodix_start_date && trialExp === 0 && (
-          <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-center text-neutral-700">
+          <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-center text-neutral-800">
             <p className="font-medium">
-              Chương trình tập thử bắt đầu vào ngày{" "}
+              Trải nghiệm thử bắt đầu vào ngày{" "}
               {formatVnYmd(data.bodix_start_date)}.
             </p>
-            <p className="mt-2 text-sm text-neutral-600">
-              Ngày mai lúc 6:30 bạn sẽ nhận tin nhắn bài tập đầu tiên qua Zalo. Chuẩn bị tinh thần nhé! 💪
+            <p className="mt-2 text-sm text-neutral-700">
+              Sáng mai lúc 6:30 bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo. Chuẩn bị tinh thần nhé! 💪
             </p>
           </div>
         )}
@@ -258,9 +269,9 @@ export function TrialPageContent() {
           >
             Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
           </Link>
-          {countdown && (
-            <p className="text-center text-sm text-neutral-500 sm:text-left">
-              Hoặc tiếp tục trải nghiệm, còn {countdown.days} ngày
+          {daysRemaining !== null && daysRemaining > 0 && (
+            <p className="text-center text-sm text-neutral-700 sm:text-left">
+              Hoặc tiếp tục trải nghiệm, còn {daysRemaining} ngày
             </p>
           )}
         </div>
@@ -321,7 +332,7 @@ function WorkoutCard({
       <h3 className="font-heading font-semibold text-primary">
         Ngày {day}
         {workout && (
-          <span className="ml-2 text-xs font-normal text-neutral-500">
+          <span className="ml-2 text-xs font-normal text-neutral-600">
             {typeLabel}
           </span>
         )}
@@ -334,7 +345,7 @@ function WorkoutCard({
           <p className="mt-1 text-xs text-accent">{workout.duration_minutes} phút</p>
         </>
       ) : (
-        <p className="mt-1 text-sm text-neutral-500">–</p>
+        <p className="mt-1 text-sm text-neutral-600">–</p>
       )}
 
       {isUnlocked ? (

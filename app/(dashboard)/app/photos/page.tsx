@@ -148,7 +148,7 @@ export default function PhotosPage() {
           <div>
             <label className="block text-sm font-medium">Chọn ảnh</label>
             <label className="mt-2 flex cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-neutral-300 p-8 hover:border-primary/50">
-              <Camera className="h-10 w-10 text-neutral-400" />
+              <Camera className="h-10 w-10 text-neutral-600" />
               <span className="mt-2 text-sm text-neutral-600">
                 {file ? file.name : "Nhấn để chọn ảnh (JPEG, PNG, WebP, tối đa 5MB)"}
               </span>

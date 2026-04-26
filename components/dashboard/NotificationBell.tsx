@@ -64,7 +64,10 @@ function formatRelativeTime(dateStr: string): string {
   if (diffHours < 24) return `${diffHours} giờ trước`;
   if (diffDays === 1) return "Hôm qua";
   if (diffDays < 7) return `${diffDays} ngày trước`;
-  return date.toLocaleDateString("vi-VN");
+  const dd = String(date.getDate()).padStart(2, "0");
+  const mm = String(date.getMonth() + 1).padStart(2, "0");
+  const yyyy = date.getFullYear();
+  return `${dd}/${mm}/${yyyy}`;
 }
 
 const PAGE_SIZE = 10;
@@ -263,11 +266,11 @@ export function NotificationBell({ userId }: { userId: string }) {
             }}
           >
             {loading ? (
-              <div className="flex items-center justify-center py-12 text-neutral-500">
+              <div className="flex items-center justify-center py-12 text-neutral-600">
                 Đang tải...
               </div>
             ) : notifications.length === 0 ? (
-              <div className="py-12 text-center text-sm text-neutral-500">
+              <div className="py-12 text-center text-sm text-neutral-600">
                 Không có thông báo mới
               </div>
             ) : (
@@ -293,7 +296,7 @@ export function NotificationBell({ userId }: { userId: string }) {
                             {notif.content}
                           </p>
                         )}
-                        <p className="mt-1 text-xs text-neutral-400">
+                        <p className="mt-1 text-xs text-neutral-600">
                           {formatRelativeTime(notif.created_at)}
                         </p>
                       </div>

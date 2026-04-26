@@ -2,17 +2,11 @@ import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckoutSuccessClient } from "@/components/checkout/CheckoutSuccessClient";
+import { formatDateVn } from "@/lib/date/vietnam";
 
 const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
-function formatDate(dateStr: string): string {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("vi-VN", {
-    day: "numeric",
-    month: "long",
-    year: "numeric",
-  });
-}
+const formatDate = formatDateVn;
 
 export default async function CheckoutSuccessPage({
   searchParams,

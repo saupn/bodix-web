@@ -304,7 +304,7 @@ export default function TrialWorkoutPage() {
 
       {/* Zalo note */}
       <div className="rounded-lg bg-primary/5 px-4 py-3 text-sm text-neutral-600">
-        <span className="font-medium text-primary">Lưu ý:</span> Check-in chính thức qua Zalo OA (reply 1/2/3). Nút bên dưới là backup.
+        <span className="font-medium text-primary">Lưu ý:</span> Check-in chính thức qua Zalo OA (reply 1/2/3). Nút bên dưới là dự phòng khi không nhắn qua Zalo OA được.
       </div>
 
       {/* Footer sticky */}

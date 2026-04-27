@@ -304,6 +304,18 @@ export function DashboardShell({ children, giftSection, profile, trialStartedAt,
                 Chia sẻ sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn bè – hoàn toàn miễn phí.
               </p>
 
+              <div className="mt-4 rounded-lg bg-neutral-50 p-3">
+                <p className="mb-2 text-sm text-neutral-700">📖 Đọc sách trước khi tặng:</p>
+                <a
+                  href="/api/guides/download"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium text-[#2D4A3E] hover:underline"
+                >
+                  Tải &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; →
+                </a>
+              </div>
+
               {giftSection.kind === "need_code" && (
                 <div className="mt-4">
                   <p className="text-sm text-neutral-700">

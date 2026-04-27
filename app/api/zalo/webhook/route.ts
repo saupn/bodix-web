@@ -151,9 +151,10 @@ async function handleUserMessage(payload: any) {
         event_name: payload.event_name ?? 'user_send_text',
       });
     const timeoutPromise = new Promise<{ error: { code: string; message: string } }>((_, reject) =>
-      setTimeout(() => reject(new Error('dedup timeout')), 2000),
+      setTimeout(() => reject(new Error('dedup timeout')), 4000),
     );
 
+    let dedupTimedOut = false;
     try {
       const { error: dedupError } = await Promise.race([dedupPromise, timeoutPromise]);
       if (dedupError) {
@@ -169,7 +170,27 @@ async function handleUserMessage(payload: any) {
         console.log('[webhook] DEDUP SKIP msg_id:', msgId, '(already processed)');
         return;
       }
-      console.warn('[webhook] DEDUP FAILED/TIMEOUT, continuing:', err?.message || e);
+      dedupTimedOut = true;
+      console.warn('[webhook] DEDUP FAILED/TIMEOUT, will re-check:', err?.message || e);
+    }
+
+    // Sau timeout: re-check tồn tại trước khi tiếp tục xử lý.
+    // Nếu insert race-condition đã thắng (Zalo retry trước), select sẽ thấy row → skip.
+    if (dedupTimedOut) {
+      try {
+        const { data: existing } = await service
+          .from('zalo_webhook_events')
+          .select('msg_id')
+          .eq('msg_id', msgId)
+          .maybeSingle();
+        if (existing) {
+          console.log('[webhook] DEDUP SKIP (re-check found):', msgId);
+          return;
+        }
+      } catch (recheckErr: unknown) {
+        const err = recheckErr as { message?: string };
+        console.warn('[webhook] re-check also failed, continuing:', err?.message || recheckErr);
+      }
     }
   }
 
@@ -544,7 +565,6 @@ async function handleCheckin(
   const programDays: number = program?.duration_days ?? 21;
   const programName: string = program?.name ?? 'BodiX 21';
   const dayNumber = (enrollment.current_day ?? 0) + 1;
-  const enrollmentStatus: string = enrollment.status;
 
   if (dayNumber > programDays) {
     await safeSend(zaloUserId,
@@ -653,37 +673,20 @@ async function handleCheckin(
     .from('streaks')
     .upsert(streakUpsert, { onConflict: 'enrollment_id' });
 
-  // Cập nhật enrollment
+  // Cập nhật enrollment — CHỈ update current_day cho trial.
+  // Việc chuyển status 'trial' → 'trial_completed' và gửi tin "🎯 3 ngày tập thử hoàn thành"
+  // do cron rescue-check xử lý. Tránh tin gửi 2 lần khi Zalo retry webhook (dedup miss).
   const isLastDay = dayNumber >= programDays;
-  const isTrialLastDay = enrollmentStatus === 'trial' && dayNumber >= 3;
 
-  if (isTrialLastDay && !isLastDay) {
-    // Trial D3 hoàn thành → trial_completed (chờ admin chọn)
-    await service
-      .from('enrollments')
-      .update({ current_day: dayNumber, status: 'trial_completed' })
-      .eq('id', enrollment.id);
-  } else {
-    await service
-      .from('enrollments')
-      .update({
-        current_day: dayNumber,
-        ...(isLastDay ? { status: 'completed', completed_at: new Date().toISOString() } : {}),
-      })
-      .eq('id', enrollment.id);
-  }
+  await service
+    .from('enrollments')
+    .update({
+      current_day: dayNumber,
+      ...(isLastDay ? { status: 'completed', completed_at: new Date().toISOString() } : {}),
+    })
+    .eq('id', enrollment.id);
 
-  // ── Ngoại lệ đặc biệt (thay thế phản hồi thông thường) ──
-
-  // Ngoại lệ b: Ngày cuối trial (D3, status='trial')
-  if (isTrialLastDay && !isLastDay) {
-    await safeSend(zaloUserId,
-      '🎯 3 ngày tập thử hoàn thành! Bạn sẽ được thông báo khi đợt tiếp theo mở.'
-    );
-    return;
-  }
-
-  // Ngoại lệ c: Ngày cuối chương trình
+  // Ngày cuối chương trình
   if (isLastDay) {
     await safeSend(zaloUserId,
       `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`

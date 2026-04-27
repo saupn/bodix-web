@@ -69,14 +69,14 @@ export async function GET(request: NextRequest) {
     `)
     .eq('status', 'active');
 
-  if (enrollError || !enrollments || enrollments.length === 0) {
-    return NextResponse.json({ l1: 0, l2: 0, l3_buddy: 0, l3_no_buddy: 0 });
+  if (enrollError) {
+    console.error('[rescue-check] enrollments query error:', enrollError);
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const stats = { l1: 0, l2: 0, l3_buddy: 0, l3_no_buddy: 0, skipped: 0, errors: 0 };
+  const stats = { l1: 0, l2: 0, l3_buddy: 0, l3_no_buddy: 0, skipped: 0, errors: 0, trial_expired: 0 };
 
-  for (const row of enrollments) {
+  for (const row of enrollments ?? []) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrollment = row as any;
     const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
@@ -331,6 +331,80 @@ export async function GET(request: NextRequest) {
 
     await new Promise(r => setTimeout(r, 100));
   }
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // TRIAL EXPIRATION CHECK
+  // Webhook KHÔNG còn auto-chuyển trial → trial_completed (tránh tin gửi 2 lần khi Zalo retry).
+  // Cron này chuyển status + gửi tin "🎯 3 ngày tập thử hoàn thành" đúng 1 lần (qua nudge_logs).
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  const { data: trialEnrollments, error: trialError } = await supabase
+    .from('enrollments')
+    .select('id, user_id, current_day')
+    .eq('status', 'trial')
+    .gte('current_day', 3);
+
+  if (trialError) {
+    console.error('[rescue-check] trial query error:', trialError);
+  }
+
+  for (const trialEnrollment of trialEnrollments ?? []) {
+    try {
+      // Chuyển status thầm lặng
+      await supabase
+        .from('enrollments')
+        .update({ status: 'trial_completed' })
+        .eq('id', trialEnrollment.id);
+
+      // Gửi tin Zalo — chỉ 1 lần, dùng nudge_logs làm dedup
+      const { data: trialProfile } = await supabase
+        .from('profiles')
+        .select('channel_user_id, full_name')
+        .eq('id', trialEnrollment.user_id)
+        .single();
+
+      if (!trialProfile?.channel_user_id) {
+        stats.trial_expired++;
+        continue;
+      }
+
+      const { data: alreadySent } = await supabase
+        .from('nudge_logs')
+        .select('id')
+        .eq('user_id', trialEnrollment.user_id)
+        .eq('nudge_type', 'trial_completed')
+        .maybeSingle();
+
+      if (alreadySent) {
+        stats.trial_expired++;
+        continue;
+      }
+
+      const trialDisplayName =
+        trialProfile.full_name?.split(' ').pop() || trialProfile.full_name || 'Bạn';
+
+      const result = await sendViaZalo(
+        trialProfile.channel_user_id,
+        `🎯 ${trialDisplayName} ơi, 3 ngày tập thử hoàn thành!\nBạn sẽ được thông báo khi đợt tiếp theo mở.`,
+      );
+
+      await supabase.from('nudge_logs').insert({
+        user_id: trialEnrollment.user_id,
+        enrollment_id: trialEnrollment.id,
+        nudge_type: 'trial_completed',
+        channel: 'zalo',
+        delivered: result.success,
+      });
+
+      stats.trial_expired++;
+    } catch (err) {
+      console.error(`[rescue-check] trial expiration error for enrollment ${trialEnrollment.id}:`, err);
+      stats.errors++;
+    }
+
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  console.log('[rescue-check] trial expired:', stats.trial_expired);
 
   return NextResponse.json(stats);
 }

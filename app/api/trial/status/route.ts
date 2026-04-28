@@ -33,6 +33,7 @@ export async function GET() {
       program_id,
       status,
       enrolled_at,
+      started_at,
       current_day,
       program:programs (
         id,
@@ -93,6 +94,7 @@ export async function GET() {
           program_id: enrollment.program_id,
           status: enrollment.status,
           enrolled_at: enrollment.enrolled_at,
+          started_at: enrollment.started_at,
           current_day: enrollment.current_day,
         }
       : null,

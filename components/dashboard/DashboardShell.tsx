@@ -11,6 +11,7 @@ import { StreakBadge } from "@/components/completion/StreakBadge";
 import { RescueBanner } from "@/components/rescue/RescueBanner";
 import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
 import { useToast } from "@/components/ui/Toast";
+import { getTrialDisplayStatus } from "@/lib/trial/status";
 
 const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
@@ -56,25 +57,15 @@ interface DashboardShellProps {
 }
 
 /**
- * Trial countdown anchored to enrollment.started_at (D1 = startDate, midnight ICT).
- * Returns null when trial chưa bắt đầu hoặc đã kết thúc.
+ * Trial pill shown in the header. Uses `getTrialDisplayStatus` to compute state
+ * from started_at (Asia/Ho_Chi_Minh). Returns null when trial đã kết thúc.
  */
 function getTrialPillText(startedAt: string | null | undefined): string | null {
-  if (!startedAt) return null;
-  const startDate = new Date(startedAt);
-  startDate.setHours(0, 0, 0, 0);
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  if (today < startDate) {
-    return "Bắt đầu từ ngày mai";
-  }
-
-  const currentDay = Math.floor((today.getTime() - startDate.getTime()) / 86400000) + 1;
-  if (currentDay > 3) return null;
-  const daysRemaining = Math.max(0, 3 - currentDay);
-  return daysRemaining > 0
-    ? `Dùng thử: còn ${daysRemaining} ngày`
+  const trial = getTrialDisplayStatus({ started_at: startedAt ?? null });
+  if (trial.isEnded) return null;
+  if (!trial.hasStarted) return "Bắt đầu từ ngày mai";
+  return trial.daysRemaining > 0
+    ? `Dùng thử: còn ${trial.daysRemaining} ngày`
     : "Dùng thử: hôm nay là ngày cuối";
 }
 

@@ -145,11 +145,7 @@ async function handleUserMessage(payload: any) {
   if (msgId) {
     const dedupPromise = service
       .from('zalo_webhook_events')
-      .insert({
-        msg_id: msgId,
-        zalo_uid: zaloUserId,
-        event_name: payload.event_name ?? 'user_send_text',
-      });
+      .insert({ msg_id: msgId });
     const timeoutPromise = new Promise<{ error: { code: string; message: string } }>((_, reject) =>
       setTimeout(() => reject(new Error('dedup timeout')), 4000),
     );
@@ -573,6 +569,22 @@ async function handleCheckin(
     return;
   }
 
+  // Dedup theo workout_date: Zalo retry khiến cùng 1 reply vào nhiều lần.
+  // day_number check ở dưới sẽ miss vì current_day đã advance ở lần insert đầu.
+  const todayStr = new Date().toISOString().split('T')[0];
+  const { data: existingCheckin } = await supabase
+    .from('daily_checkins')
+    .select('id')
+    .eq('enrollment_id', enrollment.id)
+    .eq('workout_date', todayStr)
+    .maybeSingle();
+
+  if (existingCheckin) {
+    console.log('[webhook] CHECK-IN ALREADY EXISTS for today, skipping');
+    await safeSend(zaloUserId, 'Bạn đã check-in hôm nay rồi! Nghỉ ngơi và hẹn ngày mai nhé.');
+    return;
+  }
+
   // Kiểm tra đã check-in ngày này chưa
   const { data: existing } = await supabase
     .from('daily_checkins')
@@ -588,7 +600,7 @@ async function handleCheckin(
     return;
   }
 
-  const workoutDate = new Date().toISOString().split('T')[0];
+  const workoutDate = todayStr;
 
   // Ghi check-in
   const { error: checkinError } = await service

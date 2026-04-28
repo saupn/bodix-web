@@ -10,6 +10,7 @@ import { MILESTONE_CONFIG } from "@/lib/completion/milestones";
 import { ComebackCard } from "@/components/rescue/ComebackCard";
 import { BuddyCard } from "@/components/dashboard/BuddyCard";
 import { ZaloConnectBanner } from "@/components/dashboard/ZaloConnectBanner";
+import { getTrialDisplayStatus } from "@/lib/trial/status";
 
 const COMEBACK_DISMISSED_KEY = "comeback-dismissed";
 
@@ -115,14 +116,21 @@ export function DashboardHomeContent({
           if (trialRes.ok) {
             const trialStatus = await trialRes.json();
             if (trialStatus.is_trial && trialStatus.enrollment) {
-              const trialDay = Math.min(
-                Math.max(trialStatus.enrollment.current_day ?? 0, 0) + 1,
-                3,
-              );
-              const woRes = await fetch(`/api/trial/workout/${trialDay}`);
-              if (woRes.ok) {
-                const wo = await woRes.json();
-                setTrial({ day: trialDay, workout: wo.workout });
+              // Compute trial day from started_at vs today (ICT) — DB current_day có thể bị lệch.
+              const display = getTrialDisplayStatus({
+                started_at:
+                  trialStatus.enrollment.started_at ??
+                  trialStatus.bodix_start_date ??
+                  null,
+              });
+              if (display.hasStarted && !display.isEnded) {
+                const woRes = await fetch(
+                  `/api/trial/workout/${display.currentDay}`,
+                );
+                if (woRes.ok) {
+                  const wo = await woRes.json();
+                  setTrial({ day: display.currentDay, workout: wo.workout });
+                }
               }
             }
           }

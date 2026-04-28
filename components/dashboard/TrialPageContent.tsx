@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getTrialExperienceDay } from "@/lib/trial/calendar";
+import { getTrialDisplayStatus } from "@/lib/trial/status";
 
 interface Workout {
   id: string;
@@ -34,6 +34,7 @@ interface TrialData {
     id: string;
     program_id: string;
     enrolled_at: string;
+    started_at: string | null;
     current_day: number;
   } | null;
   activity_summary: Record<string, number>;
@@ -149,7 +150,9 @@ export function TrialPageContent() {
     );
   }
 
-  const trialExp = getTrialExperienceDay(data.bodix_start_date ?? null);
+  const trial = getTrialDisplayStatus({
+    started_at: data.enrollment?.started_at ?? data.bodix_start_date ?? null,
+  });
   const program = data.program;
   const tryCount =
     (data.activity_summary?.try_workout ?? 0) +
@@ -192,11 +195,6 @@ export function TrialPageContent() {
     workouts.map((w) => [w.day_number, w])
   );
 
-  // Days remaining = 3 - currentDay (where startDate = ngày 1).
-  // When trialExp = 0 (chưa bắt đầu) we show a different banner; the "còn X ngày" pill
-  // only makes sense once the trial is running.
-  const daysRemaining = trialExp > 0 ? Math.max(0, 3 - trialExp) : null;
-
   return (
     <div className="pb-24 sm:pb-8">
       <div className="space-y-6">
@@ -204,16 +202,14 @@ export function TrialPageContent() {
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
             Trải nghiệm {program?.name ?? "chương trình"}
           </h1>
-          {trialExp > 0 ? (
+          {trial.hasStarted && !trial.isEnded ? (
             <>
-              {daysRemaining !== null && daysRemaining > 0 && (
+              {trial.daysRemaining > 0 && (
                 <span className="mt-2 inline-block rounded-full bg-primary/15 px-3 py-1 text-sm font-medium text-primary">
-                  Còn {daysRemaining} ngày trải nghiệm
+                  Còn {trial.daysRemaining} ngày trải nghiệm
                 </span>
               )}
-              <p className="mt-2 text-neutral-700">
-                Đang trải nghiệm thử – Ngày {Math.min(trialExp, 3)}/3
-              </p>
+              <p className="mt-2 text-neutral-700">{trial.headingText}</p>
             </>
           ) : (
             <p className="mt-2 text-neutral-700">
@@ -222,7 +218,7 @@ export function TrialPageContent() {
           )}
         </div>
 
-        {data.bodix_start_date && trialExp === 0 && (
+        {data.bodix_start_date && !trial.hasStarted && (
           <div className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-center text-neutral-800">
             <p className="font-medium">
               Trải nghiệm thử bắt đầu vào ngày{" "}
@@ -237,8 +233,8 @@ export function TrialPageContent() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((day) => {
             const workout = workoutsByDay[day];
-            const isUnlocked = trialExp > 0 && day <= trialExp;
-            const isPast = trialExp > 0 && day < trialExp;
+            const isUnlocked = trial.hasStarted && day <= trial.currentDay;
+            const isPast = trial.hasStarted && day < trial.currentDay;
 
             return (
               <WorkoutCard
@@ -269,9 +265,9 @@ export function TrialPageContent() {
           >
             Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
           </Link>
-          {daysRemaining !== null && daysRemaining > 0 && (
+          {trial.daysRemainingText && (
             <p className="text-center text-sm text-neutral-700 sm:text-left">
-              Hoặc tiếp tục trải nghiệm, còn {daysRemaining} ngày
+              {trial.daysRemainingText}
             </p>
           )}
         </div>

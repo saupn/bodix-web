@@ -263,12 +263,13 @@ async function handleUserMessage(payload: any) {
     return;
   }
 
-  // 2. Tìm enrollment active hoặc trial
+  // 2. Tìm enrollment active / trial / trial_completed
+  // Bao gồm 'trial_completed' để bắt reply "Y" (đăng ký chính thức) sau khi xong trial.
   const { data: enrollment, error: enrollmentError } = await supabase
     .from('enrollments')
     .select('id, user_id, cohort_id, current_day, program_id, status, programs(name, duration_days)')
     .eq('user_id', profile.id)
-    .in('status', ['active', 'trial'])
+    .in('status', ['active', 'trial', 'trial_completed'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -285,7 +286,7 @@ async function handleUserMessage(payload: any) {
       .from('enrollments')
       .select('status')
       .eq('user_id', profile.id)
-      .in('status', ['trial_completed', 'pending_payment', 'paid_waiting_cohort', 'completed', 'paused', 'dropped'])
+      .in('status', ['pending_payment', 'paid_waiting_cohort', 'completed', 'paused', 'dropped'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
@@ -293,7 +294,7 @@ async function handleUserMessage(payload: any) {
     const status = otherEnrollment?.status;
     console.log('[webhook] matched=no_active_enrollment msg_id:', msgId, 'status:', status);
 
-    if (status === 'trial_completed' || status === 'paid_waiting_cohort') {
+    if (status === 'paid_waiting_cohort') {
       await safeSend(zaloUserId,
         'Bạn đã hoàn thành tập thử. Chờ thông báo để tham gia chính thức nhé!'
       );
@@ -317,6 +318,22 @@ async function handleUserMessage(payload: any) {
     return;
   }
 
+  // ── Reply "Y" / "YES" / "CÓ" / "ĐĂNG KÝ" — đăng ký chính thức sau trial ──
+  const upperText = messageText.toUpperCase().trim();
+  const isYesReply = ['Y', 'YES', 'CÓ', 'CO', 'ĐĂNG KÝ'].includes(upperText);
+  if (isYesReply) {
+    const trialDone =
+      enrollment.status === 'trial_completed' ||
+      (enrollment.status === 'trial' && (enrollment.current_day || 0) >= 3);
+    if (trialDone) {
+      console.log('[webhook] matched=yes_register msg_id:', msgId);
+      await safeSend(zaloUserId,
+        '✅ Cảm ơn bạn! Chúng tôi sẽ thông báo cho bạn nếu bạn được chọn tham gia đợt tiếp theo.\n\nTrong thời gian chờ, bạn có thể xem thêm tại bodix.fit'
+      );
+      return;
+    }
+  }
+
   // ── Kiểm tra: reply feeling (1-5) cho weekly review? ──
   if (feelingScore !== null) {
     const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
@@ -332,26 +349,30 @@ async function handleUserMessage(payload: any) {
   }
 
   // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
+  // Skip cho trial_completed: đã xong trial, không nhận check-in mới.
   console.log('[webhook] checkin type parsed:', checkinType);
-  if (checkinType) {
+  if (checkinType && enrollment.status !== 'trial_completed') {
     console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
     await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
     return;
   }
 
-  // ── Không phải check-in hay feeling → kiểm tra có phải text không hợp lệ ──
-  // Nếu tin nhắn ngắn (< 20 ký tự) và không match → hướng dẫn check-in
-  if (messageText.trim().length < 20) {
-    console.log('[webhook] matched=invalid_short msg_id:', msgId);
+  // ── Catch-all: không match verify/Y/feeling/check-in ──
+  const trialDone =
+    enrollment.status === 'trial_completed' ||
+    (enrollment.status === 'trial' && (enrollment.current_day || 0) >= 3);
+  if (trialDone) {
+    console.log('[webhook] matched=catchall_trial_done msg_id:', msgId);
     await safeSend(zaloUserId,
-      'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nCả 3 đều tính hoàn thành!'
+      'Bạn đã hoàn thành trải nghiệm thử. Nhắn Y nếu muốn đăng ký tập chính thức, hoặc nhắn câu hỏi – chúng tôi sẽ phản hồi sớm nhất!'
     );
     return;
   }
 
-  // ── Tin nhắn dài → lưu là câu hỏi/vấn đề ──
-  console.log('[webhook] matched=question msg_id:', msgId);
-  await saveUserQuestion(zaloUserId, profile, enrollment, messageText, payload, safeSend);
+  console.log('[webhook] matched=catchall_active msg_id:', msgId);
+  await safeSend(zaloUserId,
+    'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nHoặc nhắn câu hỏi – chúng tôi sẽ phản hồi sớm nhất!'
+  );
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string };
     console.error(
@@ -569,19 +590,29 @@ async function handleCheckin(
     return;
   }
 
-  // Dedup theo workout_date: Zalo retry khiến cùng 1 reply vào nhiều lần.
-  // day_number check ở dưới sẽ miss vì current_day đã advance ở lần insert đầu.
-  const todayStr = new Date().toISOString().split('T')[0];
+  // Dedup theo workout_date (VN timezone). UTC midnight ≠ VN midnight:
+  // 6:44 SA VN = 23:44 UTC ngày hôm trước → toISOString() trả ngày hôm trước
+  // → query bằng UTC date sẽ miss row hôm nay → insert tiếp tục thành công ở day mới.
+  const vnNow = new Date(Date.now() + 7 * 3600000);
+  const todayVN = vnNow.toISOString().split('T')[0];
   const { data: existingCheckin } = await supabase
     .from('daily_checkins')
     .select('id')
     .eq('enrollment_id', enrollment.id)
-    .eq('workout_date', todayStr)
+    .eq('workout_date', todayVN)
     .maybeSingle();
 
   if (existingCheckin) {
-    console.log('[webhook] CHECK-IN ALREADY EXISTS for today, skipping');
-    await safeSend(zaloUserId, 'Bạn đã check-in hôm nay rồi! Nghỉ ngơi và hẹn ngày mai nhé.');
+    console.log('[webhook] CHECK-IN ALREADY EXISTS for today (VN), skipping');
+    const isTrial = enrollment.status === 'trial';
+    const currentDay = enrollment.current_day || 0;
+    if (isTrial && currentDay >= 3) {
+      await safeSend(zaloUserId,
+        '🎯 Chúc mừng! Bạn đã hoàn thành 3 ngày trải nghiệm thử!\n\nBạn có muốn đăng ký tập chính thức không? Nhắn Y nếu muốn đăng ký.'
+      );
+    } else {
+      await safeSend(zaloUserId, 'Bạn đã check-in hôm nay rồi! Nghỉ ngơi và hẹn ngày mai nhé.');
+    }
     return;
   }
 
@@ -600,7 +631,7 @@ async function handleCheckin(
     return;
   }
 
-  const workoutDate = todayStr;
+  const workoutDate = todayVN;
 
   // Ghi check-in
   const { error: checkinError } = await service
@@ -702,6 +733,17 @@ async function handleCheckin(
   if (isLastDay) {
     await safeSend(zaloUserId,
       `🏆 CHÚC MỪNG! Bạn đã hoàn thành ${programName}!`
+    );
+    return;
+  }
+
+  // Ngày cuối trial (D3) — gửi tin trial complete + invite Y.
+  // Cron rescue-check vẫn đảm nhiệm chuyển status 'trial' → 'trial_completed';
+  // ở đây chỉ phản hồi check-in, không tự đổi status.
+  const isTrial = enrollment.status === 'trial';
+  if (isTrial && dayNumber >= 3) {
+    await safeSend(zaloUserId,
+      '💪 Tuyệt vời! Bạn đã hoàn thành 3 ngày trải nghiệm thử!\n\nBạn có muốn đăng ký tập chính thức không? Nhắn Y nếu muốn đăng ký.'
     );
     return;
   }

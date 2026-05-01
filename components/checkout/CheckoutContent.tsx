@@ -76,7 +76,7 @@ export function CheckoutContent({
           Đăng ký thành công!
         </h2>
         <p className="mt-3 text-neutral-600">
-          Bạn sẽ được thông báo nếu được chọn tham gia đợt tiếp theo.
+          Chờ thông báo nếu bạn được chọn tham gia nhé!
         </p>
         <Link
           href="/app"

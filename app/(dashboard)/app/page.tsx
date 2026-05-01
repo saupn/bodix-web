@@ -258,8 +258,14 @@ export default async function AppPage() {
             Tập thử hoàn thành!
           </h2>
           <p className="mt-3 text-neutral-600">
-            Chờ thông báo từ BodiX. Bạn sẽ nhận tin nhắn khi đợt tiếp theo mở.
+            Đăng ký tập chính thức và chờ thông báo nếu bạn được chọn tham gia!
           </p>
+          <Link
+            href="/app/checkout/bodix-21"
+            className="mt-6 inline-flex items-center rounded-lg bg-primary px-6 py-3 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
+          >
+            Đăng ký tập chính thức
+          </Link>
         </div>
       </div>
     );

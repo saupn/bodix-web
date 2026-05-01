@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
       await sendPushToUser(order.user_id, {
         type: "paymentConfirmed",
         title: "Thanh toán xác nhận! 🎉",
-        body: "Bạn sẽ được thông báo khi đợt tập tiếp theo mở.",
+        body: "Bạn sẽ được thông báo khi đợt tập của bạn bắt đầu.",
         data: {
           order_id: order.id,
           program: order.program ?? "",

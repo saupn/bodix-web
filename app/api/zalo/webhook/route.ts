@@ -304,7 +304,7 @@ async function handleUserMessage(payload: any) {
       );
     } else if (status === 'completed') {
       await safeSend(zaloUserId,
-        '🏆 Bạn đã hoàn thành chương trình rồi! Chờ thông báo đợt tiếp theo nha.'
+        '🏆 Bạn đã hoàn thành chương trình rồi! Đăng ký tập chính thức tại bodix.fit/app và chờ thông báo nếu bạn được chọn tham gia nhé!'
       );
     } else if (status === 'paused') {
       await safeSend(zaloUserId,
@@ -328,7 +328,7 @@ async function handleUserMessage(payload: any) {
     if (trialDone) {
       console.log('[webhook] matched=yes_register msg_id:', msgId);
       await safeSend(zaloUserId,
-        '✅ Cảm ơn bạn! Chúng tôi sẽ thông báo cho bạn nếu bạn được chọn tham gia đợt tiếp theo.\n\nTrong thời gian chờ, bạn có thể xem thêm tại bodix.fit'
+        '✅ Cảm ơn bạn! Đăng ký tập chính thức tại bodix.fit/app và chờ thông báo nếu bạn được chọn tham gia nhé!'
       );
       return;
     }

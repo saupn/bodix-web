@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Building2, Wallet, Ticket } from "lucide-react";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
@@ -50,6 +51,7 @@ export function CheckoutForm({
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     // Read from cookie first, then localStorage fallback
@@ -188,6 +190,11 @@ export function CheckoutForm({
 
       if (!res.ok) {
         setError(data.error ?? "Có lỗi xảy ra. Vui lòng thử lại.");
+        return;
+      }
+
+      if (data.redirect) {
+        router.push(data.redirect);
         return;
       }
 

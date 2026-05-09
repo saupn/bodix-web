@@ -139,14 +139,21 @@ export async function POST(request: NextRequest) {
     .limit(1)
     .maybeSingle();
 
-  // ── Chỉ cho phép checkout khi đã ở pending_payment (admin đã chọn) ──────
-  const { data: pendingEnrollment } = await supabase
-    .from("enrollments")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("program_id", program.id)
-    .eq("status", "pending_payment")
-    .maybeSingle();
+  const service = createServiceClient();
+
+  // ── Cho phép checkout khi: (a) đã ở pending_payment, hoặc (b) user đã hoàn ─
+  //    thành ít nhất 1 chương trình (self-service upgrade từ /upgrade).
+  let pendingEnrollment: { id: string } | null = null;
+  {
+    const { data } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("program_id", program.id)
+      .eq("status", "pending_payment")
+      .maybeSingle();
+    pendingEnrollment = data;
+  }
 
   if (!pendingEnrollment) {
     const { data: existingOther } = await supabase
@@ -164,13 +171,43 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    return NextResponse.json(
-      { error: "Bạn chưa được chọn tham gia. Vui lòng chờ thông báo từ BodiX." },
-      { status: 403 }
-    );
-  }
+    // Self-service upgrade: nếu user đã hoàn thành ít nhất 1 chương trình.
+    const { data: completed } = await supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "completed")
+      .limit(1)
+      .maybeSingle();
 
-  const service = createServiceClient();
+    if (!completed) {
+      return NextResponse.json(
+        { error: "Bạn chưa được chọn tham gia. Vui lòng chờ thông báo từ BodiX." },
+        { status: 403 }
+      );
+    }
+
+    // Tạo pending_payment enrollment mới
+    const { data: newEnrollment, error: createErr } = await service
+      .from("enrollments")
+      .insert({
+        user_id: user.id,
+        program_id: program.id,
+        status: "pending_payment",
+        current_day: 0,
+      })
+      .select("id")
+      .single();
+
+    if (createErr || !newEnrollment) {
+      console.error("[checkout/create] auto-create enrollment:", createErr);
+      return NextResponse.json(
+        { error: "Không thể khởi tạo đơn nâng cấp." },
+        { status: 500 }
+      );
+    }
+    pendingEnrollment = { id: newEnrollment.id };
+  }
 
   // ���─ Resolve referral / affiliate code (soft-fail) ���────────────────────────
   let referralCodeId: string | null = null;
@@ -234,9 +271,88 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // ── SePay: sinh payment code unique từ DB sequence (atomic) ──────────────
+  const { data: codeData, error: codeError } = await service
+    .rpc("generate_bodix_payment_code");
+
+  if (codeError || !codeData) {
+    console.error("[checkout/create] payment_code rpc:", codeError);
+    return NextResponse.json(
+      { error: "Không thể tạo mã thanh toán. Vui lòng thử lại." },
+      { status: 500 }
+    );
+  }
+
+  const paymentCode = codeData as string;
+  const paymentSequence = parseInt(paymentCode.replace(/^BX/, ""), 10);
+
+  // ── Insert/upsert orders row gắn với enrollment ──────────────────────────
+  // Reuse pending order nếu có (user submit lại checkout) — match theo
+  // user_id + program slug + status pending. Nếu không có, tạo mới.
+  const { data: existingPending } = await service
+    .from("orders")
+    .select("id")
+    .eq("user_id", user.id)
+    .eq("program", slug)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let orderId: number | null = null;
+  if (existingPending) {
+    const { data: updated, error: updErr } = await service
+      .from("orders")
+      .update({
+        amount: finalPrice,
+        payment_method: paymentMethod,
+        payment_code: paymentCode,
+        payment_sequence: paymentSequence,
+        referral_code: body.referral_code?.trim() || null,
+      })
+      .eq("id", existingPending.id)
+      .select("id")
+      .single();
+    if (updErr) {
+      console.error("[checkout/create] order update:", updErr);
+      return NextResponse.json(
+        { error: "Không thể cập nhật đơn hàng." },
+        { status: 500 }
+      );
+    }
+    orderId = updated.id;
+  } else {
+    const orderCode = `BX-${Date.now()}-${user.id.slice(0, 8)}`;
+    const { data: inserted, error: insErr } = await service
+      .from("orders")
+      .insert({
+        order_code: orderCode,
+        user_id: user.id,
+        program: slug,
+        amount: finalPrice,
+        payment_method: paymentMethod,
+        payment_status: "pending",
+        payment_code: paymentCode,
+        payment_sequence: paymentSequence,
+        referral_code: body.referral_code?.trim() || null,
+      })
+      .select("id")
+      .single();
+    if (insErr || !inserted) {
+      console.error("[checkout/create] order insert:", insErr);
+      return NextResponse.json(
+        { error: "Không thể tạo đơn hàng." },
+        { status: 500 }
+      );
+    }
+    orderId = inserted.id;
+  }
+
   return NextResponse.json({
     success: true,
     enrollment_id: pendingEnrollment.id,
+    order_id: orderId,
+    payment_code: paymentCode,
     pricing: {
       original_price: program.price_vnd,
       referral_discount_amount: referralDiscountAmount,
@@ -246,6 +362,6 @@ export async function POST(request: NextRequest) {
       referral_applied: referralCodeId !== null,
       voucher_applied: voucherId !== null,
     },
-    redirect: `/app/checkout/success?slug=${slug}`,
+    redirect: `/checkout/${orderId}`,
   });
 }

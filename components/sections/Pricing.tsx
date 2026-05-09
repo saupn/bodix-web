@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { SectionHeading } from "@/components/ui/SectionHeading";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 
 const PRICING_CARDS = [
   {
@@ -19,6 +19,8 @@ const PRICING_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: true,
+    requires: null as string | null,
+    requiresName: null as string | null,
   },
   {
     id: "bodix-6w",
@@ -36,6 +38,8 @@ const PRICING_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: false,
+    requires: "bodix-21",
+    requiresName: "BodiX 21",
   },
   {
     id: "bodix-12w",
@@ -53,6 +57,8 @@ const PRICING_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: false,
+    requires: "bodix-6w",
+    requiresName: "BodiX 6W",
   },
 ] as const;
 
@@ -65,53 +71,81 @@ export function Pricing() {
           subtitle="Thanh toán 1 lần. Không subscription. Không phí ẩn."
         />
         <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 grid-cols-1 md:grid-cols-3">
-          {PRICING_CARDS.map((card) => (
-            <div
-              key={card.id}
-              className={`relative flex flex-col rounded-2xl border-2 bg-white p-6 sm:p-8 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
-                card.highlighted
-                  ? "border-primary shadow-lg ring-2 ring-primary/20"
-                  : "border-neutral-200"
-              }`}
-            >
-              {card.badge && (
-                <span
-                  className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium ${card.badgeStyle}`}
-                >
-                  {card.badge}
-                </span>
-              )}
-              <div className="text-center">
-                <h3 className="font-heading text-lg sm:text-xl font-bold text-primary">
-                  {card.name}
-                </h3>
-                <p className="mt-1 text-sm text-neutral-500">{card.duration}</p>
-                <p className="mt-4 text-2xl sm:text-3xl font-bold text-neutral-900">
-                  {card.price}
-                </p>
-                <p className="mt-1 text-sm text-neutral-500">{card.perDay}</p>
-              </div>
-              <ul className="mt-6 flex-1 space-y-3">
-                {card.features.map((feature) => (
-                  <li
-                    key={feature}
-                    className="flex items-start gap-2 text-sm text-neutral-800"
+          {PRICING_CARDS.map((card) => {
+            const locked = card.requires !== null;
+            return (
+              <div
+                key={card.id}
+                className={`relative flex flex-col rounded-2xl border-2 bg-white p-6 sm:p-8 shadow-md transition-all duration-200 ${
+                  locked
+                    ? "cursor-not-allowed border-neutral-200 opacity-60"
+                    : "hover:-translate-y-1 hover:shadow-lg"
+                } ${
+                  !locked && card.highlighted
+                    ? "border-primary shadow-lg ring-2 ring-primary/20"
+                    : "border-neutral-200"
+                }`}
+              >
+                {card.badge && !locked && (
+                  <span
+                    className={`absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap px-3 py-1 rounded-full text-xs font-medium ${card.badgeStyle}`}
                   >
-                    <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-8">
-                <Link
-                  href="/signup"
-                  className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-                >
-                  Bắt đầu miễn phí 3 ngày
-                </Link>
+                    {card.badge}
+                  </span>
+                )}
+                {locked && (
+                  <span className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-neutral-700 px-3 py-1 text-xs font-medium text-white">
+                    <Lock className="h-3 w-3" /> Khoá
+                  </span>
+                )}
+                <div className="text-center">
+                  <h3 className="font-heading text-lg sm:text-xl font-bold text-primary">
+                    {card.name}
+                  </h3>
+                  <p className="mt-1 text-sm text-neutral-500">{card.duration}</p>
+                  <p className="mt-4 text-2xl sm:text-3xl font-bold text-neutral-900">
+                    {card.price}
+                  </p>
+                  <p className="mt-1 text-sm text-neutral-500">{card.perDay}</p>
+                </div>
+                <ul className="mt-6 flex-1 space-y-3">
+                  {card.features.map((feature) => (
+                    <li
+                      key={feature}
+                      className="flex items-start gap-2 text-sm text-neutral-800"
+                    >
+                      <Check className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                      <span>{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-8">
+                  {locked ? (
+                    <>
+                      <button
+                        type="button"
+                        disabled
+                        className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-neutral-200 px-5 py-3 text-sm font-medium text-neutral-500"
+                      >
+                        <Lock className="h-4 w-4" />
+                        Nâng cấp sau khi hoàn thành {card.requiresName}
+                      </button>
+                      <p className="mt-2 text-center text-xs text-neutral-500">
+                        Hoàn thành {card.requiresName} để mở khoá
+                      </p>
+                    </>
+                  ) : (
+                    <Link
+                      href="/signup"
+                      className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+                    >
+                      Tập thử 3 ngày miễn phí
+                    </Link>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
         <p className="mt-8 text-center text-sm text-neutral-700 max-w-2xl mx-auto">
           Thanh toán 1 lần. Không subscription. Không phí ẩn.

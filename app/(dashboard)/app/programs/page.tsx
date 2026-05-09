@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { Check } from "lucide-react";
+import { Check, Lock } from "lucide-react";
 import { TrialStartButton } from "@/components/dashboard/TrialStartButton";
 
 const PROGRAM_CARDS = [
@@ -21,6 +21,8 @@ const PROGRAM_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: true,
+    requires: null as string | null,
+    requiresName: null as string | null,
   },
   {
     slug: "bodix-6w",
@@ -38,6 +40,8 @@ const PROGRAM_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: false,
+    requires: "bodix-21",
+    requiresName: "BodiX 21",
   },
   {
     slug: "bodix-12w",
@@ -55,6 +59,8 @@ const PROGRAM_CARDS = [
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
     highlighted: false,
+    requires: "bodix-6w",
+    requiresName: "BodiX 6W",
   },
 ] as const;
 
@@ -69,6 +75,25 @@ const UPGRADE_BANNERS: Record<string, { message: string; targetSlug: string }> =
   },
 };
 
+type EnrollmentStatus =
+  | "trial"
+  | "trial_completed"
+  | "pending_payment"
+  | "paid_waiting_cohort"
+  | "active"
+  | "completed"
+  | "paused"
+  | "dropped";
+
+const TRIAL_DONE_STATUSES = new Set<EnrollmentStatus>([
+  "trial_completed",
+  "pending_payment",
+  "paid_waiting_cohort",
+  "active",
+  "completed",
+  "dropped",
+]);
+
 export default async function ProgramsPage() {
   const supabase = await createClient();
   const {
@@ -77,7 +102,6 @@ export default async function ProgramsPage() {
 
   if (!user) redirect("/login");
 
-  // Check if user already has an active enrollment
   const { data: activeEnrollment } = await supabase
     .from("enrollments")
     .select("id")
@@ -90,7 +114,6 @@ export default async function ProgramsPage() {
     redirect("/app");
   }
 
-  // Fetch programs from DB to get IDs for trial start
   const { data: programs } = await supabase
     .from("programs")
     .select("id, slug")
@@ -101,24 +124,37 @@ export default async function ProgramsPage() {
     programIdBySlug[p.slug] = p.id;
   }
 
-  // Check completed enrollments for upgrade banners
-  const { data: completedEnrollments } = await supabase
+  const { data: enrollments } = await supabase
     .from("enrollments")
-    .select("program_id, programs(slug)")
-    .eq("user_id", user.id)
-    .eq("status", "completed");
+    .select("status, programs(slug)")
+    .eq("user_id", user.id);
 
-  const completedSlugs = (completedEnrollments ?? [])
-    .map((e) => {
-      const prog = e.programs as unknown as { slug: string } | null;
-      return prog?.slug;
-    })
-    .filter(Boolean) as string[];
+  // Slug → set of statuses user has for that program
+  const statusesBySlug = new Map<string, Set<EnrollmentStatus>>();
+  for (const e of enrollments ?? []) {
+    const prog = e.programs as unknown as { slug: string } | null;
+    const slug = prog?.slug;
+    if (!slug) continue;
+    if (!statusesBySlug.has(slug)) statusesBySlug.set(slug, new Set());
+    statusesBySlug.get(slug)!.add(e.status as EnrollmentStatus);
+  }
 
-  // Find the highest-level completed program for upgrade banner
+  const hasCompleted = (slug: string) =>
+    statusesBySlug.get(slug)?.has("completed") ?? false;
+  const hasPaid = (slug: string) => {
+    const s = statusesBySlug.get(slug);
+    return s?.has("paid_waiting_cohort") || s?.has("pending_payment") || false;
+  };
+  const trialDone = (slug: string) => {
+    const s = statusesBySlug.get(slug);
+    if (!s) return false;
+    for (const status of s) if (TRIAL_DONE_STATUSES.has(status)) return true;
+    return false;
+  };
+
   const upgradeBanner =
-    UPGRADE_BANNERS[completedSlugs.includes("bodix-6w") ? "bodix-6w" : ""]
-    ?? UPGRADE_BANNERS[completedSlugs.includes("bodix-21") ? "bodix-21" : ""]
+    UPGRADE_BANNERS[hasCompleted("bodix-6w") ? "bodix-6w" : ""]
+    ?? UPGRADE_BANNERS[hasCompleted("bodix-21") ? "bodix-21" : ""]
     ?? null;
 
   return (
@@ -130,7 +166,6 @@ export default async function ProgramsPage() {
         Thanh toán 1 lần. Không subscription. Không phí ẩn.
       </p>
 
-      {/* Upgrade banner */}
       {upgradeBanner && (
         <div className="mt-6 rounded-xl border-2 border-primary/30 bg-primary/5 p-4 sm:p-5">
           <p className="font-medium text-primary text-sm sm:text-base">
@@ -149,18 +184,35 @@ export default async function ProgramsPage() {
         {PROGRAM_CARDS.map((card) => {
           const programId = programIdBySlug[card.slug];
 
+          // Tiered unlock: card khoá khi requires chưa completed
+          const locked =
+            card.requires !== null && !hasCompleted(card.requires);
+
+          const cardCompleted = hasCompleted(card.slug);
+          const cardPaid = hasPaid(card.slug);
+          const cardTrialDone = trialDone(card.slug);
+
           return (
             <div
               key={card.slug}
-              className={`relative flex flex-col rounded-2xl border-2 bg-white p-6 sm:p-8 shadow-md transition-all duration-200 hover:shadow-lg hover:-translate-y-1 ${
-                card.highlighted
+              className={`relative flex flex-col rounded-2xl border-2 bg-white p-6 sm:p-8 shadow-md transition-all duration-200 ${
+                locked
+                  ? "cursor-not-allowed border-neutral-200 opacity-60"
+                  : "hover:-translate-y-1 hover:shadow-lg"
+              } ${
+                !locked && card.highlighted
                   ? "border-primary shadow-lg ring-2 ring-primary/20"
                   : "border-neutral-200"
               }`}
             >
-              {card.badge && (
+              {card.badge && !locked && (
                 <span className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-primary px-3 py-1 text-xs font-medium text-white">
                   {card.badge}
+                </span>
+              )}
+              {locked && (
+                <span className="absolute -top-3 left-1/2 inline-flex -translate-x-1/2 items-center gap-1 whitespace-nowrap rounded-full bg-neutral-700 px-3 py-1 text-xs font-medium text-white">
+                  <Lock className="h-3 w-3" /> Khoá
                 </span>
               )}
 
@@ -194,20 +246,81 @@ export default async function ProgramsPage() {
               </ul>
 
               <div className="mt-8">
-                {programId ? (
-                  <TrialStartButton
-                    programId={programId}
-                    programName={card.name}
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60"
+                {/* ── Locked tier ──────────────────────────────────────── */}
+                {locked && (
+                  <>
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-lg bg-neutral-200 px-5 py-3 text-sm font-medium text-neutral-500"
+                    >
+                      <Lock className="h-4 w-4" />
+                      Nâng cấp sau khi hoàn thành {card.requiresName}
+                    </button>
+                    <p className="mt-2 text-center text-xs text-neutral-500">
+                      Hoàn thành {card.requiresName} để mở khoá
+                    </p>
+                  </>
+                )}
+
+                {/* ── Đã thanh toán: chờ cohort ─────────────────────────── */}
+                {!locked && cardPaid && !cardCompleted && (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-green-100 px-5 py-3 text-sm font-medium text-green-700"
                   >
-                    Thử nghiệm miễn phí 3 ngày
-                  </TrialStartButton>
-                ) : (
+                    ✅ Đã thanh toán – chờ đợt
+                  </button>
+                )}
+
+                {/* ── Đã hoàn thành ─────────────────────────────────────── */}
+                {!locked && cardCompleted && (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-neutral-100 px-5 py-3 text-sm font-medium text-neutral-600"
+                  >
+                    ✅ Đã hoàn thành
+                  </button>
+                )}
+
+                {/* ── BodiX 21: trial done → buy / chưa trial → trial ──── */}
+                {!locked && !cardCompleted && !cardPaid && card.slug === "bodix-21" && (
+                  <>
+                    {cardTrialDone ? (
+                      <Link
+                        href={`/app/checkout/${card.slug}`}
+                        className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+                      >
+                        Đăng ký chính thức – {card.price}
+                      </Link>
+                    ) : programId ? (
+                      <TrialStartButton
+                        programId={programId}
+                        programName={card.name}
+                        className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60"
+                      >
+                        Tập thử 3 ngày miễn phí
+                      </TrialStartButton>
+                    ) : (
+                      <Link
+                        href="/signup"
+                        className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+                      >
+                        Tập thử 3 ngày miễn phí
+                      </Link>
+                    )}
+                  </>
+                )}
+
+                {/* ── 6W / 12W unlocked: button đăng ký ───────────────── */}
+                {!locked && !cardCompleted && !cardPaid && card.slug !== "bodix-21" && (
                   <Link
-                    href="/signup"
+                    href={`/app/checkout/${card.slug}`}
                     className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
                   >
-                    Thử nghiệm miễn phí 3 ngày
+                    Đăng ký {card.name} – {card.price}
                   </Link>
                 )}
               </div>
@@ -224,7 +337,7 @@ export default async function ProgramsPage() {
           href="/pricing"
           className="text-sm font-medium text-primary hover:underline"
         >
-          Hoặc mua ngay (MoMo / Chuyển khoản) →
+          Hoặc mua ngay (Chuyển khoản) →
         </Link>
       </p>
     </div>

@@ -7,6 +7,8 @@ import { getTrialDisplayStatus } from "@/lib/trial/status";
 import { formatDateVn } from "@/lib/date/vietnam";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
+import { BuddyChooser } from "@/components/dashboard/BuddyChooser";
+import { GiftBookCard } from "@/components/dashboard/GiftBookCard";
 
 const PROGRAM_NAME: Record<string, string> = {
   "bodix-21": "BodiX 21",
@@ -285,6 +287,30 @@ export default async function AppPage() {
       cohortStartDate = nextCohort?.start_date ?? null;
     }
 
+    // Đã có buddy chưa? Chỉ check khi đã được gán cohort_id.
+    let buddyName: string | null = null;
+    if (paidWaitingEnrollment.cohort_id) {
+      const { data: existingPair } = await service
+        .from("buddy_pairs")
+        .select("user_a, user_b")
+        .eq("cohort_id", paidWaitingEnrollment.cohort_id)
+        .eq("status", "active")
+        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+        .limit(1)
+        .maybeSingle();
+      if (existingPair) {
+        const buddyUserId =
+          existingPair.user_a === user.id ? existingPair.user_b : existingPair.user_a;
+        const { data: buddyProfile } = await service
+          .from("profiles")
+          .select("full_name")
+          .eq("id", buddyUserId)
+          .single();
+        buddyName = buddyProfile?.full_name ?? "Buddy";
+      }
+    }
+    const hasBuddy = !!buddyName;
+
     return (
       <div className="space-y-8">
         {pendingBanner}
@@ -315,6 +341,24 @@ export default async function AppPage() {
             </p>
           )}
         </div>
+
+        {/* Buddy state */}
+        {paidWaitingEnrollment.cohort_id && !hasBuddy && <BuddyChooser />}
+        {paidWaitingEnrollment.cohort_id && hasBuddy && buddyName && (
+          <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
+            <h3 className="font-heading text-base font-semibold text-primary">
+              👯 Buddy đồng hành
+            </h3>
+            <p className="mt-2 text-neutral-700">
+              Bạn đã ghép cặp với{" "}
+              <span className="font-semibold text-primary">{buddyName}</span>.
+              Khi đợt tập bắt đầu, hai bạn có thể chat 1-1 trong app để động
+              viên nhau.
+            </p>
+          </div>
+        )}
+
+        <GiftBookCard />
       </div>
     );
   }
@@ -342,6 +386,7 @@ export default async function AppPage() {
             Thanh toán ngay
           </Link>
         </div>
+        <GiftBookCard />
       </div>
     );
   }
@@ -366,6 +411,7 @@ export default async function AppPage() {
             Đăng ký tập chính thức
           </Link>
         </div>
+        <GiftBookCard />
       </div>
     );
   }
@@ -386,6 +432,7 @@ export default async function AppPage() {
             </h2>
             <p className="mt-2 text-neutral-700">{trial.subtextTop}</p>
           </div>
+          <GiftBookCard />
         </div>
       );
     }
@@ -412,6 +459,7 @@ export default async function AppPage() {
             </Link>
           )}
         </div>
+        <GiftBookCard />
       </div>
     );
   }
@@ -451,6 +499,7 @@ export default async function AppPage() {
             ctaHref={(slug) => `/app/checkout/${slug}`}
           />
         </div>
+        <GiftBookCard />
       </div>
     );
   }
@@ -504,6 +553,8 @@ export default async function AppPage() {
         programId={bodix21?.id ?? null}
         nextCohortDate={nextCohortDate}
       />
+
+      <GiftBookCard />
     </div>
   );
 }

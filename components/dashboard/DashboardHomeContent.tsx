@@ -10,6 +10,7 @@ import { MILESTONE_CONFIG } from "@/lib/completion/milestones";
 import { ComebackCard } from "@/components/rescue/ComebackCard";
 import { BuddyCard } from "@/components/dashboard/BuddyCard";
 import { ZaloConnectBanner } from "@/components/dashboard/ZaloConnectBanner";
+import { GiftBookCard } from "@/components/dashboard/GiftBookCard";
 import { getTrialDisplayStatus } from "@/lib/trial/status";
 
 const COMEBACK_DISMISSED_KEY = "comeback-dismissed";
@@ -252,6 +253,8 @@ export function DashboardHomeContent({
             </span>
           </Link>
         )}
+
+        <GiftBookCard />
       </div>
     );
   }
@@ -476,24 +479,7 @@ export function DashboardHomeContent({
         </div>
       )}
 
-      {/* Tặng sách – card nhỏ */}
-      <div className="bg-white border border-gray-200 rounded-xl p-4 mt-6">
-        <div className="flex items-start gap-3">
-          <span className="text-2xl">📖</span>
-          <div className="flex-1">
-            <h3 className="font-semibold text-gray-900">Tặng sách cho bạn bè</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; – tặng cho bạn bè, nhận voucher 100K khi họ tham gia.
-            </p>
-            <Link
-              href="/app/tang-sach"
-              className="text-sm text-primary font-medium mt-2 inline-block hover:underline"
-            >
-              Xem chi tiết →
-            </Link>
-          </div>
-        </div>
-      </div>
+      <GiftBookCard />
     </div>
   );
 }

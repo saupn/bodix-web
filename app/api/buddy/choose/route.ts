@@ -28,12 +28,13 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Không thể ghép buddy với chính mình.' }, { status: 400 })
   }
 
-  // Lấy enrollment active
+  // Lấy enrollment active hoặc paid_waiting_cohort (cho phép chọn buddy
+  // trước khi cohort bắt đầu).
   const { data: myEnrollment } = await supabase
     .from('enrollments')
     .select('id, cohort_id')
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .in('status', ['active', 'paid_waiting_cohort'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -72,13 +73,13 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Verify buddy cùng cohort + active
+  // Verify buddy cùng cohort + active hoặc paid_waiting_cohort
   const { data: buddyEnrollment } = await service
     .from('enrollments')
     .select('id')
     .eq('user_id', buddyUserId)
     .eq('cohort_id', myEnrollment.cohort_id)
-    .eq('status', 'active')
+    .in('status', ['active', 'paid_waiting_cohort'])
     .maybeSingle()
 
   if (!buddyEnrollment) {

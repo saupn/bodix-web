@@ -9,12 +9,13 @@ export async function GET(request: NextRequest) {
 
   const q = request.nextUrl.searchParams.get('q')?.trim() ?? ''
 
-  // Lấy enrollment active + cohort_id
+  // Lấy enrollment active hoặc paid_waiting_cohort (cho phép chọn buddy
+  // trước khi cohort bắt đầu).
   const { data: enrollment } = await supabase
     .from('enrollments')
     .select('id, cohort_id')
     .eq('user_id', user.id)
-    .eq('status', 'active')
+    .in('status', ['active', 'paid_waiting_cohort'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -25,12 +26,12 @@ export async function GET(request: NextRequest) {
 
   const service = createServiceClient()
 
-  // Lấy tất cả user cùng cohort, active
+  // Lấy tất cả user cùng cohort, active hoặc paid_waiting_cohort
   const { data: cohortEnrollments } = await service
     .from('enrollments')
     .select('user_id')
     .eq('cohort_id', enrollment.cohort_id)
-    .eq('status', 'active')
+    .in('status', ['active', 'paid_waiting_cohort'])
     .neq('user_id', user.id)
 
   if (!cohortEnrollments?.length) {

@@ -7,12 +7,12 @@ export async function GET() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
 
-  // Lấy enrollment active hoặc trial
+  // Lấy enrollment trial / paid_waiting_cohort / active (3 state có buddy logic)
   const { data: enrollment } = await supabase
     .from('enrollments')
     .select('id, cohort_id, current_day, status')
     .eq('user_id', user.id)
-    .in('status', ['active', 'trial'])
+    .in('status', ['active', 'paid_waiting_cohort', 'trial'])
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
@@ -44,7 +44,7 @@ export async function GET() {
   if (!pair) {
     return NextResponse.json({
       has_buddy: false,
-      enrollment_status: 'active',
+      enrollment_status: enrollment.status,
       cohort_id: enrollment.cohort_id,
       enrollment_id: enrollment.id,
     })
@@ -59,14 +59,14 @@ export async function GET() {
     .eq('id', buddyId)
     .single()
 
-  // Buddy check-in hôm nay?
+  // Buddy enrollment cùng cohort (active hoặc paid_waiting_cohort)
   const today = new Date().toISOString().split('T')[0]
   const { data: buddyEnrollment } = await service
     .from('enrollments')
     .select('id')
     .eq('user_id', buddyId)
     .eq('cohort_id', enrollment.cohort_id)
-    .eq('status', 'active')
+    .in('status', ['active', 'paid_waiting_cohort'])
     .maybeSingle()
 
   let buddyCheckedInToday = false
@@ -90,7 +90,7 @@ export async function GET() {
 
   return NextResponse.json({
     has_buddy: true,
-    enrollment_status: 'active',
+    enrollment_status: enrollment.status,
     buddy: {
       id: buddyProfile?.id,
       name: buddyProfile?.full_name,

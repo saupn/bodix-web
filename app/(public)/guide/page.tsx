@@ -29,7 +29,7 @@ export default function GuidePage() {
         <p className="text-sm font-semibold text-gray-900 mb-3">Mục lục</p>
         <ol className="list-decimal pl-5 space-y-1.5 text-sm text-gray-700">
           <li><a href="#dang-ky" className="hover:text-primary hover:underline">Đăng ký và onboarding</a></li>
-          <li><a href="#trial" className="hover:text-primary hover:underline">3 ngày trải nghiệm miễn phí</a></li>
+          <li><a href="#trial" className="hover:text-primary hover:underline">Với 3 ngày trải nghiệm miễn phí</a></li>
           <li><a href="#chon-chuong-trinh" className="hover:text-primary hover:underline">Chọn chương trình và mua</a></li>
           <li><a href="#tap-hang-ngay" className="hover:text-primary hover:underline">Tập luyện hàng ngày</a></li>
           <li><a href="#cuong-do" className="hover:text-primary hover:underline">3 mức cường độ Hard / Light / Easy</a></li>
@@ -83,7 +83,7 @@ export default function GuidePage() {
 
       <section id="trial" className="mt-10">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">
-          2. 3 ngày trải nghiệm miễn phí
+          2. Với 3 ngày trải nghiệm miễn phí
         </h2>
         <p className="text-gray-700 leading-relaxed mb-4">
           Trial cho phép bạn dùng đầy đủ tính năng trước khi quyết định mua.
@@ -443,8 +443,7 @@ export default function GuidePage() {
               className="text-primary hover:underline"
             >
               support@bodix.fit
-            </a>{" "}
-            – phản hồi trong 24 giờ.
+            </a>
           </li>
           <li>
             <span className="font-medium">Facebook:</span>{" "}
@@ -460,7 +459,7 @@ export default function GuidePage() {
           </li>
         </ul>
         <p className="text-gray-700 leading-relaxed">
-          Mọi yêu cầu hoàn tiền, xóa tài khoản, đổi đợt tập đều xử lý qua
+          Mọi yêu cầu hoàn tiền, xóa tài khoản, đổi đợt tập vui lòng gửi qua
           email. Vui lòng nêu rõ lý do và mã đơn hàng (nếu có).
         </p>
       </section>

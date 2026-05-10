@@ -125,8 +125,8 @@ export default function TermsPage() {
           </li>
           <li>
             <span className="font-medium">NGHIÊM CẤM</span> chia sẻ link video
-            riêng tư (Vimeo, Cloudflare Stream) cho người không đăng ký dịch
-            vụ. Mọi link đều có watermark và log truy cập.
+            riêng tư cho người không đăng ký dịch vụ. Mọi link đều có
+            watermark và log truy cập.
           </li>
           <li>
             Vi phạm bản quyền có thể dẫn đến khóa tài khoản vĩnh viễn, không
@@ -173,8 +173,8 @@ export default function TermsPage() {
             có).
           </li>
           <li>
-            Hỗ trợ thanh toán qua VNPay (thẻ ATM nội địa, Visa/Mastercard, QR
-            ngân hàng) và Stripe (thẻ quốc tế).
+            Hỗ trợ thanh toán qua các cổng thanh toán bên thứ 3 với thẻ ATM
+            nội địa, Visa/Mastercard, QR ngân hàng, hoặc thẻ quốc tế.
           </li>
           <li>
             Hóa đơn điện tử được gửi tự động qua email sau khi giao dịch thành
@@ -278,8 +278,11 @@ export default function TermsPage() {
         </p>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed">
           <li>Mất dữ liệu do lỗi thiết bị cá nhân hoặc kết nối Internet.</li>
-          <li>Gián đoạn dịch vụ do nhà cung cấp hạ tầng (Vercel, Supabase…).</li>
-          <li>Sự cố từ bên thứ ba: Zalo OA, VNPay, Stripe, Vimeo, FCM.</li>
+          <li>Gián đoạn dịch vụ do nhà cung cấp hạ tầng bên thứ 3.</li>
+          <li>
+            Sự cố từ các nhà cung cấp dịch vụ bên thứ 3 mà BodiX phụ thuộc
+            (cổng thanh toán, kênh nhắn tin, hosting video, v.v.).
+          </li>
         </ul>
         <p className="text-gray-700 leading-relaxed mt-4">
           Tổng trách nhiệm của BodiX cho mỗi Người dùng không vượt quá số

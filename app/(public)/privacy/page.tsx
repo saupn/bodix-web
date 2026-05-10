@@ -37,7 +37,7 @@ export default function PrivacyPage() {
           <span className="font-medium">Thông tin tài khoản (bắt buộc):</span>
         </p>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed mb-4">
-          <li>Email và mật khẩu (mã hóa bằng bcrypt, không lưu plaintext).</li>
+          <li>Email và mật khẩu (mã hóa một chiều, không lưu dạng đọc được).</li>
           <li>Họ tên hiển thị.</li>
           <li>Ngày sinh và giới tính – để điều chỉnh khuyến nghị cường độ.</li>
           <li>
@@ -149,42 +149,18 @@ export default function PrivacyPage() {
           bên thứ 3</span> cho mục đích quảng cáo hoặc thương mại.
         </p>
         <p className="text-gray-700 leading-relaxed mb-4">
-          Chúng tôi chỉ chia sẻ dữ liệu với các nhà cung cấp dịch vụ tin cậy
-          để vận hành BodiX:
+          Chúng tôi chỉ chia sẻ dữ liệu với các nhà cung cấp dịch vụ bên thứ
+          3 đã được BodiX đánh giá và ký thỏa thuận xử lý dữ liệu, phục vụ
+          các mục đích vận hành sau:
         </p>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed mb-4">
-          <li>
-            <span className="font-medium">Supabase</span> – lưu trữ database
-            (PostgreSQL), authentication, file storage, edge functions.
-          </li>
-          <li>
-            <span className="font-medium">Vercel</span> – hosting frontend, log
-            truy cập, analytics ẩn danh.
-          </li>
-          <li>
-            <span className="font-medium">Zalo OA</span> – gửi tin nhắc tập và
-            rescue qua API chính thức.
-          </li>
-          <li>
-            <span className="font-medium">VNPay và Stripe</span> – xử lý thanh
-            toán; BodiX không lưu thông tin thẻ.
-          </li>
-          <li>
-            <span className="font-medium">Resend</span> – gửi email giao dịch
-            (xác minh tài khoản, hóa đơn, tổng kết).
-          </li>
-          <li>
-            <span className="font-medium">Vimeo</span> – host video bài tập
-            riêng tư, có watermark.
-          </li>
-          <li>
-            <span className="font-medium">Sentry</span> – ghi nhận lỗi kỹ
-            thuật để vá lỗi (đã ẩn dữ liệu cá nhân).
-          </li>
-          <li>
-            <span className="font-medium">Firebase Cloud Messaging</span> –
-            push notification cho ứng dụng di động (sắp ra mắt).
-          </li>
+          <li>Hạ tầng lưu trữ, hosting, và xác thực tài khoản.</li>
+          <li>Gửi tin nhắc tập, rescue, và tổng kết qua kênh Zalo.</li>
+          <li>Xử lý thanh toán qua các cổng thanh toán bên thứ 3 – BodiX không lưu thông tin thẻ của bạn.</li>
+          <li>Gửi email giao dịch (xác minh tài khoản, hóa đơn, tổng kết).</li>
+          <li>Hosting video bài tập riêng tư, có watermark.</li>
+          <li>Ghi nhận lỗi kỹ thuật để cải thiện sản phẩm (đã ẩn dữ liệu cá nhân).</li>
+          <li>Push notification cho ứng dụng di động (sắp ra mắt).</li>
         </ul>
         <p className="text-gray-700 leading-relaxed">
           Một số nhà cung cấp có máy chủ ngoài Việt Nam. Việc chuyển dữ liệu
@@ -199,16 +175,16 @@ export default function PrivacyPage() {
         </h2>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed">
           <li>
-            Mật khẩu được mã hóa một chiều bằng bcrypt; nhân viên BodiX không
-            thể xem mật khẩu của bạn.
+            Mật khẩu được mã hóa một chiều; nhân viên BodiX không thể xem
+            mật khẩu của bạn.
           </li>
           <li>
             Toàn bộ traffic mã hóa TLS 1.2+. Cookie session đặt HttpOnly,
             Secure, SameSite.
           </li>
           <li>
-            Mọi bảng dữ liệu trong PostgreSQL áp dụng Row Level Security
-            (RLS) – Người dùng chỉ truy cập được dữ liệu của chính mình.
+            Mọi bảng dữ liệu áp dụng kiểm soát truy cập theo hàng – Người
+            dùng chỉ truy cập được dữ liệu của chính mình.
           </li>
           <li>
             Truy cập hạ tầng nội bộ chỉ dành cho thành viên đã xác thực 2
@@ -234,8 +210,8 @@ export default function PrivacyPage() {
             kế toán.
           </li>
           <li>
-            Log hệ thống và Sentry error: lưu tối đa 90 ngày, sau đó xóa tự
-            động.
+            Log hệ thống và log lỗi kỹ thuật: lưu tối đa 90 ngày, sau đó xóa
+            tự động.
           </li>
           <li>
             Sau khi tài khoản bị xóa: dữ liệu cá nhân được xóa trong 7 ngày
@@ -295,7 +271,7 @@ export default function PrivacyPage() {
           BodiX chỉ dùng cookie kỹ thuật cần thiết:
         </p>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed mb-4">
-          <li>Session đăng nhập (Supabase auth).</li>
+          <li>Session đăng nhập.</li>
           <li>Tùy chọn ngôn ngữ và giao diện.</li>
           <li>
             Anti-CSRF token để bảo vệ form submit.
@@ -303,8 +279,8 @@ export default function PrivacyPage() {
         </ul>
         <p className="text-gray-700 leading-relaxed">
           BodiX <span className="font-medium">không dùng cookie quảng cáo bên
-          thứ 3</span>, không dùng Google Analytics, Facebook Pixel hay các
-          tracker tương tự để theo dõi bạn xuyên website.
+          thứ 3</span>, không dùng các công cụ tracker để theo dõi bạn xuyên
+          website.
         </p>
       </section>
 
@@ -352,7 +328,7 @@ export default function PrivacyPage() {
           </li>
           <li>
             Tiêu đề email: <span className="font-medium">[Privacy] Yêu cầu
-            của bạn</span> – BodiX phản hồi trong 7 ngày làm việc.
+            của bạn</span>.
           </li>
         </ul>
       </section>

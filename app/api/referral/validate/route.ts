@@ -15,15 +15,56 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Fetch code ────────────────────────────────────────────────────────────
-  const { data: referralCode, error } = await supabase
-    .from('referral_codes')
-    .select('id, user_id, code_type, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at')
-    .eq('code', code)
-    .maybeSingle()
+  // Thử bảng referral_codes trước. Nếu không có, fallback profiles.referral_code
+  // (cho trường hợp user cũ có profile.referral_code mà chưa có row trong
+  // referral_codes — ví dụ mã PHAMSAU lưu trực tiếp trên profile).
+  let referralCode: {
+    id: string | null
+    user_id: string
+    code_type: 'referral' | 'affiliate' | null
+    referee_reward_type: string | null
+    referee_reward_value: number | null
+    is_active: boolean | null
+    max_uses: number | null
+    total_conversions: number | null
+    expires_at: string | null
+  } | null = null
 
-  if (error) {
-    console.error('[referral/validate] GET:', error)
-    return NextResponse.json({ error: 'Lỗi truy vấn.' }, { status: 500 })
+  {
+    const { data, error } = await supabase
+      .from('referral_codes')
+      .select('id, user_id, code_type, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at')
+      .eq('code', code)
+      .maybeSingle()
+
+    if (error) {
+      console.error('[referral/validate] GET:', error)
+      return NextResponse.json({ error: 'Lỗi truy vấn.' }, { status: 500 })
+    }
+    referralCode = data
+  }
+
+  if (!referralCode) {
+    // Fallback: tìm trong profiles.referral_code
+    const { data: profileCode } = await supabase
+      .from('profiles')
+      .select('id, referral_code')
+      .eq('referral_code', code)
+      .maybeSingle()
+
+    if (profileCode) {
+      referralCode = {
+        id: null,
+        user_id: profileCode.id,
+        code_type: 'referral',
+        referee_reward_type: 'discount_percent',
+        referee_reward_value: 10,
+        is_active: true,
+        max_uses: null,
+        total_conversions: 0,
+        expires_at: null,
+      }
+    }
   }
 
   if (!referralCode) {
@@ -42,7 +83,7 @@ export async function GET(request: NextRequest) {
 
   if (
     referralCode.max_uses != null &&
-    referralCode.total_conversions >= referralCode.max_uses
+    (referralCode.total_conversions ?? 0) >= referralCode.max_uses
   ) {
     return NextResponse.json({ valid: false, reason: 'code_exhausted' })
   }
@@ -64,14 +105,15 @@ export async function GET(request: NextRequest) {
 
   // ── Build reward description ──────────────────────────────────────────────
   let rewardDescription = ''
+  const rewardValue = referralCode.referee_reward_value ?? 0
   if (referralCode.referee_reward_type === 'discount_percent') {
-    rewardDescription = `Giảm ${referralCode.referee_reward_value}% chương trình đầu tiên`
+    rewardDescription = `Giảm ${rewardValue}% chương trình đầu tiên`
   } else if (referralCode.referee_reward_type === 'discount_fixed') {
-    rewardDescription = `Giảm ${(referralCode.referee_reward_value / 1000).toFixed(0)}k chương trình đầu tiên`
+    rewardDescription = `Giảm ${(rewardValue / 1000).toFixed(0)}k chương trình đầu tiên`
   } else if (referralCode.referee_reward_type === 'free_days') {
-    rewardDescription = `Thêm ${referralCode.referee_reward_value} ngày miễn phí`
+    rewardDescription = `Thêm ${rewardValue} ngày miễn phí`
   } else if (referralCode.referee_reward_type === 'credit') {
-    rewardDescription = `+${(referralCode.referee_reward_value / 1000).toFixed(0)}k credit`
+    rewardDescription = `+${(rewardValue / 1000).toFixed(0)}k credit`
   }
 
   return NextResponse.json({

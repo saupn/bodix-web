@@ -311,7 +311,7 @@ export default async function ProgramsPage() {
                     disabled
                     className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-green-100 px-5 py-3 text-sm font-medium text-green-700"
                   >
-                    ✅ Đã thanh toán – Chờ đợt mở
+                    ✅ Đã thanh toán – Chờ đợt tập mở
                   </button>
                 )}
 

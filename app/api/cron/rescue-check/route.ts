@@ -74,7 +74,22 @@ export async function GET(request: NextRequest) {
   }
 
   const today = new Date().toISOString().split('T')[0];
-  const stats = { l1: 0, l2: 0, l3_buddy: 0, l3_no_buddy: 0, skipped: 0, errors: 0, trial_expired: 0 };
+  const todayStart = new Date(today + 'T00:00:00.000Z').toISOString();
+  const stats = {
+    l1: 0,
+    l2: 0,
+    l3_buddy: 0,
+    l3_no_buddy: 0,
+    skipped: 0,
+    errors: 0,
+    trial_expired: 0,
+    evening_sent: 0,
+    evening_skipped: 0,
+    evening_errors: 0,
+    pre_cohort_sent: 0,
+    pre_cohort_skipped: 0,
+    pre_cohort_errors: 0,
+  };
 
   for (const row of enrollments ?? []) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -405,6 +420,230 @@ export async function GET(request: NextRequest) {
   }
 
   console.log('[rescue-check] trial expired:', stats.trial_expired);
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // EVENING REMINDER (21:00 VN)
+  // Gửi cho user trial/active CHƯA check-in hôm nay.
+  // Dedup qua nudge_logs (nudge_type='evening_reminder', cùng ngày).
+  // Tách riêng với edge function evening-confirmation (chưa schedule) bằng
+  // nudge_type khác.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  const { data: eveningEnrollments } = await supabase
+    .from('enrollments')
+    .select(`
+      id,
+      user_id,
+      current_day,
+      status,
+      profiles!inner (
+        id,
+        full_name,
+        channel_user_id,
+        fcm_token,
+        notification_via
+      )
+    `)
+    .in('status', ['trial', 'active']);
+
+  for (const row of eveningEnrollments ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const enrollment = row as any;
+    const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
+    const channelUserId: string | null = profile?.channel_user_id;
+
+    // Spec: gửi qua Zalo OA freeform — bỏ qua user không có Zalo connected.
+    if (!channelUserId) {
+      stats.evening_skipped++;
+      continue;
+    }
+
+    // Skip nếu đã check-in hôm nay
+    const { data: todayCheckin } = await supabase
+      .from('daily_checkins')
+      .select('id')
+      .eq('enrollment_id', enrollment.id)
+      .eq('workout_date', today)
+      .maybeSingle();
+
+    if (todayCheckin) {
+      stats.evening_skipped++;
+      continue;
+    }
+
+    // Dedup: đã gửi evening_reminder hôm nay chưa
+    const { data: alreadySent } = await supabase
+      .from('nudge_logs')
+      .select('id')
+      .eq('user_id', enrollment.user_id)
+      .eq('nudge_type', 'evening_reminder')
+      .gte('sent_at', todayStart)
+      .maybeSingle();
+
+    if (alreadySent) {
+      stats.evening_skipped++;
+      continue;
+    }
+
+    const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'Bạn';
+    const messageText =
+      `${displayName} ơi, hôm nay bạn chưa tập 🌙\n` +
+      `Còn vài giờ trong ngày – tập 1 lượt (7 phút) cũng đã giữ được chuỗi rồi.\n` +
+      `Reply 1, 2 hoặc 3 sau khi tập xong nhé!`;
+
+    try {
+      const result = await sendViaZalo(channelUserId, messageText);
+
+      await supabase.from('nudge_logs').insert({
+        user_id: enrollment.user_id,
+        enrollment_id: enrollment.id,
+        nudge_type: 'evening_reminder',
+        channel: 'zalo',
+        content_template: 'evening_reminder_v1',
+        content_variables: { day_number: enrollment.current_day },
+        delivered: result.success,
+      });
+
+      if (result.success) stats.evening_sent++;
+      else stats.evening_errors++;
+    } catch (err) {
+      console.error(`[rescue-check] evening reminder error for ${enrollment.user_id}:`, err);
+      stats.evening_errors++;
+    }
+
+    await new Promise(r => setTimeout(r, 100));
+  }
+
+  console.log('[rescue-check] evening sent:', stats.evening_sent, 'skipped:', stats.evening_skipped);
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // PRE-COHORT MESSAGES (4 / 3 / 2 / 1 ngày trước cohort start)
+  // Cho user paid_waiting_cohort đã được gán cohort_id.
+  // Dedup qua nudge_logs (nudge_type='pre_cohort_d{N}').
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  const PRE_COHORT_VARIANTS: { daysBefore: number; type: string; build: (name: string) => string }[] = [
+    {
+      daysBefore: 4,
+      type: 'pre_cohort_d4',
+      build: (name) =>
+        `${name} ơi, còn 4 ngày nữa đợt tập của bạn bắt đầu! 🌸\n\n` +
+        `Hôm nay bạn có thể chuẩn bị: chọn 1 góc nhỏ ở nhà để tập (chỉ cần 2x2m), tìm 1 cái thảm hoặc khăn dày. Vậy là đủ.`,
+    },
+    {
+      daysBefore: 3,
+      type: 'pre_cohort_d3',
+      build: (name) =>
+        `${name} ơi, 3 ngày nữa thôi! 💪\n\n` +
+        `Nhỏ thôi: tối nay đặt báo thức tập trước giờ thường ngủ 1 tiếng. Cơ thể quen lịch dần.`,
+    },
+    {
+      daysBefore: 2,
+      type: 'pre_cohort_d2',
+      build: (name) =>
+        `${name} ơi, mai là chuẩn bị – ngày kia bắt đầu! 🎯\n\n` +
+        `Một mẹo: đêm nay ngủ sớm 30 phút. Sáng mai dậy đỡ mệt.`,
+    },
+    {
+      daysBefore: 1,
+      type: 'pre_cohort_d1',
+      build: (name) =>
+        `${name} ơi, MAI bắt đầu đợt tập! 🚀\n\n` +
+        `Sáng mai 6:30 bạn sẽ nhận tin nhắc tập đầu tiên qua Zalo. Tập 10-20 phút thôi – không áp lực. Mình tin bạn làm được! 💪`,
+    },
+  ];
+
+  const todayDateForCohort = new Date(today + 'T00:00:00Z');
+
+  for (const variant of PRE_COHORT_VARIANTS) {
+    const targetDate = new Date(todayDateForCohort);
+    targetDate.setUTCDate(todayDateForCohort.getUTCDate() + variant.daysBefore);
+    const targetDateStr = targetDate.toISOString().split('T')[0];
+
+    const { data: cohorts } = await supabase
+      .from('cohorts')
+      .select('id, name, start_date')
+      .eq('status', 'upcoming')
+      .eq('start_date', targetDateStr);
+
+    if (!cohorts || cohorts.length === 0) continue;
+
+    for (const cohort of cohorts) {
+      const { data: cohortEnrollments } = await supabase
+        .from('enrollments')
+        .select(`
+          id,
+          user_id,
+          profiles!inner (
+            id,
+            full_name,
+            channel_user_id
+          )
+        `)
+        .eq('cohort_id', cohort.id)
+        .eq('status', 'paid_waiting_cohort');
+
+      for (const row of cohortEnrollments ?? []) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const enrollment = row as any;
+        const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
+        const channelUserId: string | null = profile?.channel_user_id;
+
+        if (!channelUserId) {
+          stats.pre_cohort_skipped++;
+          continue;
+        }
+
+        // Dedup: đã gửi variant này cho user này chưa (any time)
+        const { data: alreadySent } = await supabase
+          .from('nudge_logs')
+          .select('id')
+          .eq('user_id', enrollment.user_id)
+          .eq('nudge_type', variant.type)
+          .maybeSingle();
+
+        if (alreadySent) {
+          stats.pre_cohort_skipped++;
+          continue;
+        }
+
+        const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'Bạn';
+        const messageText = variant.build(displayName);
+
+        try {
+          const result = await sendViaZalo(channelUserId, messageText);
+
+          await supabase.from('nudge_logs').insert({
+            user_id: enrollment.user_id,
+            enrollment_id: enrollment.id,
+            nudge_type: variant.type,
+            channel: 'zalo',
+            content_template: variant.type,
+            content_variables: {
+              cohort_id: cohort.id,
+              cohort_name: cohort.name,
+              start_date: cohort.start_date,
+              days_before: variant.daysBefore,
+            },
+            delivered: result.success,
+          });
+
+          if (result.success) stats.pre_cohort_sent++;
+          else stats.pre_cohort_errors++;
+        } catch (err) {
+          console.error(`[rescue-check] pre-cohort ${variant.type} error for ${enrollment.user_id}:`, err);
+          stats.pre_cohort_errors++;
+        }
+
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+  }
+
+  console.log(
+    '[rescue-check] pre_cohort sent:', stats.pre_cohort_sent,
+    'skipped:', stats.pre_cohort_skipped,
+  );
 
   return NextResponse.json(stats);
 }

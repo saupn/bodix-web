@@ -42,11 +42,94 @@ const MODE_EMOJI: Record<string, string> = {
   review: "📝",
 };
 
+interface EnrollmentSummary {
+  status:
+    | "no_enrollment"
+    | "trial"
+    | "trial_completed"
+    | "pending_payment"
+    | "paid_waiting_cohort"
+    | "active"
+    | "completed";
+  program_slug: string | null;
+  program_name: string | null;
+  cohort_name: string | null;
+  cohort_start_date: string | null;
+}
+
+function formatVnDate(iso: string): string {
+  const [y, m, d] = iso.split("T")[0].split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
+function EmptyState({ summary }: { summary: EnrollmentSummary | null }) {
+  const status = summary?.status ?? "no_enrollment";
+  const programName = summary?.program_name ?? "BodiX 21";
+
+  let body: string;
+  let ctaHref: string;
+  let ctaLabel: string;
+
+  switch (status) {
+    case "trial":
+    case "trial_completed":
+    case "pending_payment":
+      body = `Bạn đang trải nghiệm ${programName}. Hoàn tất thanh toán để tham gia đợt tập chính thức.`;
+      ctaHref = `/app/checkout/${summary?.program_slug ?? "bodix-21"}`;
+      ctaLabel = "Thanh toán ngay";
+      break;
+    case "paid_waiting_cohort":
+      body = summary?.cohort_start_date
+        ? `Bạn đã đăng ký ${programName} và đang chờ đợt tập mở. Đợt sắp tới: ${formatVnDate(summary.cohort_start_date)}.`
+        : `Bạn đã đăng ký ${programName} và đang chờ đợt tập mở.`;
+      ctaHref = "/app";
+      ctaLabel = "Về Dashboard";
+      break;
+    case "completed":
+      body = `Bạn đã hoàn thành ${programName}! Sẵn sàng nâng cấp lên chương trình tiếp theo?`;
+      ctaHref = "/app/programs";
+      ctaLabel = "Xem các chương trình";
+      break;
+    default:
+      body =
+        "Bạn chưa đăng ký chương trình. Đăng ký tập thử 3 ngày miễn phí để bắt đầu.";
+      ctaHref = "/app/programs";
+      ctaLabel = "Xem các chương trình";
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+        Tiến trình của bạn
+      </h1>
+      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
+        <p className="text-4xl">📊</p>
+        <p className="mt-3 font-medium text-neutral-800">
+          Chưa có dữ liệu tiến trình
+        </p>
+        <p className="mt-2 text-sm text-neutral-600">{body}</p>
+        <p className="mt-2 text-xs text-neutral-500">
+          Chuỗi ngày, milestone, lịch sử check-in sẽ hiện ở đây khi bạn bắt
+          đầu chương trình.
+        </p>
+        <Link
+          href={ctaHref}
+          className="mt-5 inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+        >
+          {ctaLabel}
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 export default function ProgressPage() {
   const [stats, setStats] = useState<StatsData | null>(null);
   const [history, setHistory] = useState<HistoryDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [hasStats, setHasStats] = useState(true);
+  const [summary, setSummary] = useState<EnrollmentSummary | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -55,6 +138,11 @@ export default function ProgressPage() {
         if (!statsRes.ok) {
           if (statsRes.status === 404) {
             setHasStats(false);
+            // Lấy enrollment summary để render empty state phù hợp với status
+            const sumRes = await fetch("/api/user/enrollment-summary");
+            if (sumRes.ok) {
+              setSummary(await sumRes.json());
+            }
           }
           return;
         }
@@ -86,29 +174,7 @@ export default function ProgressPage() {
   }
 
   if (!stats || !hasStats) {
-    return (
-      <div className="mx-auto max-w-2xl">
-        <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Tiến trình của bạn
-        </h1>
-        <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
-          <p className="text-4xl">📊</p>
-          <p className="mt-3 font-medium text-neutral-800">
-            Bạn chưa có chương trình tập đang chạy
-          </p>
-          <p className="mt-2 text-sm text-neutral-600">
-            Tiến trình – chuỗi ngày, milestone, lịch sử check-in – sẽ hiện ở
-            đây khi bạn bắt đầu một chương trình.
-          </p>
-          <Link
-            href="/app/programs"
-            className="mt-5 inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-          >
-            Xem các chương trình
-          </Link>
-        </div>
-      </div>
-    );
+    return <EmptyState summary={summary} />;
   }
 
   const { streak, milestones } = stats;

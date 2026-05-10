@@ -12,7 +12,8 @@ const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 // ─── Referral / affiliate code validation ─────────────────────────────────────
 
 interface ResolvedCode {
-  id: string
+  /** null khi code đến từ profiles.referral_code (chưa có row referral_codes) */
+  id: string | null
   code_type: "referral" | "affiliate"
 }
 
@@ -22,23 +23,47 @@ async function resolveReferralCode(
   code: string,
   userId: string
 ): Promise<{ valid: true; info: ResolvedCode } | { valid: false }> {
+  const upperCode = code.trim().toUpperCase();
+
+  // Thử bảng referral_codes trước
   const { data } = await supabase
     .from("referral_codes")
     .select("id, user_id, code_type, is_active, max_uses, total_conversions, expires_at")
-    .eq("code", code.trim().toUpperCase())
+    .eq("code", upperCode)
     .maybeSingle();
 
-  if (!data) return { valid: false };
-  if (!data.is_active) return { valid: false };
-  if (data.expires_at && new Date(data.expires_at) < new Date()) return { valid: false };
-  if (data.max_uses != null && data.total_conversions >= data.max_uses) return { valid: false };
-  if (data.user_id === userId) return { valid: false }; // self-referral
+  if (data) {
+    if (!data.is_active) return { valid: false };
+    if (data.expires_at && new Date(data.expires_at) < new Date()) return { valid: false };
+    if (data.max_uses != null && data.total_conversions >= data.max_uses) return { valid: false };
+    if (data.user_id === userId) return { valid: false }; // self-referral
+
+    return {
+      valid: true,
+      info: {
+        id: data.id,
+        code_type: data.code_type ?? "referral",
+      },
+    };
+  }
+
+  // Fallback: tìm trong profiles.referral_code (mã user cũ chưa có row referral_codes)
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("id, referral_code")
+    .eq("referral_code", upperCode)
+    .maybeSingle();
+
+  if (!profile) return { valid: false };
+  if (profile.id === userId) return { valid: false }; // self-referral
 
   return {
     valid: true,
     info: {
-      id: data.id,
-      code_type: data.code_type ?? "referral",
+      // Không có row referral_codes → id=null. Caller xử lý: không update
+      // total_conversions vì không có row để update.
+      id: null,
+      code_type: "referral",
     },
   };
 }

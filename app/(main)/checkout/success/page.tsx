@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { CheckCircle2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { formatDateVn } from "@/lib/date/vietnam";
 
 const PROGRAM_NAME: Record<string, string> = {
   "bodix-21": "BodiX 21",
@@ -27,6 +28,7 @@ export default async function SuccessPage({
   if (!user) redirect("/login");
 
   let programLabel = "chương trình";
+  let programSlug: string | null = null;
   if (orderParam) {
     const numericId = Number(orderParam);
     if (Number.isFinite(numericId) && numericId > 0) {
@@ -39,7 +41,33 @@ export default async function SuccessPage({
 
       if (order && order.user_id === user.id) {
         programLabel = PROGRAM_NAME[order.program] ?? order.program;
+        programSlug = order.program;
       }
+    }
+  }
+
+  // Tìm cohort upcoming gần nhất cho program này
+  let cohortName: string | null = null;
+  let cohortStartDate: string | null = null;
+  if (programSlug) {
+    const { data: program } = await supabase
+      .from("programs")
+      .select("id")
+      .eq("slug", programSlug)
+      .maybeSingle();
+    if (program?.id) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: cohort } = await supabase
+        .from("cohorts")
+        .select("name, start_date")
+        .eq("program_id", program.id)
+        .eq("status", "upcoming")
+        .gte("start_date", todayStr)
+        .order("start_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      cohortName = cohort?.name ?? null;
+      cohortStartDate = cohort?.start_date ?? null;
     }
   }
 
@@ -54,11 +82,25 @@ export default async function SuccessPage({
         </h1>
         <p className="mt-3 text-neutral-600">
           Tài khoản đã được kích hoạt cho{" "}
-          <span className="font-semibold text-neutral-800">{programLabel}</span>.
+          <span className="font-semibold text-neutral-800">{programLabel}</span>
+          .
         </p>
-        <p className="mt-2 text-sm text-neutral-500">
-          Bạn sẽ nhận thông báo khi đợt tập tiếp theo mở.
-        </p>
+        {cohortName && cohortStartDate ? (
+          <p className="mt-3 text-sm text-neutral-700">
+            Đợt tập sắp tới:{" "}
+            <span className="font-semibold text-primary">{cohortName}</span> –
+            bắt đầu ngày{" "}
+            <span className="font-semibold text-primary">
+              {formatDateVn(cohortStartDate)}
+            </span>
+            . Bạn sẽ nhận thông báo qua Zalo trước khi đợt mở.
+          </p>
+        ) : (
+          <p className="mt-2 text-sm text-neutral-500">
+            Bạn sẽ nhận thông báo khi đợt tập tiếp theo mở (thường trong 1-2
+            tuần).
+          </p>
+        )}
 
         <Link
           href="/app"

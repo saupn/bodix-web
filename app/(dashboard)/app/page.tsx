@@ -258,15 +258,31 @@ export default async function AppPage() {
 
   // --- State 2: Paid, waiting for cohort to start ---
   if (paidWaitingEnrollment) {
-    // Fetch cohort start_date
+    // Fetch cohort name + start_date — nếu chưa gán cohort, query upcoming gần nhất
+    let cohortName: string | null = null;
     let cohortStartDate: string | null = null;
+
     if (paidWaitingEnrollment.cohort_id) {
       const { data: cohort } = await supabase
         .from("cohorts")
-        .select("start_date, name")
+        .select("name, start_date")
         .eq("id", paidWaitingEnrollment.cohort_id)
         .single();
+      cohortName = cohort?.name ?? null;
       cohortStartDate = cohort?.start_date ?? null;
+    } else if (paidWaitingEnrollment.program_id) {
+      const todayStr = new Date().toISOString().split("T")[0];
+      const { data: nextCohort } = await supabase
+        .from("cohorts")
+        .select("name, start_date")
+        .eq("program_id", paidWaitingEnrollment.program_id)
+        .eq("status", "upcoming")
+        .gte("start_date", todayStr)
+        .order("start_date", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      cohortName = nextCohort?.name ?? null;
+      cohortStartDate = nextCohort?.start_date ?? null;
     }
 
     return (
@@ -277,15 +293,27 @@ export default async function AppPage() {
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
             Thanh toán xác nhận!
           </h2>
-          <p className="mt-3 text-neutral-700">
-            Bạn sẽ được thông báo ngày bắt đầu.
-            {cohortStartDate && (
-              <> Dự kiến: <span className="font-semibold text-primary">{formatDateVn(cohortStartDate)}</span>.</>
-            )}
-          </p>
-          <p className="mt-2 text-neutral-600">
-            Tất cả thành viên sẽ bắt đầu Ngày 1 cùng nhau!
-          </p>
+          {cohortName && cohortStartDate ? (
+            <>
+              <p className="mt-3 text-neutral-700">
+                Đợt tập sắp tới:{" "}
+                <span className="font-semibold text-primary">{cohortName}</span>{" "}
+                – bắt đầu ngày{" "}
+                <span className="font-semibold text-primary">
+                  {formatDateVn(cohortStartDate)}
+                </span>
+                .
+              </p>
+              <p className="mt-2 text-neutral-600">
+                Bạn sẽ nhận thông báo qua Zalo trước khi đợt mở.
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-neutral-700">
+              Bạn sẽ nhận thông báo khi đợt tập tiếp theo mở (thường trong 1-2
+              tuần).
+            </p>
+          )}
         </div>
       </div>
     );

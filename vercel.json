@@ -18,6 +18,6 @@
   ],
   "crons": [
     { "path": "/api/cron/morning-messages", "schedule": "30 23 * * *" },
-    { "path": "/api/cron/rescue-check", "schedule": "0 15 * * *" }
+    { "path": "/api/cron/rescue-check", "schedule": "0 14 * * *" }
   ]
 }

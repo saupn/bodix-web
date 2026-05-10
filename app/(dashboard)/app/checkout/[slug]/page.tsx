@@ -1,7 +1,9 @@
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckoutContent } from "@/components/checkout/CheckoutContent";
+import { SEPAY_CONFIG, getSePayQRUrl } from "@/lib/sepay";
 
 const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
@@ -48,6 +50,32 @@ export default async function CheckoutPage({
     .limit(1)
     .maybeSingle();
 
+  // Resume: nếu user đã có pending order cho program này, mở thẳng QR view.
+  const service = createServiceClient();
+  const { data: pendingOrder } = await service
+    .from("orders")
+    .select("id, amount, payment_code, payment_status")
+    .eq("user_id", user.id)
+    .eq("program", slug)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const initialPayment =
+    pendingOrder && pendingOrder.payment_code
+      ? {
+          orderId: String(pendingOrder.id),
+          paymentCode: pendingOrder.payment_code as string,
+          amount: pendingOrder.amount as number,
+          qrUrl: getSePayQRUrl(
+            pendingOrder.amount as number,
+            pendingOrder.payment_code as string,
+            "compact",
+          ),
+        }
+      : null;
+
   const fullName = profile?.full_name?.trim() || user.user_metadata?.full_name || "";
   const email = user.email || "";
   const phone = profile?.phone || "";
@@ -68,6 +96,12 @@ export default async function CheckoutPage({
         fullName={fullName}
         email={email}
         phone={phone}
+        initialPayment={initialPayment}
+        bankConfig={{
+          bankCode: SEPAY_CONFIG.bankCode,
+          bankAccount: SEPAY_CONFIG.bankAccount,
+          bankAccountName: SEPAY_CONFIG.bankAccountName,
+        }}
       />
     </div>
   );

@@ -1,8 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { Building2, Wallet, Ticket } from "lucide-react";
+import { getSePayQRUrl } from "@/lib/sepay";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
 
@@ -15,21 +15,40 @@ interface CheckoutFormProps {
   email: string;
   phone: string;
   priceVnd: number;
-  onReferralChange?: (valid: boolean, discount: number, codeType?: string, referrerName?: string) => void;
+  referralDiscount: number;
+  voucherDiscount: number;
+  finalPrice: number;
+  onReferralChange?: (
+    valid: boolean,
+    discount: number,
+    codeType?: string,
+    referrerName?: string,
+  ) => void;
   onVoucherChange?: (valid: boolean, discount: number) => void;
-  onSubmitted?: () => void;
+  onPaymentReady: (order: {
+    orderId: string;
+    paymentCode: string;
+    amount: number;
+    qrUrl: string;
+  }) => void;
+}
+
+function formatVnd(n: number): string {
+  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
 }
 
 export function CheckoutForm({
   slug,
-  programName,
   fullName,
   email,
   phone,
   priceVnd,
+  referralDiscount,
+  voucherDiscount,
+  finalPrice,
   onReferralChange,
   onVoucherChange,
-  onSubmitted,
+  onPaymentReady,
 }: CheckoutFormProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
   const [referralCode, setReferralCode] = useState("");
@@ -42,19 +61,20 @@ export function CheckoutForm({
   } | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
 
-  // Voucher — nhiều mã, phân tách bằng dấu phẩy
+  // Voucher input — supports multiple codes split by comma
   const [voucherInput, setVoucherInput] = useState("");
   const [voucherLines, setVoucherLines] = useState<
-    { code: string; valid: boolean; amount: number }[]
+    { code: string; valid: boolean; amount: number; remaining: number }[]
   >([]);
   const [voucherValidating, setVoucherValidating] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const router = useRouter();
+
+  // Cap = giá sau khi đã trừ referral discount. Voucher tối đa = cap.
+  const maxVoucherUsable = Math.max(0, priceVnd - referralDiscount);
 
   useEffect(() => {
-    // Read from cookie first, then localStorage fallback
     try {
       const cookieMatch = document.cookie.match(/(?:^|;\s*)bodix_ref=([^;]*)/);
       const fromCookie = cookieMatch ? decodeURIComponent(cookieMatch[1]) : null;
@@ -114,7 +134,7 @@ export function CheckoutForm({
     return () => clearTimeout(timer);
   }, [referralCode, priceVnd, onReferralChange]);
 
-  // ── Voucher: từng mã sau dấu phẩy, cộng dồn giảm ───────────────────────────
+  // ── Voucher validation, capped at maxVoucherUsable ────────────────────────
 
   useEffect(() => {
     const codes = voucherInput
@@ -129,27 +149,23 @@ export function CheckoutForm({
     const timer = setTimeout(async () => {
       setVoucherValidating(true);
       try {
-        const referralDiscount = referralValid?.valid
-          ? (referralValid.discount_amount ?? 0)
-          : 0;
-        let priceLeft = priceVnd - referralDiscount;
-        const lines: { code: string; valid: boolean; amount: number }[] = [];
-        let total = 0;
+        let priceLeft = maxVoucherUsable;
+        const lines: { code: string; valid: boolean; amount: number; remaining: number }[] = [];
         for (const code of codes) {
           const res = await fetch(
-            `/api/voucher/validate?code=${encodeURIComponent(code)}`
+            `/api/voucher/validate?code=${encodeURIComponent(code)}`,
           );
           const data = (await res.json()) as {
             valid?: boolean;
             remaining_amount?: number;
           };
-          if (data.valid && (data.remaining_amount ?? 0) > 0 && priceLeft > 0) {
-            const take = Math.min(data.remaining_amount ?? 0, priceLeft);
-            total += take;
+          const remaining = data.remaining_amount ?? 0;
+          if (data.valid && remaining > 0 && priceLeft > 0) {
+            const take = Math.min(remaining, priceLeft);
             priceLeft -= take;
-            lines.push({ code, valid: true, amount: take });
+            lines.push({ code, valid: true, amount: take, remaining });
           } else {
-            lines.push({ code, valid: false, amount: 0 });
+            lines.push({ code, valid: false, amount: 0, remaining });
           }
         }
         setVoucherLines(lines);
@@ -164,9 +180,9 @@ export function CheckoutForm({
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [voucherInput, priceVnd, referralValid, onVoucherChange]);
+  }, [voucherInput, maxVoucherUsable, onVoucherChange]);
 
-  // ── Submit ────────────────────────────────────────────────────────────────
+  // ── Submit: tạo order → swap sang QR view inline ──────────────────────────
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -193,12 +209,18 @@ export function CheckoutForm({
         return;
       }
 
-      if (data.redirect) {
-        router.push(data.redirect);
+      if (!data.order_id || !data.payment_code) {
+        setError("Không nhận được thông tin thanh toán. Vui lòng thử lại.");
         return;
       }
 
-      onSubmitted?.();
+      const amount = data.pricing?.final_price ?? finalPrice;
+      onPaymentReady({
+        orderId: String(data.order_id),
+        paymentCode: data.payment_code,
+        amount,
+        qrUrl: getSePayQRUrl(amount, data.payment_code, "compact"),
+      });
     } catch {
       setError("Không thể kết nối. Vui lòng thử lại.");
     } finally {
@@ -233,6 +255,15 @@ export function CheckoutForm({
       ? `Giảm ${referralValid.discount_percent ?? 10}% từ đối tác ${referralValid.referrer_name}`
       : `Giảm ${referralValid.discount_percent ?? 10}% từ mã giới thiệu ${referralValid.referrer_name}`
     : null;
+
+  // ── Voucher input cap warning ─────────────────────────────────────────────
+
+  const voucherInputDigits = voucherLines.reduce(
+    (sum, l) => sum + (l.valid ? l.amount : 0),
+    0,
+  );
+  const voucherCapHit =
+    voucherDiscount > 0 && voucherInputDigits >= maxVoucherUsable;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -297,7 +328,7 @@ export function CheckoutForm({
         )}
         {!referralValidating && referralValid?.valid && referralLabel && (
           <p className="mt-1 text-sm text-success">
-            ✓ {referralLabel} – Giảm {referralValid.discount_amount?.toLocaleString("vi-VN")}đ
+            ✓ {referralLabel} – Giảm {formatVnd(referralValid.discount_amount ?? 0)}
           </p>
         )}
         {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (
@@ -305,18 +336,21 @@ export function CheckoutForm({
         )}
       </div>
 
-      {/* Voucher — nhiều mã */}
+      {/* Voucher với cap */}
       <div>
         <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-600">
           <Ticket className="h-4 w-4" />
           Voucher
         </label>
+        <p className="mt-1 text-xs text-neutral-500">
+          Tối đa {formatVnd(maxVoucherUsable)} voucher áp dụng cho đơn này.
+        </p>
         <input
           type="text"
           value={voucherInput}
           onChange={(e) => setVoucherInput(e.target.value.toUpperCase())}
           placeholder="Nhập mã voucher (nhiều mã cách nhau bằng dấu phẩy)"
-          className="mt-1 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          className="mt-2 w-full rounded-lg border border-neutral-200 px-3 py-2 text-neutral-800 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
         />
         <p className="mt-1 text-xs text-neutral-500">
           Ví dụ: V-ABC123, V-DEF456
@@ -332,34 +366,35 @@ export function CheckoutForm({
                 className={line.valid ? "text-success" : "text-red-600"}
               >
                 {line.valid
-                  ? `✅ ${line.code}: -${line.amount.toLocaleString("vi-VN")}đ`
-                  : `❌ ${line.code}: không hợp lệ`}
+                  ? `✅ ${line.code}: -${formatVnd(line.amount)}${
+                      line.amount < line.remaining
+                        ? ` (chỉ áp dụng đến mức cap; còn lại ${formatVnd(line.remaining - line.amount)} trong voucher)`
+                        : ""
+                    }`
+                  : `❌ ${line.code}: không hợp lệ${
+                      line.remaining > 0 && voucherCapHit
+                        ? " hoặc đã đủ cap voucher cho đơn này"
+                        : ""
+                    }`}
               </li>
             ))}
             {voucherLines.some((l) => l.valid) && (
               <li className="font-medium text-neutral-800">
-                Tổng giảm voucher: -
-                {voucherLines
-                  .filter((l) => l.valid)
-                  .reduce((s, l) => s + l.amount, 0)
-                  .toLocaleString("vi-VN")}
-                đ
+                Tổng giảm voucher: -{formatVnd(voucherDiscount)}
               </li>
             )}
           </ul>
         )}
       </div>
 
-      {/* Payment method */}
+      {/* Notice + Payment method */}
       <div>
-        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-neutral-700">
-          <p className="font-medium text-blue-900">ℹ️ Bạn chưa cần thanh toán ngay.</p>
-          <p className="mt-2">
-            Hiện có nhiều người đang đăng ký. Chúng tôi sẽ xác nhận và gửi thông báo cho bạn khi bạn
-            được tham gia đợt tập tiếp theo.
+        <div className="mb-4 rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-medium">
+            🎉 May mắn! Đợt tới còn chỗ – bạn có thể thanh toán giữ chỗ ngay bây giờ.
           </p>
           <p className="mt-2">
-            Vui lòng xác nhận đăng ký bên dưới để giữ chỗ.
+            Mỗi đợt giới hạn để đảm bảo chất lượng đồng hành.
           </p>
         </div>
         <h2 className="font-heading text-lg font-semibold text-primary">
@@ -407,7 +442,7 @@ export function CheckoutForm({
         disabled={loading || paymentMethod !== "bank_transfer"}
         className="w-full rounded-lg bg-primary px-4 py-3 font-medium text-secondary-light transition-colors hover:bg-primary-dark disabled:opacity-60"
       >
-        {loading ? "Đang xử lý..." : "Xác nhận đăng ký"}
+        {loading ? "Đang xử lý..." : `Thanh toán ngay – ${formatVnd(finalPrice)}`}
       </button>
     </form>
   );

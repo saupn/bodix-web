@@ -10,8 +10,6 @@ const REFERRAL_BASE =
     : process.env.NEXT_PUBLIC_APP_URL
       ? `${process.env.NEXT_PUBLIC_APP_URL}/r`
       : "https://bodix.fit/r";
-const SHARE_MESSAGE = (code: string) =>
-  `Mình đang tập BodiX – chương trình fitness hoàn thành được, không phải chỉ bắt đầu! 💪\nDùng mã ${code} để giảm 10% chương trình đầu tiên.\n👉 ${REFERRAL_BASE}/${code}`;
 
 const STATUS_LABEL: Record<string, string> = {
   clicked: "Đã click",
@@ -33,12 +31,22 @@ const STATUS_CLASS: Record<string, string> = {
   fraudulent: "bg-red-100 text-red-800",
 };
 
-const TX_TYPE_LABEL: Record<string, string> = {
+const SOURCE_LABEL: Record<string, string> = {
   referral_reward: "Thưởng giới thiệu",
-  affiliate_commission: "Commission",
-  purchase_discount: "Dùng credit mua",
-  withdrawal: "Rút tiền",
-  admin_adjustment: "Điều chỉnh",
+  admin_grant: "BodiX tặng",
+  promotion: "Khuyến mãi",
+};
+
+const VOUCHER_STATUS_LABEL: Record<string, string> = {
+  active: "Còn hiệu lực",
+  used: "Đã dùng",
+  expired: "Hết hạn",
+};
+
+const VOUCHER_STATUS_CLASS: Record<string, string> = {
+  active: "bg-green-100 text-green-800",
+  used: "bg-neutral-100 text-neutral-600",
+  expired: "bg-neutral-100 text-neutral-600",
 };
 
 interface CodeData {
@@ -60,15 +68,23 @@ interface TrackingData {
     date: string;
     reward: number | null;
   }[];
-  balance: number;
-  credit_history: {
-    id: string;
-    amount: number;
-    balance_after: number;
-    transaction_type: string;
-    description: string;
-    created_at: string;
-  }[];
+}
+
+interface Voucher {
+  id: string;
+  code: string;
+  amount: number;
+  remaining_amount: number;
+  status: string;
+  expires_at: string;
+  source_type: string;
+  created_at: string;
+  used_at: string | null;
+}
+
+interface VoucherData {
+  vouchers: Voucher[];
+  active_balance: number;
 }
 
 function formatDate(dateStr: string): string {
@@ -84,6 +100,7 @@ function formatDate(dateStr: string): string {
 export default function ReferralPage() {
   const [codeData, setCodeData] = useState<CodeData | null>(null);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
+  const [voucherData, setVoucherData] = useState<VoucherData | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
@@ -91,14 +108,14 @@ export default function ReferralPage() {
   const referralLink = codeData
     ? `${REFERRAL_BASE}/${codeData.code}`
     : "";
-  const shareMessage = codeData ? SHARE_MESSAGE(codeData.code) : "";
 
   useEffect(() => {
     const load = async () => {
       try {
-        const [codeRes, trackRes] = await Promise.all([
+        const [codeRes, trackRes, voucherRes] = await Promise.all([
           fetch("/api/referral/code"),
           fetch("/api/referral/tracking"),
+          fetch("/api/user/vouchers"),
         ]);
         if (codeRes.ok) {
           const c = await codeRes.json();
@@ -107,6 +124,10 @@ export default function ReferralPage() {
         if (trackRes.ok) {
           const t = await trackRes.json();
           setTrackingData(t);
+        }
+        if (voucherRes.ok) {
+          const v = await voucherRes.json();
+          setVoucherData(v);
         }
       } finally {
         setLoading(false);
@@ -177,7 +198,7 @@ export default function ReferralPage() {
           Giới thiệu bạn bè – Nhận thưởng! 🎁
         </h1>
         <p className="mt-2 text-neutral-600">
-          Mỗi bạn bè đăng ký qua link của bạn, bạn nhận 100.000đ credit
+          Mỗi bạn bè đăng ký qua link của bạn, bạn nhận 100.000đ voucher
         </p>
       </div>
 
@@ -263,9 +284,9 @@ export default function ReferralPage() {
           Thưởng của bạn
         </h2>
         <ul className="mt-4 space-y-2 text-left text-neutral-600 sm:mx-auto sm:max-w-md">
-          <li>• Bạn bè đăng ký → Bạn nhận 100.000đ credit</li>
+          <li>• Bạn bè đăng ký → Bạn nhận 100.000đ voucher</li>
           <li>• Bạn bè được giảm 10% chương trình đầu tiên</li>
-          <li>• Credit dùng để mua chương trình tiếp theo hoặc gia hạn</li>
+          <li>• Voucher dùng để mua chương trình tiếp theo hoặc gia hạn</li>
         </ul>
       </section>
 
@@ -354,53 +375,73 @@ export default function ReferralPage() {
         )}
       </section>
 
-      {/* Section 5 — Credit Balance */}
+      {/* Section 5 — Voucher của bạn */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 font-heading text-lg font-semibold text-primary">
-          Số dư credit
+          Voucher của bạn
         </h2>
         <p className="text-2xl font-bold text-primary">
-          {(trackingData?.balance ?? 0).toLocaleString("vi-VN")} đ
+          {(voucherData?.active_balance ?? 0).toLocaleString("vi-VN")} đ
         </p>
         <p className="mt-1 text-sm text-neutral-600">
-          Dùng credit vào lần mua tiếp theo
+          Tổng voucher còn hiệu lực – dùng tại bước thanh toán
         </p>
-        {trackingData?.credit_history?.length ? (
+
+        {voucherData && voucherData.vouchers.length > 0 ? (
           <div className="mt-6">
             <h3 className="mb-3 text-sm font-medium text-neutral-700">
-              Giao dịch gần nhất
+              Danh sách voucher
             </h3>
             <ul className="space-y-2">
-              {trackingData.credit_history.map((tx) => (
-                <li
-                  key={tx.id}
-                  className="flex items-center justify-between rounded-lg border border-neutral-100 px-3 py-2 text-sm"
-                >
-                  <div>
-                    <span className="font-medium">
-                      {TX_TYPE_LABEL[tx.transaction_type] ?? tx.transaction_type}
-                    </span>
-                    {tx.description && (
-                      <span className="ml-2 text-neutral-600">
-                        {tx.description}
-                      </span>
-                    )}
-                  </div>
-                  <span
-                    className={
-                      tx.amount >= 0 ? "text-success" : "text-red-600"
-                    }
+              {voucherData.vouchers.map((v) => {
+                const expired = new Date(v.expires_at) <= new Date();
+                const effectiveStatus = expired && v.status === "active" ? "expired" : v.status;
+                const isActive = effectiveStatus === "active";
+                return (
+                  <li
+                    key={v.id}
+                    className={`rounded-lg border px-4 py-3 text-sm ${
+                      isActive
+                        ? "border-green-200 bg-green-50/50"
+                        : "border-neutral-200 bg-neutral-50/50"
+                    }`}
                   >
-                    {tx.amount >= 0 ? "+" : ""}
-                    {tx.amount.toLocaleString("vi-VN")} đ
-                  </span>
-                </li>
-              ))}
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-mono font-semibold text-neutral-900">
+                          {v.code}
+                        </p>
+                        <p className="mt-0.5 text-xs text-neutral-600">
+                          {SOURCE_LABEL[v.source_type] ?? v.source_type} ·{" "}
+                          {formatDate(v.created_at)}
+                        </p>
+                      </div>
+                      <span
+                        className={`shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                          VOUCHER_STATUS_CLASS[effectiveStatus] ?? "bg-neutral-100"
+                        }`}
+                      >
+                        {VOUCHER_STATUS_LABEL[effectiveStatus] ?? effectiveStatus}
+                      </span>
+                    </div>
+                    <div className="mt-2 flex items-baseline justify-between text-sm">
+                      <span className="text-neutral-600">
+                        {isActive
+                          ? `Còn lại: ${v.remaining_amount.toLocaleString("vi-VN")} đ / ${v.amount.toLocaleString("vi-VN")} đ`
+                          : `Mệnh giá: ${v.amount.toLocaleString("vi-VN")} đ`}
+                      </span>
+                      <span className="text-xs text-neutral-500">
+                        HSD: {formatDate(v.expires_at)}
+                      </span>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           </div>
         ) : (
           <p className="mt-4 text-sm text-neutral-600">
-            Chưa có giao dịch credit
+            Chưa có voucher nào. Mời bạn bè để nhận voucher đầu tiên!
           </p>
         )}
       </section>

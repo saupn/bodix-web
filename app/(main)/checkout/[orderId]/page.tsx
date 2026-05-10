@@ -2,7 +2,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getSePayQRUrl, SEPAY_CONFIG } from "@/lib/sepay";
-import { PaymentClient } from "./PaymentClient";
+import { PaymentClient } from "@/components/checkout/PaymentClient";
 
 const PROGRAM_NAME: Record<string, string> = {
   "bodix-21": "BodiX 21",

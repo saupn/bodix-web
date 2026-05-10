@@ -14,6 +14,8 @@ interface PaymentClientProps {
   bankAccount: string;
   bankCode: string;
   bankAccountName: string;
+  /** Override default redirect to /checkout/success on paid. */
+  onPaid?: (orderId: string) => void;
 }
 
 type Status = "pending" | "paid" | "expired";
@@ -50,6 +52,7 @@ export function PaymentClient({
   bankAccount,
   bankCode,
   bankAccountName,
+  onPaid,
 }: PaymentClientProps) {
   const router = useRouter();
   const [status, setStatus] = useState<Status>("pending");
@@ -68,13 +71,17 @@ export function PaymentClient({
           setStatus("paid");
           clearInterval(interval);
           setTimeout(() => {
-            router.push(`/checkout/success?order=${orderId}`);
+            if (onPaid) {
+              onPaid(orderId);
+            } else {
+              router.push(`/checkout/success?order=${orderId}`);
+            }
           }, 1500);
         }
       } catch {
         // network blip — keep polling
       }
-    }, 3000);
+    }, 5000);
 
     const timeout = setTimeout(
       () => {
@@ -88,10 +95,10 @@ export function PaymentClient({
       clearInterval(interval);
       clearTimeout(timeout);
     };
-  }, [status, orderId, router]);
+  }, [status, orderId, router, onPaid]);
 
   return (
-    <div className="mx-auto max-w-md space-y-5 px-4 py-8">
+    <div className="mx-auto max-w-md space-y-5">
       {/* Section 1: Tóm tắt đơn hàng */}
       <div className="rounded-2xl border border-neutral-200 bg-white p-5 shadow-sm">
         <h1 className="font-heading text-lg font-bold text-primary">
@@ -211,7 +218,7 @@ export function PaymentClient({
           <div className="flex items-center gap-3">
             <CheckCircle2 className="h-5 w-5 text-green-600" />
             <div>
-              <p className="font-semibold text-green-900">Đã nhận thanh toán! 🎉</p>
+              <p className="font-semibold text-green-900">✅ Thanh toán thành công!</p>
               <p className="mt-0.5 text-xs text-green-800">Đang kích hoạt tài khoản...</p>
             </div>
           </div>

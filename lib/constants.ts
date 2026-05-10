@@ -205,9 +205,9 @@ export const FOOTER_DATA = {
       title: "HỖ TRỢ",
       links: [
         { label: "FAQ", href: "/#faq" },
-        { label: "Hướng dẫn", href: "/huong-dan" },
-        { label: "Điều khoản", href: "/dieu-khoan" },
-        { label: "Bảo mật", href: "/bao-mat" },
+        { label: "Hướng dẫn", href: "/guide" },
+        { label: "Điều khoản", href: "/terms" },
+        { label: "Bảo mật", href: "/privacy" },
       ],
     },
     {

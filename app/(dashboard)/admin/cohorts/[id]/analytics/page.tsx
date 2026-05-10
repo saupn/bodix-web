@@ -28,6 +28,8 @@ interface MemberRow {
   last_checkin: string | null;
   risk_score: number;
   risk_level: string;
+  is_complimentary?: boolean;
+  complimentary_reason?: string | null;
 }
 
 interface CohortData {
@@ -284,7 +286,17 @@ export default function CohortAnalyticsPage() {
               <tbody className="divide-y divide-neutral-200">
                 {sortedMembers.map((m) => (
                   <tr key={m.enrollment_id} className="hover:bg-neutral-50">
-                    <td className="whitespace-nowrap px-4 py-2 text-sm">{m.full_name ?? "–"}</td>
+                    <td className="whitespace-nowrap px-4 py-2 text-sm">
+                      <span>{m.full_name ?? "–"}</span>
+                      {m.is_complimentary && (
+                        <span
+                          className="ml-2 inline-flex items-center rounded-full border border-amber-300 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-800"
+                          title={m.complimentary_reason ?? "Vé miễn phí từ admin"}
+                        >
+                          🎁 Vé miễn phí
+                        </span>
+                      )}
+                    </td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.current_day}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.current_streak}</td>
                     <td className="whitespace-nowrap px-4 py-2 text-sm">{m.completion_rate}%</td>

@@ -342,6 +342,8 @@ export default async function AppPage() {
           )}
         </div>
 
+        <GiftBookCard />
+
         {/* Buddy state */}
         {paidWaitingEnrollment.cohort_id && !hasBuddy && <BuddyChooser />}
         {paidWaitingEnrollment.cohort_id && hasBuddy && buddyName && (
@@ -357,8 +359,6 @@ export default async function AppPage() {
             </p>
           </div>
         )}
-
-        <GiftBookCard />
       </div>
     );
   }
@@ -371,6 +371,7 @@ export default async function AppPage() {
     return (
       <div className="space-y-8">
         {pendingBanner}
+        <GiftBookCard />
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-8 text-center">
           <div className="text-4xl mb-4">🎉</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
@@ -386,7 +387,6 @@ export default async function AppPage() {
             Thanh toán ngay
           </Link>
         </div>
-        <GiftBookCard />
       </div>
     );
   }
@@ -396,6 +396,7 @@ export default async function AppPage() {
     return (
       <div className="space-y-8">
         {pendingBanner}
+        <GiftBookCard />
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6 sm:p-8 text-center">
           <div className="text-4xl mb-4">🎯</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
@@ -411,7 +412,6 @@ export default async function AppPage() {
             Đăng ký tập chính thức
           </Link>
         </div>
-        <GiftBookCard />
       </div>
     );
   }
@@ -489,6 +489,7 @@ export default async function AppPage() {
             Chọn chương trình tiếp theo để tiếp tục hành trình.
           </p>
         </div>
+        <GiftBookCard />
         {upgradeBanner && <UpgradeBanner upgradeBanner={upgradeBanner} />}
         <div>
           <h2 className="font-heading text-xl font-bold text-primary mb-6">
@@ -499,7 +500,6 @@ export default async function AppPage() {
             ctaHref={(slug) => `/app/checkout/${slug}`}
           />
         </div>
-        <GiftBookCard />
       </div>
     );
   }
@@ -547,14 +547,14 @@ export default async function AppPage() {
         </p>
       </div>
 
+      <GiftBookCard />
+
       <TrialSignupCard
         canTrial={canTrial}
         hasEverTrialed={hasEverTrialed}
         programId={bodix21?.id ?? null}
         nextCohortDate={nextCohortDate}
       />
-
-      <GiftBookCard />
     </div>
   );
 }

@@ -215,6 +215,8 @@ export function DashboardHomeContent({
           </h1>
         </div>
 
+        <GiftBookCard />
+
         {creditBalance > 0 && (
           <Link
             href="/app/profile"
@@ -253,8 +255,6 @@ export function DashboardHomeContent({
             </span>
           </Link>
         )}
-
-        <GiftBookCard />
       </div>
     );
   }
@@ -305,6 +305,8 @@ export function DashboardHomeContent({
           compact
         />
       </div>
+
+      <GiftBookCard />
 
       {/* Voucher/credit card */}
       {creditBalance > 0 && (
@@ -478,8 +480,6 @@ export function DashboardHomeContent({
           </ul>
         </div>
       )}
-
-      <GiftBookCard />
     </div>
   );
 }

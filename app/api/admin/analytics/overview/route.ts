@@ -40,6 +40,7 @@ export async function GET() {
 
   const service = createServiceClient()
   const todayISO = new Date().toISOString().slice(0, 10)
+  const monthStart = `${todayISO.slice(0, 7)}-01T00:00:00Z`
   const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString()
 
   // Cached MV data (5 min) + cached historical data (1 hour) + live today stats
@@ -52,6 +53,8 @@ export async function GET() {
     todaySignupCount,
     todayPurchaseRows,
     churnRows,
+    complimentaryTodayCount,
+    complimentaryMonthCount,
   ] = await Promise.all([
     getCachedAnalyticsMVs(),
     getCachedAnalyticsHistorical(),
@@ -77,16 +80,32 @@ export async function GET() {
       .then(r => r.count ?? 0),
 
     service.from('enrollments')
-      .select('amount_paid')
+      .select('amount_paid, is_complimentary')
       .gte('paid_at', `${todayISO}T00:00:00Z`)
       .neq('status', 'trial')
-      .then(r => (r.data ?? []) as Array<{ amount_paid: number }>),
+      .then(r =>
+        ((r.data ?? []) as Array<{ amount_paid: number; is_complimentary: boolean | null }>),
+      ),
 
     service.from('enrollments')
       .select('status')
       .in('status', ['active', 'dropped'])
       .gte('created_at', thirtyDaysAgo)
       .then(r => (r.data ?? []) as Array<{ status: string }>),
+
+    // Complimentary tickets granted today
+    service.from('enrollments')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_complimentary', true)
+      .gte('paid_at', `${todayISO}T00:00:00Z`)
+      .then(r => r.count ?? 0),
+
+    // Complimentary tickets granted this month
+    service.from('enrollments')
+      .select('*', { count: 'exact', head: true })
+      .eq('is_complimentary', true)
+      .gte('paid_at', monthStart)
+      .then(r => r.count ?? 0),
   ])
 
   const { programRows, cohortRows, upgradeRows, revenueRows, monthlyRevenue6 } = mvData
@@ -139,7 +158,11 @@ export async function GET() {
     (sum: number, a: { pending_balance: number }) => sum + (a.pending_balance ?? 0), 0
   )
 
-  const revenueToday = todayPurchaseRows.reduce((s, e) => s + (e.amount_paid ?? 0), 0)
+  // Doanh thu chỉ tính các đơn KHÔNG phải complimentary (amount > 0).
+  const revenueToday = todayPurchaseRows
+    .filter((e) => !e.is_complimentary)
+    .reduce((s, e) => s + (e.amount_paid ?? 0), 0)
+  const purchasesTodayCount = todayPurchaseRows.filter((e) => !e.is_complimentary).length
   const checkinRate = (activeCount as number) > 0
     ? Math.round((todayCheckinCount as number) / (activeCount as number) * 1000) / 10
     : 0
@@ -271,10 +294,12 @@ export async function GET() {
       checkins: todayCheckinCount,
       rescues: todayRescueCount,
       signups: todaySignupCount,
-      purchases: todayPurchaseRows.length,
+      purchases: purchasesTodayCount,
       revenue: revenueToday,
       voucher_outstanding: voucherOutstanding,
       affiliate_pending: affiliatePending,
+      complimentary_today: complimentaryTodayCount,
+      complimentary_month: complimentaryMonthCount,
     },
     charts: {
       completion_daily: chart_completion_daily,

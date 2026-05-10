@@ -22,6 +22,46 @@ const GENDER_LABEL: Record<string, string> = {
   other: "Khác",
 };
 
+/**
+ * fitness_goal đến ở 3 dạng do lịch sử lưu data:
+ *   - Array (vd ["Giảm mỡ", "Tăng sức bền"]) — onboarding gửi multi-select array
+ *   - JSON string (vd '["Giảm mỡ", ...]') — Postgres coerce array vào cột text
+ *   - Plain text (vd "Giảm mỡ") — single value cũ
+ * Helper trả về mảng các goal đã parse sạch.
+ */
+function parseFitnessGoals(value: unknown): string[] {
+  if (!value) return [];
+  if (Array.isArray(value)) {
+    return value.filter((v): v is string => typeof v === "string" && v.trim() !== "");
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (!trimmed) return [];
+    if (trimmed.startsWith("[")) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(
+            (v): v is string => typeof v === "string" && v.trim() !== "",
+          );
+        }
+      } catch {
+        // not valid JSON — fall through
+      }
+    }
+    // Postgres array literal "{a,b}" — Supabase trả về raw nếu cột là text[]
+    if (trimmed.startsWith("{") && trimmed.endsWith("}")) {
+      return trimmed
+        .slice(1, -1)
+        .split(",")
+        .map((s) => s.replace(/^"(.*)"$/, "$1").trim())
+        .filter(Boolean);
+    }
+    return [trimmed];
+  }
+  return [];
+}
+
 export default async function ProfilePage() {
   const supabase = await createClient();
   const {
@@ -109,9 +149,10 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-600">Mục tiêu</dt>
             <dd className="mt-1 text-neutral-800">
-              {Array.isArray(profile?.fitness_goal) && profile.fitness_goal.length > 0
-                ? profile.fitness_goal.join(", ")
-                : "–"}
+              {(() => {
+                const goals = parseFitnessGoals(profile?.fitness_goal);
+                return goals.length > 0 ? goals.join(", ") : "–";
+              })()}
             </dd>
           </div>
         </dl>

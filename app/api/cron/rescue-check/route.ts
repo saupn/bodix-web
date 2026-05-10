@@ -89,6 +89,8 @@ export async function GET(request: NextRequest) {
     pre_cohort_sent: 0,
     pre_cohort_skipped: 0,
     pre_cohort_errors: 0,
+    orphan_assigned: 0,
+    orphan_skipped: 0,
   };
 
   for (const row of enrollments ?? []) {
@@ -643,6 +645,75 @@ export async function GET(request: NextRequest) {
   console.log(
     '[rescue-check] pre_cohort sent:', stats.pre_cohort_sent,
     'skipped:', stats.pre_cohort_skipped,
+  );
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // AUTO-ASSIGN ORPHAN PAID USERS
+  // User đã thanh toán nhưng cohort_id = null (lúc thanh toán cohort đầy
+  // hoặc chưa có upcoming). Mỗi đêm cron tìm cohort upcoming còn chỗ và gán.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  const { data: orphanEnrollments } = await supabase
+    .from('enrollments')
+    .select('id, user_id, program_id')
+    .eq('status', 'paid_waiting_cohort')
+    .is('cohort_id', null);
+
+  for (const orphan of orphanEnrollments ?? []) {
+    if (!orphan.program_id) {
+      stats.orphan_skipped++;
+      continue;
+    }
+
+    const { data: nextCohort } = await supabase
+      .from('cohorts')
+      .select('id, name, start_date, max_members, current_members')
+      .eq('program_id', orphan.program_id)
+      .eq('status', 'upcoming')
+      .gte('start_date', today)
+      .order('start_date', { ascending: true })
+      .limit(1)
+      .maybeSingle();
+
+    if (!nextCohort) {
+      stats.orphan_skipped++;
+      continue;
+    }
+
+    const max = nextCohort.max_members ?? 50;
+    const current = nextCohort.current_members ?? 0;
+    if (current >= max) {
+      stats.orphan_skipped++;
+      continue;
+    }
+
+    const { error: assignErr } = await supabase
+      .from('enrollments')
+      .update({ cohort_id: nextCohort.id })
+      .eq('id', orphan.id);
+
+    if (assignErr) {
+      console.error('[rescue-check] orphan assign error:', orphan.user_id, assignErr);
+      continue;
+    }
+
+    await supabase
+      .from('cohorts')
+      .update({ current_members: current + 1 })
+      .eq('id', nextCohort.id);
+
+    stats.orphan_assigned++;
+    console.log(
+      '[rescue-check] auto-assigned orphan user:',
+      orphan.user_id,
+      'to',
+      nextCohort.name,
+    );
+  }
+
+  console.log(
+    '[rescue-check] orphan assigned:', stats.orphan_assigned,
+    'skipped:', stats.orphan_skipped,
   );
 
   return NextResponse.json(stats);

@@ -5,6 +5,12 @@ import { sendPushToUser } from "@/lib/messaging/adapters/push";
 
 type AmountStatus = "correct" | "overpaid" | "underpaid";
 
+function formatDateVnLocal(iso: string): string {
+  const [y, m, d] = iso.split("T")[0].split("-");
+  if (!y || !m || !d) return iso;
+  return `${d}/${m}/${y}`;
+}
+
 function classifyAmount(paid: number, expected: number, tolerance: number): AmountStatus {
   const diff = paid - expected;
   if (Math.abs(diff) <= tolerance) return "correct";
@@ -278,6 +284,8 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     let enrollmentId: string | null = null;
+    let assignedCohort: { id: string; name: string; start_date: string } | null = null;
+
     if (programRow && order.user_id) {
       const { data: enrollment } = await service
         .from("enrollments")
@@ -325,6 +333,47 @@ export async function POST(request: NextRequest) {
               .eq("id", voucher.id);
           }
         }
+
+        // Auto-assign vào cohort upcoming gần nhất nếu còn chỗ.
+        // Nếu cohort đầy hoặc chưa có → enrollment.cohort_id = null,
+        // cron rescue-check sẽ pick up sau.
+        const todayStr = new Date().toISOString().split("T")[0];
+        const { data: nextCohort } = await service
+          .from("cohorts")
+          .select("id, name, start_date, max_members, current_members")
+          .eq("program_id", programRow.id)
+          .eq("status", "upcoming")
+          .gte("start_date", todayStr)
+          .order("start_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+
+        if (nextCohort) {
+          const max = nextCohort.max_members ?? 50;
+          const current = nextCohort.current_members ?? 0;
+          if (current < max) {
+            await service
+              .from("enrollments")
+              .update({ cohort_id: nextCohort.id })
+              .eq("id", enrollment.id);
+            await service
+              .from("cohorts")
+              .update({ current_members: current + 1 })
+              .eq("id", nextCohort.id);
+            assignedCohort = {
+              id: nextCohort.id,
+              name: nextCohort.name,
+              start_date: nextCohort.start_date,
+            };
+          } else {
+            console.log(
+              "[sepay] cohort full, user pending assign:",
+              order.user_id,
+              "cohort:",
+              nextCohort.id,
+            );
+          }
+        }
       }
     }
 
@@ -349,17 +398,22 @@ export async function POST(request: NextRequest) {
     if (order.user_id) {
       const programName = programRow?.name ?? order.program;
 
+      const cohortLine = assignedCohort
+        ? `Bạn đã được xếp vào "${assignedCohort.name}" – đợt tập bắt đầu ngày ${formatDateVnLocal(assignedCohort.start_date)}.`
+        : "Đợt tập sắp tới chưa mở – BodiX sẽ thông báo khi có đợt mới.";
+
       await service.from("notifications").insert({
         user_id: order.user_id,
         type: "payment_confirmed",
         channel: "in_app",
         title: `Thanh toán ${programName} thành công!`,
         content: isOverpaid
-          ? `Bạn đã chuyển dư ${amountDiff.toLocaleString("vi-VN")}đ — mình sẽ liên hệ hoàn lại. Bạn sẽ được thông báo khi đợt tập tiếp theo mở.`
-          : "Bạn sẽ được thông báo khi đợt tập tiếp theo mở.",
+          ? `Bạn đã chuyển dư ${amountDiff.toLocaleString("vi-VN")}đ — mình sẽ liên hệ hoàn lại. ${cohortLine}`
+          : cohortLine,
         metadata: {
           order_id: order.id,
           enrollment_id: enrollmentId,
+          cohort_id: assignedCohort?.id ?? null,
           amount_paid: transferAmount,
           amount_expected: order.amount,
           amount_diff: amountDiff,
@@ -375,11 +429,12 @@ export async function POST(request: NextRequest) {
           type: "paymentConfirmed",
           title: "Thanh toán xác nhận! 🎉",
           body: isOverpaid
-            ? `Bạn đã chuyển dư ${amountDiff.toLocaleString("vi-VN")}đ — mình sẽ liên hệ hoàn lại.`
-            : "Bạn sẽ được thông báo khi đợt tập tiếp theo mở.",
+            ? `Bạn đã chuyển dư ${amountDiff.toLocaleString("vi-VN")}đ — ${cohortLine}`
+            : cohortLine,
           data: {
             order_id: String(order.id),
             program: order.program ?? "",
+            cohort_id: assignedCohort?.id ?? "",
           },
         });
       } catch (pushErr) {
@@ -390,16 +445,19 @@ export async function POST(request: NextRequest) {
       try {
         const { data: profile } = await service
           .from("profiles")
-          .select("channel_user_id")
+          .select("channel_user_id, full_name")
           .eq("id", order.user_id)
           .maybeSingle();
 
         if (profile?.channel_user_id) {
           const { sendViaZalo } = await import("@/lib/messaging/adapters/zalo");
-          await sendViaZalo(
-            profile.channel_user_id,
-            `✅ Thanh toán xác nhận!${overpaidNote} Bạn sẽ được thông báo ngày bắt đầu.`,
-          );
+          const firstName =
+            profile.full_name?.split(/\s+/).pop() || profile.full_name || "Bạn";
+          const paidAmountText = transferAmount.toLocaleString("vi-VN");
+          const messageText = assignedCohort
+            ? `✅ Thanh toán thành công!\n\n${firstName} ơi, BodiX đã ghi nhận ${paidAmountText}đ.${overpaidNote}\n\nBạn đã được xếp vào "${assignedCohort.name}" – đợt tập bắt đầu ngày ${formatDateVnLocal(assignedCohort.start_date)}. Chuẩn bị tinh thần nhé! 💪`
+            : `✅ Thanh toán thành công!\n\n${firstName} ơi, BodiX đã ghi nhận ${paidAmountText}đ.${overpaidNote}\n\nĐợt tập sắp tới chưa mở – BodiX sẽ thông báo khi có đợt mới.`;
+          await sendViaZalo(profile.channel_user_id, messageText);
         }
       } catch (zaloErr) {
         console.error("[sepay] zalo notify:", zaloErr);

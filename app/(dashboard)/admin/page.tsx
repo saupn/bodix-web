@@ -41,6 +41,8 @@ interface OverviewData {
     revenue: number;
     voucher_outstanding: number;
     affiliate_pending: number;
+    complimentary_today?: number;
+    complimentary_month?: number;
   };
   charts: {
     completion_daily: { date: string; rate_21: number; rate_6w: number; rate_12w: number }[];
@@ -206,6 +208,8 @@ export default function AdminDashboardPage() {
               { label: "Revenue", value: `${today.revenue.toLocaleString("vi-VN")}đ` },
               { label: "Voucher outstanding", value: `${(today.voucher_outstanding ?? 0).toLocaleString("vi-VN")}đ` },
               { label: "Affiliate pending", value: `${(today.affiliate_pending ?? 0).toLocaleString("vi-VN")}đ` },
+              { label: "🎁 Vé tặng hôm nay", value: today.complimentary_today ?? 0 },
+              { label: "🎁 Vé tặng tháng này", value: today.complimentary_month ?? 0 },
             ].map((item) => (
               <div
                 key={item.label}

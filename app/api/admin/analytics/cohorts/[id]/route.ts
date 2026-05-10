@@ -36,11 +36,12 @@ export async function GET(
       .from('enrollments')
       .select(`
         id, user_id, status, current_day, started_at, amount_paid,
+        is_complimentary, complimentary_reason,
         profiles!enrollments_user_id_fkey (id, full_name, avatar_url),
         streaks (current_streak, longest_streak, last_checkin_date)
       `)
       .eq('cohort_id', cohortId)
-      .in('status', ['active', 'completed', 'dropped', 'paused'])
+      .in('status', ['active', 'completed', 'dropped', 'paused', 'paid_waiting_cohort'])
       .order('current_day', { ascending: false }),
 
     // Dropout hotspots via RPC (requires program_id)
@@ -132,6 +133,8 @@ export async function GET(
   const member_list = (enrollmentRows.data as unknown as Array<{
     id: string; user_id: string; status: string; current_day: number
     started_at: string | null; amount_paid: number
+    is_complimentary: boolean | null
+    complimentary_reason: string | null
     profiles: ProfileShape | null; streaks: StreakShape
   }>).map((e) => {
     const profile = e.profiles
@@ -155,6 +158,8 @@ export async function GET(
       last_checkin: lastCheckinMap.get(e.id) ?? null,
       risk_score: riskScore,
       risk_level: riskLevel,
+      is_complimentary: !!e.is_complimentary,
+      complimentary_reason: e.complimentary_reason ?? null,
     }
   })
 

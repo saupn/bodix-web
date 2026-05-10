@@ -85,7 +85,7 @@ export function CohortsList({
   const [, startTransition] = useTransition();
 
   const [showCreate, setShowCreate] = useState(false);
-  const [assignFor, setAssignFor] = useState<CohortRow | null>(null);
+  const [giftFor, setGiftFor] = useState<CohortRow | null>(null);
   const [confirmStart, setConfirmStart] = useState<CohortRow | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<CohortRow | null>(null);
 
@@ -93,11 +93,14 @@ export function CohortsList({
 
   return (
     <div className="mt-8 space-y-8">
-      {/* Section 1: Đang chờ đợt tập */}
+      {/* Section 1: User chưa được gán cohort (orphan paid)
+          User thanh toán → tự động gán cohort upcoming. Section này chỉ liệt
+          kê user còn sót (cohort đầy / chưa có upcoming lúc thanh toán).
+          Cron rescue-check sẽ auto-fill mỗi đêm. */}
       <section className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm">
         <div className="flex items-baseline justify-between">
           <h2 className="font-heading text-lg font-semibold text-primary">
-            Đang chờ đợt tập
+            Chưa gán cohort
           </h2>
           <span className="text-sm text-neutral-500">
             {usersWaiting.length} user
@@ -105,22 +108,27 @@ export function CohortsList({
         </div>
         {usersWaiting.length === 0 ? (
           <p className="mt-3 text-sm text-neutral-500">
-            Không có user nào đang chờ.
+            Tất cả user đã thanh toán đều đã được gán cohort.
           </p>
         ) : (
-          <div className="mt-3 flex flex-wrap gap-2">
-            {usersWaiting.map((u) => (
-              <span
-                key={u.id}
-                className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
-              >
-                <span className="font-medium">{u.full_name || u.phone || u.id.slice(0, 8)}</span>
-                {u.bodix_program && (
-                  <span className="text-neutral-500">· {u.bodix_program}</span>
-                )}
-              </span>
-            ))}
-          </div>
+          <>
+            <p className="mt-1 text-xs text-neutral-500">
+              Cron tự gán mỗi đêm khi có cohort upcoming còn chỗ.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {usersWaiting.map((u) => (
+                <span
+                  key={u.id}
+                  className="inline-flex items-center gap-2 rounded-full border border-neutral-200 bg-neutral-50 px-3 py-1 text-xs text-neutral-700"
+                >
+                  <span className="font-medium">{u.full_name || u.phone || u.id.slice(0, 8)}</span>
+                  {u.bodix_program && (
+                    <span className="text-neutral-500">· {u.bodix_program}</span>
+                  )}
+                </span>
+              ))}
+            </div>
+          </>
         )}
       </section>
 
@@ -193,13 +201,19 @@ export function CohortsList({
                   <div className="inline-flex flex-wrap items-center justify-end gap-2">
                     {c.status === "upcoming" && (
                       <>
-                        <button
-                          type="button"
-                          onClick={() => setAssignFor(c)}
-                          className="rounded-md border border-primary/30 bg-primary/5 px-2.5 py-1 text-xs font-medium text-primary hover:bg-primary/10"
-                        >
-                          Gán users
-                        </button>
+                        {(c.current_members ?? 0) < (c.max_members ?? 50) ? (
+                          <button
+                            type="button"
+                            onClick={() => setGiftFor(c)}
+                            className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800 hover:bg-amber-100"
+                          >
+                            🎁 Tặng vé
+                          </button>
+                        ) : (
+                          <span className="rounded-md border border-neutral-200 bg-neutral-50 px-2.5 py-1 text-xs text-neutral-500">
+                            Đầy chỗ
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => setConfirmStart(c)}
@@ -207,6 +221,12 @@ export function CohortsList({
                         >
                           Bắt đầu
                         </button>
+                        <Link
+                          href={`/admin/cohorts/${c.id}/analytics`}
+                          className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
+                        >
+                          Xem
+                        </Link>
                         <button
                           type="button"
                           onClick={() => setConfirmDelete(c)}
@@ -221,7 +241,7 @@ export function CohortsList({
                         href={`/admin/cohorts/${c.id}/analytics`}
                         className="rounded-md border border-neutral-300 px-2.5 py-1 text-xs font-medium text-neutral-700 hover:bg-neutral-50"
                       >
-                        Xem analytics
+                        Xem
                       </Link>
                     )}
                     {c.status === "completed" && (
@@ -251,13 +271,12 @@ export function CohortsList({
         />
       )}
 
-      {assignFor && (
-        <AssignUsersModal
-          cohort={assignFor}
-          users={usersWaiting}
-          onClose={() => setAssignFor(null)}
-          onAssigned={() => {
-            setAssignFor(null);
+      {giftFor && (
+        <GiftTicketModal
+          cohort={giftFor}
+          onClose={() => setGiftFor(null)}
+          onGranted={() => {
+            setGiftFor(null);
             refresh();
           }}
         />
@@ -395,106 +414,116 @@ function CreateCohortModal({
   );
 }
 
-// ─── Assign modal ─────────────────────────────────────────────────────────────
+// ─── Gift ticket modal ────────────────────────────────────────────────────────
 
-function AssignUsersModal({
+function GiftTicketModal({
   cohort,
-  users,
   onClose,
-  onAssigned,
+  onGranted,
 }: {
   cohort: CohortRow;
-  users: WaitingUser[];
   onClose: () => void;
-  onAssigned: () => void;
+  onGranted: () => void;
 }) {
-  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [phone, setPhone] = useState("");
+  const [reason, setReason] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const toggle = (id: string) =>
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-
-  const submit = async () => {
-    if (selected.size === 0) return;
-    setLoading(true);
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
     setError(null);
+    if (!phone.trim()) {
+      setError("Vui lòng nhập số điện thoại của người nhận.");
+      return;
+    }
+    if (!reason.trim()) {
+      setError("Vui lòng nhập lý do tặng vé.");
+      return;
+    }
+    setLoading(true);
     try {
-      const res = await fetch(`/api/admin/cohorts/${cohort.id}/assign`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_ids: Array.from(selected) }),
-      });
+      const res = await fetch(
+        `/api/admin/cohorts/${cohort.id}/grant-complimentary`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ phone: phone.trim(), reason: reason.trim() }),
+        },
+      );
       const data = await res.json();
       if (!res.ok) {
-        setError(data.error ?? "Không thể gán.");
+        setError(data.error ?? "Không thể tặng vé.");
         return;
       }
-      onAssigned();
+      onGranted();
+    } catch {
+      setError("Không kết nối được. Vui lòng thử lại.");
     } finally {
       setLoading(false);
     }
   };
 
+  const remaining =
+    (cohort.max_members ?? 50) - (cohort.current_members ?? 0);
+
   return (
-    <Modal title={`Gán users vào "${cohort.name}"`} onClose={onClose}>
-      {users.length === 0 ? (
-        <p className="text-sm text-neutral-500">Không có user nào đang chờ.</p>
-      ) : (
-        <div className="max-h-72 space-y-2 overflow-y-auto">
-          {users.map((u) => (
-            <label
-              key={u.id}
-              className="flex cursor-pointer items-center gap-3 rounded-lg border border-neutral-200 px-3 py-2 hover:bg-neutral-50"
-            >
-              <input
-                type="checkbox"
-                checked={selected.has(u.id)}
-                onChange={() => toggle(u.id)}
-                className="h-4 w-4 text-primary"
-              />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium text-neutral-900">
-                  {u.full_name || "(không tên)"}
-                </p>
-                <p className="text-xs text-neutral-500">
-                  {u.phone || "—"}
-                  {u.bodix_program ? ` · ${u.bodix_program}` : ""}
-                </p>
-              </div>
-            </label>
-          ))}
+    <Modal title={`🎁 Tặng vé "${cohort.name}"`} onClose={onClose}>
+      <p className="text-sm text-neutral-600">
+        Tặng 1 vé miễn phí cho KOL / beta tester / người quen. Enrollment được
+        tạo với <code className="font-mono">is_complimentary=true</code>, gán
+        cohort luôn — KHÔNG tính vào doanh thu.
+      </p>
+      <p className="mt-1 text-xs text-neutral-500">
+        Còn {remaining} chỗ trong cohort này.
+      </p>
+
+      <form onSubmit={submit} className="mt-4 space-y-3">
+        <Field label="Số điện thoại người nhận">
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="VD: 0909123456"
+            required
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </Field>
+        <Field label="Lý do tặng vé">
+          <textarea
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            placeholder="VD: KOL Linh – beta tester đợt đầu"
+            required
+            rows={3}
+            maxLength={500}
+            className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary"
+          />
+        </Field>
+
+        {error && (
+          <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
+            {error}
+          </p>
+        )}
+
+        <div className="flex justify-end gap-2 pt-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+          >
+            Huỷ
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-lg bg-amber-600 px-4 py-2 text-sm font-semibold text-white hover:bg-amber-700 disabled:opacity-60"
+          >
+            {loading ? "Đang tặng..." : "Tặng vé"}
+          </button>
         </div>
-      )}
-
-      {error && (
-        <p className="mt-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-4 flex justify-end gap-2">
-        <button
-          type="button"
-          onClick={onClose}
-          className="rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
-        >
-          Huỷ
-        </button>
-        <button
-          type="button"
-          onClick={submit}
-          disabled={loading || selected.size === 0}
-          className="rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-white hover:bg-primary-dark disabled:opacity-60"
-        >
-          {loading ? "Đang gán..." : `Gán ${selected.size} users`}
-        </button>
-      </div>
+      </form>
     </Modal>
   );
 }

@@ -15,21 +15,21 @@ const steps = [
   },
   {
     emoji: "📊",
-    title: "Chủ nhật: Review tuần",
+    title: "Chủ nhật: Tổng kết tuần",
     description:
       "Xem video nhận xét, lắng nghe cơ thể, đặt mục tiêu tuần mới. ~20-30 phút.",
   },
   {
     emoji: "🔥",
-    title: "Mỗi ngày: Check-in hàng ngày & Streak",
+    title: "Mỗi ngày: Check-in hàng ngày & Chuỗi ngày",
     description:
-      "Check-in → Streak tích lũy → Cộng đồng thấy bạn hoàn thành. Nhịp đều đặn tạo kết quả.",
+      "Check-in → Chuỗi ngày tích lũy → Cộng đồng thấy bạn hoàn thành. Nhịp đều đặn tạo kết quả.",
   },
 ];
 
 export function Problems() {
   return (
-    <section className="py-12 md:py-20 lg:py-24 bg-neutral-50">
+    <section className="py-10 md:py-12 lg:py-16 bg-neutral-50">
       <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading title="Một tuần trong BodiX" />
         <div className="mt-8 sm:mt-12 grid gap-6 sm:gap-8 sm:grid-cols-2 md:grid-cols-4">

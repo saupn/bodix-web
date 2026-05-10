@@ -16,7 +16,7 @@ import { getTrialDisplayStatus } from "@/lib/trial/status";
 const NAV_LINKS_BASE = [
   { href: "/app", label: "Trang chủ", icon: Home },
   { href: "/app/programs", label: "Chương trình tập", icon: Dumbbell },
-  { href: "/app/review/history", label: "Review", icon: FileText },
+  { href: "/app/review/history", label: "Tổng kết", icon: FileText },
   { href: "/app/referral", label: "Giới thiệu bạn bè", icon: Gift },
   { href: "/app/affiliate", label: "Đối tác", icon: Handshake },
   { href: "/app/community", label: "Cộng đồng", icon: Users, badgeKey: "community" },

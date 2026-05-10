@@ -162,7 +162,7 @@ export default function WeeklyReviewPage() {
     <div className="mx-auto max-w-2xl px-4 pb-12 pt-6">
       <header className="mb-6">
         <h1 className="font-heading text-2xl font-bold text-primary">
-          📝 Review Tuần {weekNum}
+          📝 Tổng kết Tuần {weekNum}
         </h1>
         <p className="mt-1 text-neutral-600">
           Tuần {startDate} – {endDate}

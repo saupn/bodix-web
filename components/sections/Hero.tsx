@@ -61,9 +61,10 @@ export function Hero() {
           className="mt-6 text-lg font-medium text-white opacity-0 drop-shadow-md max-w-2xl mx-auto animate-fade-slide-up sm:text-xl md:text-2xl leading-relaxed"
           style={{ animationDelay: "0.3s" }}
         >
-          BodiX giúp bạn hoàn thành hành trình thay đổi cơ thể với chương trình
-          có điểm đầu, điểm cuối rõ ràng. Tập tại nhà, mỗi ngày 10-25 phút, có
-          người đồng hành.
+          BodiX là hệ thống tập tại nhà cho phụ nữ, với lộ trình từ 3 tuần đến
+          12 tuần, thiết kế để bạn hoàn thành – không phải bỏ giữa chừng. 10–20
+          phút mỗi ngày, có rescue khi mệt, có buddy khi nản. Đi đến cuối – và
+          thấy thân mình thon gọn, khỏe hơn.
         </p>
         <div
           className="mt-10 flex flex-col gap-4 justify-center opacity-0 animate-fade-slide-up sm:flex-row sm:gap-4"

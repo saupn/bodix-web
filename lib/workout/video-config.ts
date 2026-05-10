@@ -208,7 +208,7 @@ export function getDayWorkout(programSlug: string, dayNumber: number) {
   // Tạo title tiếng Việt
   let title: string;
   if (day.type === 'review') {
-    title = 'Review Chủ nhật';
+    title = 'Tổng kết Chủ nhật';
   } else if (day.type === 'recovery') {
     title = 'Phục hồi & Linh hoạt';
   } else if (videoCount === 1) {

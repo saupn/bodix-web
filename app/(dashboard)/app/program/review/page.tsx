@@ -279,7 +279,7 @@ export default function SundayReviewPage() {
   if (loading) {
     return (
       <div className="flex min-h-[300px] items-center justify-center">
-        <p className="text-neutral-600">Đang tải Review Chủ nhật...</p>
+        <p className="text-neutral-600">Đang tải Tổng kết Chủ nhật...</p>
       </div>
     );
   }
@@ -318,12 +318,12 @@ export default function SundayReviewPage() {
         <div className="relative mx-4 max-w-md rounded-2xl bg-white p-8 text-center shadow-2xl">
           <div className="mb-4 text-6xl">🌟</div>
           <h2 className="font-heading text-2xl font-bold text-primary">
-            Review Tuần {weekNum} hoàn thành!
+            Tổng kết Tuần {weekNum} hoàn thành!
           </h2>
           <p className="mt-2 text-neutral-600">{getPersonalMessage()}</p>
           {stats && stats.streak.current_streak > 0 && (
             <p className="mt-4 text-sm font-medium text-primary">
-              Streak: 🔥 {stats.streak.current_streak} ngày
+              Chuỗi ngày: 🔥 {stats.streak.current_streak} ngày
             </p>
           )}
           <p className="mt-4 text-sm text-neutral-600">Đang chuyển hướng...</p>
@@ -346,7 +346,7 @@ export default function SundayReviewPage() {
       {/* Page header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Review Chủ nhật – Tuần {weekNum}
+          Tổng kết Chủ nhật – Tuần {weekNum}
         </h1>
         <p className="mt-2 text-neutral-600">
           ~25 phút dành cho bản thân. Xem lại tuần qua, lắng nghe cơ thể, và chuẩn bị cho tuần mới.
@@ -379,7 +379,7 @@ export default function SundayReviewPage() {
             1
           </span>
           <h2 className="font-heading text-lg font-semibold text-primary">
-            Video Review tuần
+            Video tổng kết tuần
           </h2>
           <span className="text-sm text-neutral-600">~10 phút</span>
         </div>
@@ -389,13 +389,13 @@ export default function SundayReviewPage() {
             {reviewContent?.review_video_url ? (
               <VimeoPlayer
                 videoUrl={reviewContent.review_video_url}
-                title={reviewContent.review_video_title ?? "Review video"}
+                title={reviewContent.review_video_title ?? "Video tổng kết"}
               />
             ) : (
               <div className="rounded-xl bg-purple-50 p-8 text-center">
                 <div className="text-5xl mb-3">🎬</div>
                 <h3 className="font-heading text-lg font-semibold text-purple-800">
-                  {reviewContent?.review_video_title ?? `Review Tuần ${weekNum}`}
+                  {reviewContent?.review_video_title ?? `Tổng kết Tuần ${weekNum}`}
                 </h3>
                 <p className="mt-2 text-sm text-purple-600">
                   Video review đang được chuẩn bị
@@ -729,7 +729,7 @@ export default function SundayReviewPage() {
                 <p className="text-3xl font-bold text-primary">
                   🔥 {stats?.streak.current_streak ?? 0}
                 </p>
-                <p className="text-sm text-neutral-600 mt-1">streak hiện tại</p>
+                <p className="text-sm text-neutral-600 mt-1">chuỗi hiện tại</p>
               </div>
               <div className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-center">
                 <p className="text-3xl font-bold text-primary">

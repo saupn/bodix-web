@@ -135,7 +135,7 @@ export default function ProgressPage() {
           <p className="text-3xl font-bold text-primary">
             🔥 {streak.current_streak}
           </p>
-          <p className="mt-1 text-sm text-neutral-600">Streak hiện tại</p>
+          <p className="mt-1 text-sm text-neutral-600">Chuỗi hiện tại</p>
         </div>
         <div className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-center">
           <p className="text-3xl font-bold text-amber-700">
@@ -156,7 +156,7 @@ export default function ProgressPage() {
             { emoji: "🌿", label: "Light", count: streak.total_light_days },
             { emoji: "☀️", label: "Easy", count: easyCount },
             { emoji: "🧘", label: "Phục hồi", count: streak.total_recovery_days },
-            { emoji: "📝", label: "Review", count: reviewCount },
+            { emoji: "📝", label: "Tổng kết", count: reviewCount },
           ].map((item) => (
             <div
               key={item.label}

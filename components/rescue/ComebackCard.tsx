@@ -34,7 +34,7 @@ export function ComebackCard({
             Dừng lại rồi quay lại – đó là sức mạnh, không phải yếu đuối.
           </p>
           <p className="mt-2 text-sm font-medium text-primary">
-            Streak mới: 🔥 {currentStreak} ngày
+            Chuỗi mới: 🔥 {currentStreak} ngày
           </p>
         </div>
         <Link

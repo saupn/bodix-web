@@ -333,13 +333,13 @@ export default function ReviewHistoryPage() {
     <div className="mx-auto max-w-2xl space-y-10 px-4 pb-16 pt-6">
       <div className="flex items-center justify-between">
         <h1 className="font-heading text-2xl font-bold text-primary">
-          Lịch sử review & Tiến bộ
+          Lịch sử tổng kết & Tiến bộ
         </h1>
         <Link
           href="/app/review/weekly"
           className="text-sm font-medium text-primary hover:underline"
         >
-          Review tuần mới →
+          Tổng kết tuần mới →
         </Link>
       </div>
 

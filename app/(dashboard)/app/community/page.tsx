@@ -578,7 +578,7 @@ export default function CommunityPage() {
             <aside className="lg:w-64">
               <div className="sticky top-24 rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
                 <h3 className="mb-3 font-heading text-sm font-semibold text-primary">
-                  🔥 Streak Leaderboard
+                  🔥 Bảng xếp hạng chuỗi ngày
                 </h3>
                 {(() => {
                   const top10 = [...boardData.members]
@@ -589,7 +589,7 @@ export default function CommunityPage() {
                   if (top10.length === 0) {
                     return (
                       <p className="py-4 text-center text-sm text-neutral-600">
-                        Chưa có streak nào. Hãy bắt đầu!
+                        Chưa có chuỗi nào. Hãy bắt đầu!
                       </p>
                     );
                   }

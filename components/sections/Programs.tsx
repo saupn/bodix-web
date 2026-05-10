@@ -4,7 +4,7 @@ import { PROGRAMS } from "@/lib/constants";
 
 export function Programs() {
   return (
-    <section id="programs" className="py-12 md:py-20 lg:py-24 bg-secondary">
+    <section id="programs" className="py-10 md:py-12 lg:py-16 bg-secondary">
       <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           title="3 hành trình – Chọn hành trình phù hợp với bạn"

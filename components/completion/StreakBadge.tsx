@@ -20,7 +20,7 @@ export function StreakBadge({
 
   const label =
     currentStreak === 0
-      ? "Bắt đầu streak mới!"
+      ? "Bắt đầu chuỗi mới!"
       : `🔥 ${currentStreak} ngày`;
 
   if (compact) {

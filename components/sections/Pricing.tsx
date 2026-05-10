@@ -14,7 +14,7 @@ const PRICING_CARDS = [
     features: [
       "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
-      "21 ngày hoàn thành liên tục & Streak",
+      "21 ngày hoàn thành liên tục & Chuỗi ngày",
       "Nhóm tập luyện cùng đợt",
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
@@ -33,7 +33,7 @@ const PRICING_CARDS = [
     features: [
       "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
-      "42 ngày hoàn thành & Review chuyên sâu",
+      "42 ngày hoàn thành & Tổng kết chuyên sâu",
       "Kết quả rõ rệt từ tuần thứ 3",
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
@@ -64,7 +64,7 @@ const PRICING_CARDS = [
 
 export function Pricing() {
   return (
-    <section id="pricing" className="py-12 md:py-20 lg:py-24 bg-white">
+    <section id="pricing" className="py-10 md:py-12 lg:py-16 bg-white">
       <div className="container mx-auto px-4 sm:px-6">
         <SectionHeading
           title="Chọn hành trình của bạn"

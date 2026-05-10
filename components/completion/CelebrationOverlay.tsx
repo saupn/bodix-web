@@ -86,7 +86,7 @@ export function CelebrationOverlay({
             <p className="mt-2 text-neutral-600">{config.description}</p>
             {currentStreak > 0 && (
               <p className="mt-4 text-sm font-medium text-primary">
-                Streak: 🔥 {currentStreak} ngày
+                Chuỗi ngày: 🔥 {currentStreak} ngày
               </p>
             )}
           </>
@@ -101,7 +101,7 @@ export function CelebrationOverlay({
             </p>
             {currentStreak > 0 && (
               <p className="mt-4 text-sm font-medium text-primary">
-                Streak: 🔥 {currentStreak} ngày
+                Chuỗi ngày: 🔥 {currentStreak} ngày
               </p>
             )}
           </>

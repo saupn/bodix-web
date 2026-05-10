@@ -45,7 +45,7 @@ interface ProgramData {
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
   main: "Chính",
   recovery: "Recovery",
-  review: "Review",
+  review: "Tổng kết",
   flexible: "Linh hoạt",
 };
 
@@ -291,7 +291,7 @@ export function ProgramPageContent() {
                 <span className="text-3xl">☀️</span>
                 <div>
                   <h2 className="font-heading text-xl font-bold text-primary">
-                    Review Chủ nhật
+                    Tổng kết Chủ nhật
                   </h2>
                   <p className="text-sm text-neutral-500">~25 phút</p>
                 </div>
@@ -380,7 +380,7 @@ export function ProgramPageContent() {
                 <span className="text-3xl">☀️</span>
                 <div>
                   <h2 className="font-heading text-lg font-semibold text-primary">
-                    Review Chủ nhật
+                    Tổng kết Chủ nhật
                   </h2>
                   <p className="mt-1 flex items-center gap-2 text-success font-medium">
                     ✓ Đã hoàn thành

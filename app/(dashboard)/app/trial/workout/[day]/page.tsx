@@ -34,7 +34,7 @@ interface Workout {
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
   main: "Chính",
   recovery: "Phục hồi",
-  review: "Review",
+  review: "Tổng kết",
   flexible: "Linh hoạt",
 };
 

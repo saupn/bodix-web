@@ -16,7 +16,7 @@ const PROGRAM_CARDS = [
     features: [
       "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
-      "21 ngày hoàn thành liên tục & Streak",
+      "21 ngày hoàn thành liên tục & Chuỗi ngày",
       "Nhóm tập luyện cùng đợt",
       "Hỗ trợ và nhắc tập qua Zalo",
     ],
@@ -35,7 +35,7 @@ const PROGRAM_CARDS = [
     features: [
       "Mỗi buổi ~14-42 phút tùy cường độ",
       "Chọn Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt)",
-      "42 ngày hoàn thành & Review chuyên sâu",
+      "42 ngày hoàn thành & Tổng kết chuyên sâu",
       "Kết quả rõ rệt từ tuần thứ 3",
       "Hỗ trợ và nhắc tập qua Zalo",
     ],

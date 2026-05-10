@@ -2,7 +2,7 @@
 
 export default function IntroVideo() {
   return (
-    <section className="py-16 px-4 bg-gray-50">
+    <section className="py-10 md:py-12 px-4 bg-gray-50">
       <div className="max-w-3xl mx-auto text-center">
         <h2 className="text-2xl md:text-3xl font-bold text-gray-900 mb-3">
           Tại sao 90% phụ nữ bỏ tập giữa chừng?

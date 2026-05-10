@@ -118,7 +118,8 @@ export function BuddyCard() {
         </h3>
         <p className="mt-2 text-sm text-neutral-600">
           Khi tham gia chương trình chính thức, bạn sẽ được ghép đôi với một
-          người đồng hành cùng đợt tập.
+          buddy – người tập cùng đợt với bạn để cả hai cùng động viên, nhắc
+          nhở. Buddy KHÔNG phải coach hay PT cá nhân.
         </p>
       </div>
     );
@@ -172,7 +173,7 @@ export function BuddyCard() {
   return (
     <div className="rounded-xl border border-neutral-200 bg-white p-4 shadow-sm">
       <h3 className="font-heading text-sm font-semibold text-primary">
-        👯 Tìm người đồng hành
+        👯 Tìm buddy
       </h3>
       <p className="mt-1 text-xs text-neutral-600">
         Buddy giúp bạn duy trì động lực. Chọn 1 người cùng đợt tập!

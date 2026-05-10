@@ -23,7 +23,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       },
       {
         id: 'mr_3',
-        title: '🔥 Streak {current_streak} ngày',
+        title: '🔥 Chuỗi {current_streak} ngày',
         body: 'Bạn đang giữ chuỗi {current_streak} ngày liên tiếp! Tiếp tục nào – ngày {day_number} đang đợi.',
       },
       {
@@ -44,7 +44,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'ec_1',
         title: 'Check-in nào!',
-        body: '{name} ơi, bạn đã hoàn thành hôm nay chưa? Check-in để giữ streak 🔥 nhé!',
+        body: '{name} ơi, bạn đã hoàn thành hôm nay chưa? Check-in để giữ chuỗi 🔥 nhé!',
       },
       {
         id: 'ec_2',
@@ -79,7 +79,7 @@ export const NUDGE_TEMPLATES: Record<string, NudgeTemplate> = {
       {
         id: 'ru_1',
         title: 'Đừng dừng lại ở đây',
-        body: '{name}, bạn đã đi được {completed_days} ngày rồi. Đừng để streak đứt! Chỉ cần 10 phút Recovery hôm nay – giữ nhịp là đủ. 🙏',
+        body: '{name}, bạn đã đi được {completed_days} ngày rồi. Đừng để chuỗi đứt! Chỉ cần 10 phút Recovery hôm nay – giữ nhịp là đủ. 🙏',
       },
       {
         id: 'ru_2',

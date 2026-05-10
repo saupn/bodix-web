@@ -51,7 +51,10 @@ export function NextCohortBanner() {
             {label}
           </p>
           <p className="mt-2 text-sm text-cyan-50/95">
-            Đăng ký tập thử 3 ngày để giữ chỗ!
+            Đăng ký tập thử 3 ngày để giữ chỗ
+          </p>
+          <p className="mt-1 text-xs text-cyan-50/80">
+            Mỗi đợt giới hạn để đảm bảo chất lượng đồng hành
           </p>
           <Link
             href="/signup?program=bodix21"

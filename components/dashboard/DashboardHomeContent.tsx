@@ -328,15 +328,15 @@ export function DashboardHomeContent({
               <span className="text-2xl">📝</span>
               <div>
                 <p className="font-medium text-amber-900">
-                  Review tuần {reviewPending.week_number} đang chờ bạn
+                  Tổng kết tuần {reviewPending.week_number} đang chờ bạn
                 </p>
                 <p className="text-sm text-amber-700">
-                  {reviewPending.message ?? "Dành 2 phút review tuần vừa qua nhé!"}
+                  {reviewPending.message ?? "Dành 2 phút tổng kết tuần vừa qua nhé!"}
                 </p>
               </div>
             </div>
             <span className="shrink-0 rounded-lg bg-amber-200 px-4 py-2 font-medium text-amber-900">
-              Review ngay
+              Tổng kết ngay
             </span>
           </div>
         </Link>

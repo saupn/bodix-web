@@ -13,7 +13,7 @@ export const GIFT_BOOK_DESCRIPTION =
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
-  slogan: "Thay đổi vóc dáng tại nhà – không cần phòng tập hay PT",
+  slogan: "Không phải bạn lười. Chương trình tập cũ thiết kế sai – để bạn bỏ giữa chừng.",
   targetAudience: "Phụ nữ Việt Nam, 25-45 tuổi",
 } as const;
 
@@ -37,7 +37,7 @@ export const PROGRAMS = [
     features: [
       "Mỗi ngày ~7-21 phút tùy cường độ",
       "Chọn Hard / Light / Easy theo cảm giác",
-      "Review Chủ nhật mỗi tuần",
+      "Tổng kết Chủ nhật mỗi tuần",
     ],
     cta: "Bắt đầu miễn phí 3 ngày",
     highlighted: true,
@@ -54,7 +54,7 @@ export const PROGRAMS = [
     features: [
       "Mỗi buổi ~14-42 phút tùy cường độ",
       "Kết quả rõ rệt từ tuần thứ 3",
-      "Review chuyên sâu mỗi Chủ nhật",
+      "Tổng kết chuyên sâu mỗi Chủ nhật",
     ],
     cta: "Bắt đầu miễn phí 3 ngày",
     highlighted: false,
@@ -118,25 +118,45 @@ export const COMPARISON_DATA = {
 
 export const FAQS = [
   {
-    question:
-      "Tôi hoàn toàn mới, chưa bao giờ tập luyện. Nên bắt đầu từ đâu?",
-    answer:
-      "Hãy bắt đầu với BodiX 21. Chương trình này được thiết kế dành cho người mới, với cường độ nhẹ và mục tiêu chính là giúp bạn xây dựng thói quen. Ngày nào mệt, bạn chọn Easy chỉ 10 phút. Bạn không cần có nền tảng gì trước đó.",
-  },
-  {
-    question: "Tôi có cần đến phòng gym không?",
+    question: "Tôi có cần dụng cụ gì không?",
     answer:
       "Không. Tất cả các chương trình BodiX đều tập tại nhà. BodiX 21 không cần bất kỳ dụng cụ nào. BodiX 6W và 12W có thể cần thảm tập và tạ nhẹ, nhưng đều có thể thay thế bằng đồ vật trong nhà.",
   },
   {
-    question: "BodiX có phù hợp với nam không?",
+    question: "Tự tập tại nhà có sợ tập sai gây chấn thương không?",
     answer:
-      "Hiện tại BodiX được thiết kế dành riêng cho phụ nữ. Các bài tập tập trung vào những vùng cơ thể phụ nữ thường muốn cải thiện. Phiên bản dành cho nam đang được phát triển và sẽ ra mắt sớm!",
+      "Bài tập trong BodiX được thiết kế tối ưu lên các nhóm cơ chính, với động tác đơn giản và an toàn – gần như không có khả năng gây chấn thương nghiêm trọng. Khác với tạ nặng hay máy gym, các bài tập BodiX dùng trọng lượng cơ thể, kỹ thuật tự nhiên. Quan trọng nhất là bạn vận động đều đặn. Nếu động tác chưa hoàn hảo, cơ thể vẫn được kích hoạt, vẫn đốt calo, vẫn khỏe lên. Không hoàn hảo còn hơn không tập.",
+  },
+  {
+    question: "Bao lâu thì thấy thân mình thay đổi?",
+    answer:
+      "Phụ nữ thường mong giảm cân nhanh trong 1-2 tuần, nhưng thực tế cần thời gian. Sau 21 ngày tập đều đặn cùng ăn uống lành mạnh, hầu hết thấy thay đổi rõ về dáng đứng, độ săn chắc, năng lượng. Để giảm mỡ thấy rõ trên cân, cần 6-12 tuần kết hợp tập + ăn uống. BodiX không hứa lột xác trong 21 ngày – chúng tôi hứa giúp bạn KHÔNG bỏ giữa chừng, để bạn đi đến điểm thấy kết quả.",
+  },
+  {
+    question: "Có cần khởi động và giãn cơ không?",
+    answer:
+      "Có, nhưng đơn giản. Trước buổi tập: đi bộ tại chỗ 1-2 phút, xoay khớp vai/hông/cổ tay. Sau buổi tập: ngồi gập người chạm chân, kéo căng nhẹ tay/chân/lưng 30 giây mỗi nhóm. Bạn có thể dùng cách khởi động/giãn cơ mình đã biết – BodiX không bắt buộc theo công thức cứng.",
+  },
+  {
+    question: "Có thể tập ở công viên hoặc sân với bạn bè không?",
+    answer:
+      "Hoàn toàn có thể. Bài tập BodiX không cần dụng cụ phức tạp, chỉ cần không gian khoảng 2x2m. Tập ngoài trời với buddy hoặc nhóm bạn còn vui hơn và giúp duy trì động lực tốt hơn.",
+  },
+  {
+    question:
+      "Tôi hoàn toàn mới, chưa bao giờ tập luyện. Có phù hợp không?",
+    answer:
+      "Chương trình thiết kế cho phụ nữ ở mọi mức độ thể lực. Mục tiêu không phải xây thói quen – mà giúp bạn duy trì động lực để tập đều đặn và HOÀN THÀNH chương trình. Mỗi ngày có 3 mức cường độ (3 lượt – 2 lượt – 1 lượt) để bạn chọn theo cảm giác cơ thể.",
+  },
+  {
+    question: "BodiX khác gì với các chương trình online khác?",
+    answer:
+      "Phần lớn chương trình online tập trung vào nội dung bài tập. BodiX tập trung vào việc giúp bạn HOÀN THÀNH: có rescue khi bạn mệt, có buddy cùng đợt khi bạn nản, có nhắc tập qua Zalo, có tổng kết tuần. Chúng tôi đo bạn có đi đến cuối hay không – chứ không chỉ phát video.",
   },
   {
     question: "Mỗi ngày tôi cần tập bao lâu?",
     answer:
-      "Tùy bạn chọn! Mỗi ngày bạn chọn 1 trong 3 mức: Hard (3 lượt, ~21 phút), Light (2 lượt, ~14 phút), hoặc Easy (1 lượt, ~7 phút). Thứ 7 là phiên phục hồi ~7 phút, Chủ nhật là Review ~25 phút.",
+      "Tùy bạn chọn! Mỗi ngày bạn chọn 1 trong 3 mức: Hard (3 lượt, ~21 phút), Light (2 lượt, ~14 phút), hoặc Easy (1 lượt, ~7 phút). Thứ 7 là phiên phục hồi ~7 phút, Chủ nhật là Tổng kết ~25 phút.",
   },
   {
     question: "Nếu một hôm tôi quá mệt, không thể tập được thì sao?",
@@ -144,10 +164,9 @@ export const FAQS = [
       "Đó chính là lý do BodiX có chế độ Easy – chỉ 1 lượt, ~7 phút. Ngày mệt, bạn chọn Easy thay vì bỏ. Giữ nhịp quan trọng hơn cường độ. Nếu bạn bỏ 2 ngày, hệ thống sẽ nhắn nhẹ qua Zalo để kéo bạn lại.",
   },
   {
-    question:
-      "Sau khi hoàn thành BodiX 21, tôi có bắt buộc phải tiếp tục với 6W không?",
+    question: "BodiX có phù hợp với nam không?",
     answer:
-      "Không bắt buộc. Bạn có thể lặp lại BodiX 21 nếu muốn củng cố thói quen, hoặc nghỉ ngơi trước khi tiếp tục. Tuy nhiên, nếu bạn muốn thấy thay đổi rõ rệt về hình thể, việc tiếp tục với 6W hoặc 12W sẽ mang lại kết quả tốt hơn.",
+      "Hiện tại BodiX được thiết kế dành riêng cho phụ nữ. Các bài tập tập trung vào những vùng cơ thể phụ nữ thường muốn cải thiện. Phiên bản dành cho nam đang được phát triển và sẽ ra mắt sớm!",
   },
   {
     question: "Chi phí như thế nào?",
@@ -155,7 +174,7 @@ export const FAQS = [
       "BodiX 21 chỉ 499.000đ (~24.000đ/ngày, rẻ hơn ly trà sữa). Thanh toán 1 lần, không subscription, không phí ẩn. Bạn được trải nghiệm miễn phí 3 ngày trước khi quyết định.",
   },
   {
-    question: "Review Chủ nhật là gì?",
+    question: "Tổng kết Chủ nhật là gì?",
     answer:
       "Mỗi Chủ nhật, bạn xem video nhận xét từ coach, tự đánh giá cơ thể (body scan), và đặt mục tiêu cho tuần mới. Đây là lúc bạn dừng lại, lắng nghe cơ thể, và thấy mình đang tiến lên.",
   },
@@ -186,9 +205,9 @@ export const FOOTER_DATA = {
       title: "HỖ TRỢ",
       links: [
         { label: "FAQ", href: "/#faq" },
-        { label: "Hướng dẫn", href: "#" },
-        { label: "Điều khoản", href: "#" },
-        { label: "Bảo mật", href: "#" },
+        { label: "Hướng dẫn", href: "/huong-dan" },
+        { label: "Điều khoản", href: "/dieu-khoan" },
+        { label: "Bảo mật", href: "/bao-mat" },
       ],
     },
     {

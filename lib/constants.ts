@@ -13,7 +13,7 @@ export const GIFT_BOOK_DESCRIPTION =
 export const SITE = {
   name: "BodiX",
   tagline: "Completion First Fitness",
-  slogan: "Không phải bạn lười. Chương trình tập cũ thiết kế sai – để bạn bỏ giữa chừng.",
+  slogan: "Không phải bạn thiếu quyết tâm. Chương trình tập cũ thiết kế sai – để bạn bỏ giữa chừng.",
   targetAudience: "Phụ nữ Việt Nam, 25-45 tuổi",
 } as const;
 

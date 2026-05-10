@@ -3,6 +3,9 @@ import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/sections/Hero";
 import IntroVideo from "@/components/sections/IntroVideo";
 import LeadCapture from "@/components/landing/LeadCapture";
+import ForEveryWoman from "@/components/landing/ForEveryWoman";
+import HealthBenefits from "@/components/landing/HealthBenefits";
+import Community from "@/components/landing/Community";
 import { Philosophy } from "@/components/sections/Philosophy";
 import { Problems } from "@/components/sections/Problems";
 import { Programs } from "@/components/sections/Programs";
@@ -19,6 +22,9 @@ export default function Home() {
         <Hero />
         <IntroVideo />
         <Philosophy />
+        <ForEveryWoman />
+        <HealthBenefits />
+        <Community />
         <Programs />
         <Problems />
         <Pricing />

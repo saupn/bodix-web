@@ -11,7 +11,7 @@ const cards = [
     emoji: "👥",
     title: "Không tập một mình",
     description:
-      "Bạn tập cùng đợt với những người khác. Thấy họ hoàn thành – bạn cũng muốn hoàn thành.",
+      "Tập cùng đợt với người khác. Thấy họ hoàn thành – bạn cũng muốn hoàn thành.",
   },
   {
     emoji: "🆘",

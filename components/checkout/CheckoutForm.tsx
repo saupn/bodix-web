@@ -54,6 +54,7 @@ export function CheckoutForm({
   const [referralCode, setReferralCode] = useState("");
   const [referralValid, setReferralValid] = useState<{
     valid: boolean;
+    reason?: string;
     referrer_name?: string;
     code_type?: string;
     discount_percent?: number;
@@ -121,7 +122,7 @@ export function CheckoutForm({
           setReferralValid({ valid: true, referrer_name: data.referrer_name, code_type: data.code_type, discount_amount: 0 });
           onReferralChange?.(false, 0);
         } else {
-          setReferralValid({ valid: false });
+          setReferralValid({ valid: false, reason: data.reason });
           onReferralChange?.(false, 0);
         }
       } catch {
@@ -332,7 +333,17 @@ export function CheckoutForm({
           </p>
         )}
         {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (
-          <p className="mt-1 text-xs text-red-600">Mã không hợp lệ</p>
+          <p className="mt-1 text-xs text-red-600">
+            {referralValid.reason === "self_referral"
+              ? "Không thể dùng mã của chính bạn"
+              : referralValid.reason === "code_expired"
+                ? "Mã đã hết hạn"
+                : referralValid.reason === "code_exhausted"
+                  ? "Mã đã hết lượt sử dụng"
+                  : referralValid.reason === "code_inactive"
+                    ? "Mã đã ngừng hoạt động"
+                    : "Mã không hợp lệ"}
+          </p>
         )}
       </div>
 

@@ -141,72 +141,80 @@ export async function POST(request: NextRequest) {
 
   const service = createServiceClient();
 
-  // ── Cho phép checkout khi: (a) đã ở pending_payment, hoặc (b) user đã hoàn ─
-  //    thành ít nhất 1 chương trình (self-service upgrade từ /upgrade).
+  // ── Resolve / promote enrollment cho program này ──────────────────────────
+  // Ai cũng được thanh toán: trial, trial_completed, pending_payment, completed,
+  // hoặc chưa có enrollment cho program này. Chỉ chặn khi đã paid_waiting_cohort
+  // hoặc đang active cho chính program này.
   let pendingEnrollment: { id: string } | null = null;
   {
-    const { data } = await supabase
-      .from("enrollments")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("program_id", program.id)
-      .eq("status", "pending_payment")
-      .maybeSingle();
-    pendingEnrollment = data;
-  }
-
-  if (!pendingEnrollment) {
-    const { data: existingOther } = await supabase
+    const { data: existing } = await supabase
       .from("enrollments")
       .select("id, status")
       .eq("user_id", user.id)
       .eq("program_id", program.id)
-      .in("status", ["paid_waiting_cohort", "active"])
+      .in("status", [
+        "trial",
+        "trial_completed",
+        "pending_payment",
+        "paid_waiting_cohort",
+        "active",
+        "completed",
+      ])
+      .order("enrolled_at", { ascending: false })
+      .limit(1)
       .maybeSingle();
 
-    if (existingOther) {
+    if (existing && (existing.status === "paid_waiting_cohort" || existing.status === "active")) {
       return NextResponse.json(
         { error: "Bạn đã thanh toán chương trình này rồi.", redirect: "/app" },
         { status: 409 }
       );
     }
 
-    // Self-service upgrade: nếu user đã hoàn thành ít nhất 1 chương trình.
-    const { data: completed } = await supabase
-      .from("enrollments")
-      .select("id")
-      .eq("user_id", user.id)
-      .eq("status", "completed")
-      .limit(1)
-      .maybeSingle();
+    if (
+      existing &&
+      (existing.status === "trial" ||
+        existing.status === "trial_completed" ||
+        existing.status === "pending_payment")
+    ) {
+      // Promote sang pending_payment (idempotent nếu đã pending_payment).
+      if (existing.status !== "pending_payment") {
+        const { error: promoteErr } = await service
+          .from("enrollments")
+          .update({ status: "pending_payment" })
+          .eq("id", existing.id);
+        if (promoteErr) {
+          console.error("[checkout/create] promote enrollment:", promoteErr);
+          return NextResponse.json(
+            { error: "Không thể cập nhật trạng thái đăng ký." },
+            { status: 500 }
+          );
+        }
+      }
+      pendingEnrollment = { id: existing.id };
+    } else {
+      // Không có enrollment cho program này, hoặc đã completed — tạo mới
+      // pending_payment (re-purchase / upgrade lên program khác).
+      const { data: newEnrollment, error: createErr } = await service
+        .from("enrollments")
+        .insert({
+          user_id: user.id,
+          program_id: program.id,
+          status: "pending_payment",
+          current_day: 0,
+        })
+        .select("id")
+        .single();
 
-    if (!completed) {
-      return NextResponse.json(
-        { error: "Bạn chưa được chọn tham gia. Vui lòng chờ thông báo từ BodiX." },
-        { status: 403 }
-      );
+      if (createErr || !newEnrollment) {
+        console.error("[checkout/create] create enrollment:", createErr);
+        return NextResponse.json(
+          { error: "Không thể khởi tạo đơn đăng ký." },
+          { status: 500 }
+        );
+      }
+      pendingEnrollment = { id: newEnrollment.id };
     }
-
-    // Tạo pending_payment enrollment mới
-    const { data: newEnrollment, error: createErr } = await service
-      .from("enrollments")
-      .insert({
-        user_id: user.id,
-        program_id: program.id,
-        status: "pending_payment",
-        current_day: 0,
-      })
-      .select("id")
-      .single();
-
-    if (createErr || !newEnrollment) {
-      console.error("[checkout/create] auto-create enrollment:", createErr);
-      return NextResponse.json(
-        { error: "Không thể khởi tạo đơn nâng cấp." },
-        { status: 500 }
-      );
-    }
-    pendingEnrollment = { id: newEnrollment.id };
   }
 
   // ���─ Resolve referral / affiliate code (soft-fail) ���────────────────────────

@@ -1,11 +1,54 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { hasMinDaysBeforeCohortForTrial } from "@/lib/trial/utils";
 import { getTrialDisplayStatus } from "@/lib/trial/status";
 import { formatDateVn } from "@/lib/date/vietnam";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
+
+const PROGRAM_NAME: Record<string, string> = {
+  "bodix-21": "BodiX 21",
+  "bodix-6w": "BodiX 6W",
+  "bodix-12w": "BodiX 12W",
+};
+
+function PendingPaymentBanner({
+  program,
+  amount,
+  paymentCode,
+}: {
+  program: string;
+  amount: number;
+  paymentCode: string;
+}) {
+  const programName = PROGRAM_NAME[program] ?? program;
+  return (
+    <Link
+      href={`/app/checkout/${program}`}
+      className="block rounded-xl border-2 border-orange-300 bg-orange-50 p-4 transition-colors hover:border-orange-400 hover:bg-orange-100"
+    >
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl">💳</span>
+          <div>
+            <p className="font-medium text-orange-900">
+              Còn 1 bước nữa: thanh toán giữ chỗ đợt tập tiếp theo
+            </p>
+            <p className="mt-0.5 text-sm text-orange-800">
+              {programName} · Mã: <span className="font-mono font-semibold">{paymentCode}</span> ·{" "}
+              {new Intl.NumberFormat("vi-VN").format(amount)}đ
+            </p>
+          </div>
+        </div>
+        <span className="shrink-0 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white">
+          Thanh toán ngay
+        </span>
+      </div>
+    </Link>
+  );
+}
 
 const PROGRAM_CARDS = [
   {
@@ -183,9 +226,34 @@ export default async function AppPage() {
     ["trial", "trial_completed", "pending_payment", "paid_waiting_cohort", "active", "completed"].includes(e.status)
   );
 
+  // Pending order — hiện banner ở mọi state để user resume thanh toán.
+  const service = createServiceClient();
+  const { data: pendingOrder } = await service
+    .from("orders")
+    .select("id, program, amount, payment_code, payment_status")
+    .eq("user_id", user.id)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  const pendingBanner =
+    pendingOrder && pendingOrder.payment_code ? (
+      <PendingPaymentBanner
+        program={pendingOrder.program as string}
+        amount={pendingOrder.amount as number}
+        paymentCode={pendingOrder.payment_code as string}
+      />
+    ) : null;
+
   // --- State 1: Active enrollment → show dashboard ---
   if (activeEnrollment) {
-    return <DashboardHomeContent displayName={displayName} phoneVerified={profile?.phone_verified ?? false} />;
+    return (
+      <>
+        {pendingBanner && <div className="mb-6">{pendingBanner}</div>}
+        <DashboardHomeContent displayName={displayName} phoneVerified={profile?.phone_verified ?? false} />
+      </>
+    );
   }
 
   // --- State 2: Paid, waiting for cohort to start ---
@@ -203,6 +271,7 @@ export default async function AppPage() {
 
     return (
       <div className="space-y-8">
+        {pendingBanner}
         <div className="rounded-xl border-2 border-success/30 bg-success/5 p-6 sm:p-8 text-center">
           <div className="text-4xl mb-4">✅</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
@@ -229,6 +298,7 @@ export default async function AppPage() {
 
     return (
       <div className="space-y-8">
+        {pendingBanner}
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-8 text-center">
           <div className="text-4xl mb-4">🎉</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
@@ -252,6 +322,7 @@ export default async function AppPage() {
   if (trialCompletedEnrollment) {
     return (
       <div className="space-y-8">
+        {pendingBanner}
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6 sm:p-8 text-center">
           <div className="text-4xl mb-4">🎯</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
@@ -280,6 +351,7 @@ export default async function AppPage() {
     if (trial.isEnded) {
       return (
         <div className="space-y-8">
+          {pendingBanner}
           <div className="rounded-xl border-2 border-accent/30 bg-accent/5 p-4 sm:p-6">
             <h2 className="font-heading text-lg font-semibold text-primary">
               {trial.headingText}
@@ -292,6 +364,7 @@ export default async function AppPage() {
 
     return (
       <div className="space-y-8">
+        {pendingBanner}
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <h2 className="font-heading text-lg font-semibold text-primary">
             {trial.headingText}
@@ -331,6 +404,7 @@ export default async function AppPage() {
   if (completedEnrollments.length > 0) {
     return (
       <div className="space-y-8">
+        {pendingBanner}
         <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
           <h2 className="font-heading text-lg font-semibold text-primary">
             Chào mừng {displayName}!
@@ -386,6 +460,7 @@ export default async function AppPage() {
 
   return (
     <div className="space-y-8">
+      {pendingBanner}
       <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
         <h2 className="font-heading text-lg font-semibold text-primary">
           Trải nghiệm thử

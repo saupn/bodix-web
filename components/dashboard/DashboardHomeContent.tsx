@@ -70,54 +70,6 @@ interface TrialData {
   };
 }
 
-interface PendingPayment {
-  pending: boolean;
-  order?: {
-    id: number;
-    program: string;
-    amount: number;
-    payment_code: string;
-  };
-}
-
-const PROGRAM_NAME: Record<string, string> = {
-  "bodix-21": "BodiX 21",
-  "bodix-6w": "BodiX 6W",
-  "bodix-12w": "BodiX 12W",
-};
-
-function formatVnd(n: number): string {
-  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
-}
-
-function PendingPaymentBanner({ data }: { data: PendingPayment["order"] }) {
-  if (!data) return null;
-  const programName = PROGRAM_NAME[data.program] ?? data.program;
-  return (
-    <Link
-      href={`/app/checkout/${data.program}`}
-      className="block rounded-xl border-2 border-orange-300 bg-orange-50 p-4 transition-colors hover:border-orange-400 hover:bg-orange-100"
-    >
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-2xl">💳</span>
-          <div>
-            <p className="font-medium text-orange-900">
-              Đơn hàng {programName} đang chờ thanh toán
-            </p>
-            <p className="mt-0.5 text-sm text-orange-800">
-              Mã: <span className="font-mono font-semibold">{data.payment_code}</span> ·{" "}
-              {formatVnd(data.amount)}
-            </p>
-          </div>
-        </div>
-        <span className="shrink-0 rounded-lg bg-orange-600 px-4 py-2 text-sm font-semibold text-white">
-          Thanh toán ngay
-        </span>
-      </div>
-    </Link>
-  );
-}
 
 export function DashboardHomeContent({
   displayName,
@@ -132,7 +84,6 @@ export function DashboardHomeContent({
   const [history, setHistory] = useState<HistoryData | null>(null);
   const [trial, setTrial] = useState<TrialData | null>(null);
   const [creditBalance, setCreditBalance] = useState<number>(0);
-  const [pendingPayment, setPendingPayment] = useState<PendingPayment["order"]>(undefined);
   const [loading, setLoading] = useState(true);
   const [comebackDismissed, setComebackDismissed] = useState<string | null>(null);
   const [reviewPending, setReviewPending] = useState<{
@@ -148,24 +99,16 @@ export function DashboardHomeContent({
   useEffect(() => {
     const load = async () => {
       try {
-        const [progRes, statsRes, pendingRes, creditsRes, pendingOrderRes] = await Promise.all([
+        const [progRes, statsRes, pendingRes, creditsRes] = await Promise.all([
           fetch("/api/program/active"),
           fetch("/api/completion/my-stats"),
           fetch("/api/reviews/weekly/pending"),
           fetch("/api/user/credits"),
-          fetch("/api/checkout/pending-order"),
         ]);
 
         if (creditsRes.ok) {
           const credits = await creditsRes.json();
           setCreditBalance(credits.balance ?? 0);
-        }
-
-        if (pendingOrderRes.ok) {
-          const pendingData: PendingPayment = await pendingOrderRes.json();
-          if (pendingData.pending && pendingData.order) {
-            setPendingPayment(pendingData.order);
-          }
         }
 
         // Trial fallback: nếu không có active program → load trial workout card
@@ -263,8 +206,6 @@ export function DashboardHomeContent({
   if (!program || !stats) {
     return (
       <div className="space-y-6">
-        <PendingPaymentBanner data={pendingPayment} />
-
         <ZaloConnectBanner phoneVerified={phoneVerified} />
 
         <div className="flex flex-wrap items-center justify-between gap-4">
@@ -347,9 +288,6 @@ export function DashboardHomeContent({
 
   return (
     <div className="space-y-6">
-      {/* Pending payment banner — luôn hiện khi có order pending */}
-      <PendingPaymentBanner data={pendingPayment} />
-
       {/* Zalo connect banner */}
       <ZaloConnectBanner phoneVerified={phoneVerified} />
 
@@ -538,23 +476,24 @@ export function DashboardHomeContent({
         </div>
       )}
 
-      {/* Tặng sách card link nhỏ */}
-      <Link
-        href="/app/tang-sach"
-        className="block rounded-xl border border-neutral-200 bg-white p-4 shadow-sm transition-colors hover:border-primary/30 hover:shadow-md"
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h3 className="font-heading text-sm font-semibold text-primary">
-              📖 Tặng sách cho bạn bè – nhận thưởng
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              Chia sẻ &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; và nhận voucher khi bạn bè đăng ký.
+      {/* Tặng sách – card nhỏ */}
+      <div className="bg-white border border-gray-200 rounded-xl p-4 mt-6">
+        <div className="flex items-start gap-3">
+          <span className="text-2xl">📖</span>
+          <div className="flex-1">
+            <h3 className="font-semibold text-gray-900">Tặng sách cho bạn bè</h3>
+            <p className="text-sm text-gray-600 mt-1">
+              Sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; – tặng cho bạn bè, nhận voucher 100K khi họ tham gia.
             </p>
+            <Link
+              href="/app/tang-sach"
+              className="text-sm text-primary font-medium mt-2 inline-block hover:underline"
+            >
+              Xem chi tiết →
+            </Link>
           </div>
-          <span className="shrink-0 text-sm font-medium text-primary">→</span>
         </div>
-      </Link>
+      </div>
     </div>
   );
 }

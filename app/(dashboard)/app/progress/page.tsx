@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Lock } from "lucide-react";
 import { MILESTONE_CONFIG } from "@/lib/completion/milestones";
@@ -44,10 +43,10 @@ const MODE_EMOJI: Record<string, string> = {
 };
 
 export default function ProgressPage() {
-  const router = useRouter();
   const [stats, setStats] = useState<StatsData | null>(null);
   const [history, setHistory] = useState<HistoryDay[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hasStats, setHasStats] = useState(true);
 
   useEffect(() => {
     const load = async () => {
@@ -55,7 +54,7 @@ export default function ProgressPage() {
         const statsRes = await fetch("/api/completion/my-stats");
         if (!statsRes.ok) {
           if (statsRes.status === 404) {
-            router.replace("/app");
+            setHasStats(false);
           }
           return;
         }
@@ -70,18 +69,44 @@ export default function ProgressPage() {
           setHistory(h.days ?? []);
         }
       } catch {
-        router.replace("/app");
+        setHasStats(false);
       } finally {
         setLoading(false);
       }
     };
     load();
-  }, [router]);
+  }, []);
 
-  if (loading || !stats) {
+  if (loading) {
     return (
       <div className="flex min-h-[200px] items-center justify-center">
         <p className="text-neutral-600">Đang tải...</p>
+      </div>
+    );
+  }
+
+  if (!stats || !hasStats) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
+          Tiến trình của bạn
+        </h1>
+        <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-6 text-center shadow-sm">
+          <p className="text-4xl">📊</p>
+          <p className="mt-3 font-medium text-neutral-800">
+            Bạn chưa có chương trình tập đang chạy
+          </p>
+          <p className="mt-2 text-sm text-neutral-600">
+            Tiến trình – chuỗi ngày, milestone, lịch sử check-in – sẽ hiện ở
+            đây khi bạn bắt đầu một chương trình.
+          </p>
+          <Link
+            href="/app/programs"
+            className="mt-5 inline-flex items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+          >
+            Xem các chương trình
+          </Link>
+        </div>
       </div>
     );
   }

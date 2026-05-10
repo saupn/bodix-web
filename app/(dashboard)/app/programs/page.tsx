@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { Check, Lock } from "lucide-react";
 import { TrialStartButton } from "@/components/dashboard/TrialStartButton";
@@ -141,16 +142,32 @@ export default async function ProgramsPage() {
 
   const hasCompleted = (slug: string) =>
     statusesBySlug.get(slug)?.has("completed") ?? false;
-  const hasPaid = (slug: string) => {
+  const hasPaidWaiting = (slug: string) =>
+    statusesBySlug.get(slug)?.has("paid_waiting_cohort") ?? false;
+  const hasPendingPayment = (slug: string) => {
     const s = statusesBySlug.get(slug);
-    return s?.has("paid_waiting_cohort") || s?.has("pending_payment") || false;
+    return (s?.has("pending_payment") || s?.has("trial_completed")) ?? false;
   };
+  const isTrialing = (slug: string) =>
+    statusesBySlug.get(slug)?.has("trial") ?? false;
   const trialDone = (slug: string) => {
     const s = statusesBySlug.get(slug);
     if (!s) return false;
     for (const status of s) if (TRIAL_DONE_STATUSES.has(status)) return true;
     return false;
   };
+
+  // Pending order — ưu tiên hiển thị nút "Tiếp tục thanh toán".
+  const service = createServiceClient();
+  const { data: pendingOrder } = await service
+    .from("orders")
+    .select("program")
+    .eq("user_id", user.id)
+    .eq("payment_status", "pending")
+    .order("created_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const pendingOrderSlug = pendingOrder?.program ?? null;
 
   const upgradeBanner =
     UPGRADE_BANNERS[hasCompleted("bodix-6w") ? "bodix-6w" : ""]
@@ -189,8 +206,11 @@ export default async function ProgramsPage() {
             card.requires !== null && !hasCompleted(card.requires);
 
           const cardCompleted = hasCompleted(card.slug);
-          const cardPaid = hasPaid(card.slug);
+          const cardPaidWaiting = hasPaidWaiting(card.slug);
+          const cardPendingPay = hasPendingPayment(card.slug);
+          const cardTrialing = isTrialing(card.slug);
           const cardTrialDone = trialDone(card.slug);
+          const cardHasPendingOrder = pendingOrderSlug === card.slug;
 
           return (
             <div
@@ -263,19 +283,18 @@ export default async function ProgramsPage() {
                   </>
                 )}
 
-                {/* ── Đã thanh toán: chờ cohort ─────────────────────────── */}
-                {!locked && cardPaid && !cardCompleted && (
-                  <button
-                    type="button"
-                    disabled
-                    className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-green-100 px-5 py-3 text-sm font-medium text-green-700"
+                {/* Ưu tiên 1: có pendingOrder cho card này → Tiếp tục thanh toán */}
+                {!locked && cardHasPendingOrder && (
+                  <Link
+                    href={`/app/checkout/${card.slug}`}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
                   >
-                    ✅ Đã thanh toán – chờ đợt
-                  </button>
+                    Tiếp tục thanh toán
+                  </Link>
                 )}
 
-                {/* ── Đã hoàn thành ─────────────────────────────────────── */}
-                {!locked && cardCompleted && (
+                {/* Ưu tiên 2: đã hoàn thành */}
+                {!locked && !cardHasPendingOrder && cardCompleted && (
                   <button
                     type="button"
                     disabled
@@ -285,10 +304,68 @@ export default async function ProgramsPage() {
                   </button>
                 )}
 
-                {/* ── BodiX 21: trial done → buy / chưa trial → trial ──── */}
-                {!locked && !cardCompleted && !cardPaid && card.slug === "bodix-21" && (
-                  <>
-                    {cardTrialDone ? (
+                {/* Ưu tiên 3: paid_waiting_cohort */}
+                {!locked && !cardHasPendingOrder && !cardCompleted && cardPaidWaiting && (
+                  <button
+                    type="button"
+                    disabled
+                    className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-green-100 px-5 py-3 text-sm font-medium text-green-700"
+                  >
+                    ✅ Đã thanh toán – Chờ đợt mở
+                  </button>
+                )}
+
+                {/* Ưu tiên 4: pending_payment / trial_completed → Thanh toán ngay */}
+                {!locked && !cardHasPendingOrder && !cardCompleted && !cardPaidWaiting && cardPendingPay && (
+                  <Link
+                    href={`/app/checkout/${card.slug}`}
+                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+                  >
+                    Thanh toán ngay – {card.price}
+                  </Link>
+                )}
+
+                {/* Ưu tiên 5: trial đang chạy → Đang trải nghiệm */}
+                {!locked &&
+                  !cardHasPendingOrder &&
+                  !cardCompleted &&
+                  !cardPaidWaiting &&
+                  !cardPendingPay &&
+                  cardTrialing && (
+                    <button
+                      type="button"
+                      disabled
+                      className="inline-flex w-full cursor-default items-center justify-center rounded-lg bg-neutral-100 px-5 py-3 text-sm font-medium text-neutral-600"
+                    >
+                      Đang trải nghiệm
+                    </button>
+                  )}
+
+                {/* Ưu tiên 6: chưa có gì + đã trial xong cho card khác → cho thanh toán */}
+                {!locked &&
+                  !cardHasPendingOrder &&
+                  !cardCompleted &&
+                  !cardPaidWaiting &&
+                  !cardPendingPay &&
+                  !cardTrialing &&
+                  card.slug !== "bodix-21" && (
+                    <Link
+                      href={`/app/checkout/${card.slug}`}
+                      className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+                    >
+                      Đăng ký {card.name} – {card.price}
+                    </Link>
+                  )}
+
+                {/* Ưu tiên 7: BodiX 21 chưa có enrollment → tập thử / đăng ký theo trial done */}
+                {!locked &&
+                  !cardHasPendingOrder &&
+                  !cardCompleted &&
+                  !cardPaidWaiting &&
+                  !cardPendingPay &&
+                  !cardTrialing &&
+                  card.slug === "bodix-21" && (
+                    cardTrialDone ? (
                       <Link
                         href={`/app/checkout/${card.slug}`}
                         className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
@@ -310,19 +387,8 @@ export default async function ProgramsPage() {
                       >
                         Tập thử 3 ngày miễn phí
                       </Link>
-                    )}
-                  </>
-                )}
-
-                {/* ── 6W / 12W unlocked: button đăng ký ───────────────── */}
-                {!locked && !cardCompleted && !cardPaid && card.slug !== "bodix-21" && (
-                  <Link
-                    href={`/app/checkout/${card.slug}`}
-                    className="inline-flex w-full items-center justify-center rounded-lg bg-primary px-5 py-3 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-                  >
-                    Đăng ký {card.name} – {card.price}
-                  </Link>
-                )}
+                    )
+                  )}
               </div>
             </div>
           );

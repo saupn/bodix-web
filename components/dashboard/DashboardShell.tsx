@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake, BookOpen } from "lucide-react";
+import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
 import { StreakBadge } from "@/components/completion/StreakBadge";
@@ -16,10 +16,9 @@ const NAV_LINKS_BASE = [
   { href: "/app/programs", label: "Chương trình tập", icon: Dumbbell },
   { href: "/app/review/history", label: "Tổng kết", icon: FileText },
   { href: "/app/referral", label: "Giới thiệu bạn bè", icon: Gift },
-  { href: "/app/tang-sach", label: "Tặng sách", icon: BookOpen },
   { href: "/app/affiliate", label: "Đối tác", icon: Handshake },
   { href: "/app/community", label: "Cộng đồng", icon: Users, badgeKey: "community" },
-  { href: "/app/progress", label: "Tiến độ", icon: BarChart3 },
+  { href: "/app/progress", label: "Tiến trình", icon: BarChart3 },
   { href: "/app/profile", label: "Hồ sơ", icon: User },
 ];
 
@@ -54,7 +53,9 @@ interface DashboardShellProps {
  * from started_at (Asia/Ho_Chi_Minh). Returns null when trial đã kết thúc.
  */
 function getTrialPillText(startedAt: string | null | undefined): string | null {
-  const trial = getTrialDisplayStatus({ started_at: startedAt ?? null });
+  // Không có enrollment trial → ẩn pill hoàn toàn.
+  if (!startedAt) return null;
+  const trial = getTrialDisplayStatus({ started_at: startedAt });
   if (trial.isEnded) return null;
   if (!trial.hasStarted) return "Bắt đầu từ ngày mai";
   return trial.daysRemaining > 0

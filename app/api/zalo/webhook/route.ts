@@ -233,7 +233,14 @@ async function handleUserMessage(payload: any) {
 
       await service
         .from('profiles')
-        .update({ phone_verified: true, channel_user_id: zaloUserId, phone: verification.phone })
+        .update({
+          phone_verified: true,
+          zalo_verified: true,
+          zalo_phone: verification.phone,
+          channel_user_id: zaloUserId,
+          preferred_channel: 'zalo',
+          phone: verification.phone,
+        })
         .eq('id', verification.user_id);
 
       await safeSend(zaloUserId,

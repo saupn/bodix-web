@@ -241,8 +241,8 @@ export default function AffiliatePage() {
           <p className="mt-2 text-neutral-700">
             Nhận{" "}
             <span className="font-bold text-primary">{COMMISSION_RATE}%</span>{" "}
-            hoa hồng tiền mặt cho mỗi đơn hàng qua link của bạn. Người mua qua
-            link đối tác được giảm{" "}
+            hoa hồng tiền mặt cho mỗi đơn hàng qua link của bạn. Ngoài ra,
+            người mua qua link của bạn cũng được giảm{" "}
             <span className="font-bold text-primary">10%</span>.
           </p>
           <p className="mt-1 text-sm text-neutral-700">

@@ -450,15 +450,46 @@ export default async function AppPage() {
               {trial.daysRemainingText}
             </p>
           )}
-          {trial.showWorkoutCard && (
-            <Link
-              href="/app/trial"
-              className="mt-4 inline-flex items-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-            >
-              Xem bài tập hôm nay
-            </Link>
-          )}
         </div>
+
+        <Link
+          href="/app/trial"
+          className="block rounded-xl border border-neutral-200 bg-white p-6 transition hover:border-primary hover:shadow-sm"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-heading text-base font-semibold text-neutral-900">
+                Bài tập trải nghiệm thử
+              </h3>
+              <p className="mt-1 text-sm text-neutral-600">
+                {trial.hasStarted
+                  ? `Ngày ${trial.currentDay}/${trial.totalDays} – xem bài tập hôm nay`
+                  : "Bắt đầu từ ngày mai. Xem trước bài tập đầu tiên?"}
+              </p>
+            </div>
+            <span className="shrink-0 text-lg text-primary">→</span>
+          </div>
+        </Link>
+
+        <Link
+          href="/app/checkout/bodix-21"
+          className="block rounded-xl border-2 border-primary bg-primary/5 p-6 transition hover:bg-primary/10"
+        >
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="font-heading text-base font-semibold text-primary">
+                Đăng ký chính thức – BodiX 21
+              </h3>
+              <p className="mt-1 text-sm text-neutral-700">
+                Sẵn sàng bắt đầu hành trình 21 ngày ngay – 499.000đ
+              </p>
+            </div>
+            <span className="shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-secondary-light">
+              Thanh toán
+            </span>
+          </div>
+        </Link>
+
         <GiftBookCard />
       </div>
     );
@@ -540,10 +571,10 @@ export default async function AppPage() {
       {pendingBanner}
       <div className="rounded-xl border-2 border-primary/20 bg-primary/5 p-4 sm:p-6">
         <h2 className="font-heading text-lg font-semibold text-primary">
-          Trải nghiệm thử
+          Sẵn sàng bắt đầu, {displayName}!
         </h2>
         <p className="mt-2 text-sm text-neutral-600">
-          Bạn chưa đăng ký chương trình nào cả.
+          Đăng ký tập thử 3 ngày miễn phí để bắt đầu hành trình.
         </p>
       </div>
 

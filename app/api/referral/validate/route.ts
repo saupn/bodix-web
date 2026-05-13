@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
 
 // ─── GET ?code=BODIX-A7K3 ─────────────────────────────────────────────────────
 
 export async function GET(request: NextRequest) {
+  // Regular client — chỉ dùng để xác định current user (self-referral check).
   const supabase = await createClient()
-
-  // Auth optional — unauthenticated users can also validate a code (e.g. on landing page)
   const { data: { user } } = await supabase.auth.getUser()
+
+  // Service client — bypass RLS để đọc referral_codes / profiles của user khác.
+  // RLS gốc chỉ cho user thấy mã của chính mình; nếu không bypass thì mọi mã
+  // của người khác đều trả null → UI báo "Mã không hợp lệ".
+  const service = createServiceClient()
 
   const code = request.nextUrl.searchParams.get('code')?.trim().toUpperCase()
   if (!code) {
@@ -31,7 +36,7 @@ export async function GET(request: NextRequest) {
   } | null = null
 
   {
-    const { data, error } = await supabase
+    const { data, error } = await service
       .from('referral_codes')
       .select('id, user_id, code_type, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at')
       .eq('code', code)
@@ -46,7 +51,7 @@ export async function GET(request: NextRequest) {
 
   if (!referralCode) {
     // Fallback: tìm trong profiles.referral_code
-    const { data: profileCode } = await supabase
+    const { data: profileCode } = await service
       .from('profiles')
       .select('id, referral_code')
       .eq('referral_code', code)
@@ -94,7 +99,7 @@ export async function GET(request: NextRequest) {
   }
 
   // ── Fetch referrer first name only (privacy) ──────────────────────────────
-  const { data: referrerProfile } = await supabase
+  const { data: referrerProfile } = await service
     .from('profiles')
     .select('full_name')
     .eq('id', referralCode.user_id)

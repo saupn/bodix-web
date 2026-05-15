@@ -226,12 +226,10 @@ async function handleUserMessage(payload: any) {
     console.log('[webhook] verify code matched in DB:', !!verification);
     if (verification) {
       console.log('[webhook] matched=verify msg_id:', msgId);
-      await service
-        .from('phone_verifications')
-        .update({ status: 'verified', zalo_uid: zaloUserId, verified_at: new Date().toISOString() })
-        .eq('id', verification.id);
-
-      await service
+      // Update profiles TRƯỚC (nguồn sự thật cho FE poll + hard gate
+      // complete-onboarding). Lỗi → KHÔNG báo success giả; để user gửi lại
+      // mã (phone_verifications vẫn 'pending' nên resend match lại được).
+      const { error: profileUpdateError } = await service
         .from('profiles')
         .update({
           phone_verified: true,
@@ -242,6 +240,33 @@ async function handleUserMessage(payload: any) {
           phone: verification.phone,
         })
         .eq('id', verification.user_id);
+
+      if (profileUpdateError) {
+        console.error(
+          '[webhook] verify: profiles update FAILED msg_id:', msgId,
+          'user_id:', verification.user_id,
+          'err:', profileUpdateError.message,
+        );
+        await safeSend(zaloUserId,
+          'Có lỗi khi xác minh, bạn gửi lại mã giúp mình nhé. Nếu vẫn lỗi, thử lại sau ít phút.'
+        );
+        return;
+      }
+
+      // profiles đã link xong → đánh dấu phone_verifications.
+      // Lỗi ở đây KHÔNG chặn user (linkage đã thành công), chỉ log.
+      const { error: pvUpdateError } = await service
+        .from('phone_verifications')
+        .update({ status: 'verified', zalo_uid: zaloUserId, verified_at: new Date().toISOString() })
+        .eq('id', verification.id);
+
+      if (pvUpdateError) {
+        console.error(
+          '[webhook] verify: phone_verifications update failed (non-fatal) msg_id:', msgId,
+          'id:', verification.id,
+          'err:', pvUpdateError.message,
+        );
+      }
 
       await safeSend(zaloUserId,
         'Xác minh thành công! ✅\n\nQuay lại trang bodix.fit để tiếp tục đăng ký nha.'
@@ -254,21 +279,43 @@ async function handleUserMessage(payload: any) {
   const feelingScore = parseFeelingScore(messageText);
 
   // 1. Tìm profile theo channel_user_id (Zalo UID)
-  const { data: profile, error: profileError } = await supabase
+  // KHÔNG .single(): ném lỗi khi 0 HOẶC >1 row (profile trùng
+  // channel_user_id) → báo nhầm "chưa tìm thấy" dù tài khoản tồn tại.
+  // .order('created_at' desc) + .limit(1) + .maybeSingle():
+  //   - có duplicate → lấy profile mới nhất, không throw
+  //   - không có row → data = null (không phải error)
+  // .trim() input phòng channel_user_id lưu dính khoảng trắng
+  // (xem verify-zalo-otp/route.ts:103). KHÔNG thêm unique constraint
+  // ở DB lúc này — data duplicate đang tồn tại, dọn thủ công sau.
+  const zaloUid = String(zaloUserId ?? '').trim();
+
+  const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name')
-    .eq('channel_user_id', zaloUserId)
-    .single();
+    .select('id, full_name, phone, phone_verified, channel_user_id')
+    .eq('channel_user_id', zaloUid)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
-  console.log('[webhook] profile:', profile?.id, 'channel_user_id:', zaloUserId, 'error:', profileError?.message);
-
-  if (profileError || !profile) {
-    console.log('[webhook] matched=no_profile msg_id:', msgId);
+  if (!profile) {
+    console.log('[webhook] matched=no_profile msg_id:', msgId, 'uid:', zaloUid);
     await safeSend(zaloUserId,
       'Mình chưa tìm thấy tài khoản của bạn. Vui lòng đăng ký tại bodix.fit trước nhé!'
     );
     return;
   }
+
+  // Bonus: cảnh báo nếu nhiều profile cùng Zalo UID → admin cần dọn dữ liệu
+  const { count: dupCount } = await supabase
+    .from('profiles')
+    .select('id', { count: 'exact', head: true })
+    .eq('channel_user_id', zaloUid);
+
+  if (dupCount && dupCount > 1) {
+    console.warn(`[webhook] Multiple profiles (${dupCount}) for Zalo UID ${zaloUid}, using latest`);
+  }
+
+  console.log('[webhook] profile:', profile.id, 'channel_user_id:', zaloUid, 'dup:', dupCount ?? 1);
 
   // 2. Tìm enrollment active / trial / trial_completed
   // Bao gồm 'trial_completed' để bắt reply "Y" (đăng ký chính thức) sau khi xong trial.
@@ -397,11 +444,14 @@ async function handleUserMessage(payload: any) {
 async function handleUserMedia(payload: any) {
   const zaloUserId = payload.sender.id;
 
+  // KHÔNG .single() — throw khi >1 profile trùng channel_user_id.
   const { data: profile } = await supabase
     .from('profiles')
     .select('id, full_name')
-    .eq('channel_user_id', zaloUserId)
-    .single();
+    .eq('channel_user_id', String(zaloUserId ?? '').trim())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (!profile) return;
 
@@ -809,11 +859,14 @@ async function handleUnfollow(payload: { follower?: { id: string }; user_id_by_a
   const zaloUserId = payload.follower?.id || payload.user_id_by_app;
   if (!zaloUserId) return;
 
+  // KHÔNG .single() — throw khi >1 profile trùng channel_user_id.
   const { data: profile } = await supabase
     .from('profiles')
     .select('id')
-    .eq('channel_user_id', zaloUserId)
-    .single();
+    .eq('channel_user_id', String(zaloUserId ?? '').trim())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
 
   if (profile) {
     await supabase

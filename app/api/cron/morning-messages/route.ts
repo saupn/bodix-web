@@ -476,6 +476,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       program_id,
       cohort_id,
       enrolled_at,
+      started_at,
       cohorts ( start_date ),
       profiles!inner (
         id,
@@ -535,6 +536,15 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const userId: string = profile?.id;
     const channelUserId: string | null = profile?.channel_user_id ?? null;
     const fcmToken: string | null = profile?.fcm_token ?? null;
+
+    // Defensive: nếu started_at sau hôm nay VN, user chưa đến ngày tập — skip
+    if (enrollment.started_at) {
+      const startedYmd = isoTimestampToVietnamYmd(enrollment.started_at as string);
+      if (startedYmd > todayVN) {
+        skip(userId, `active: started_at=${enrollment.started_at} in future (todayVN=${todayVN})`);
+        continue;
+      }
+    }
 
     const startAnchor: string =
       cohort?.start_date ?? isoTimestampToVietnamYmd(enrollment.enrolled_at as string);

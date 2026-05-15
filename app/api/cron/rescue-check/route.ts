@@ -7,6 +7,7 @@ import {
   pickMessagingChannel,
 } from '@/lib/messaging/adapters/push';
 import type { MessageResult } from '@/lib/messaging/types';
+import { isoTimestampToVietnamYmd } from '@/lib/date/vietnam';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RESCUE MESSAGES
@@ -50,7 +51,9 @@ export async function GET(request: NextRequest) {
 
   const supabase = createServiceClient();
 
-  // Lấy enrollments active + profile
+  // Lấy enrollments active + profile.
+  // .lte('started_at', now): bỏ enrollment chưa bắt đầu (started_at trong tương lai
+  // hoặc NULL). Rescue tự nhiên có natural filter qua lastCheckin nhưng đây là defense-in-depth.
   const { data: enrollments, error: enrollError } = await supabase
     .from('enrollments')
     .select(`
@@ -59,6 +62,7 @@ export async function GET(request: NextRequest) {
       user_id,
       program_id,
       cohort_id,
+      started_at,
       profiles!inner (
         id,
         full_name,
@@ -67,7 +71,8 @@ export async function GET(request: NextRequest) {
         notification_via
       )
     `)
-    .eq('status', 'active');
+    .eq('status', 'active')
+    .lte('started_at', new Date().toISOString());
 
   if (enrollError) {
     console.error('[rescue-check] enrollments query error:', enrollError);
@@ -431,6 +436,7 @@ export async function GET(request: NextRequest) {
   // nudge_type khác.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
+  const nowIso = new Date().toISOString();
   const { data: eveningEnrollments } = await supabase
     .from('enrollments')
     .select(`
@@ -438,6 +444,7 @@ export async function GET(request: NextRequest) {
       user_id,
       current_day,
       status,
+      started_at,
       profiles!inner (
         id,
         full_name,
@@ -446,13 +453,34 @@ export async function GET(request: NextRequest) {
         notification_via
       )
     `)
-    .in('status', ['trial', 'active']);
+    .in('status', ['trial', 'active'])
+    // Chỉ gửi cho enrollment đã thực sự bắt đầu. Trial mới đăng ký hôm nay
+    // có started_at = ngày mai (VN) → bị filter ra. NULL cũng bị filter.
+    .lte('started_at', nowIso);
 
   for (const row of eveningEnrollments ?? []) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const enrollment = row as any;
     const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
     const channelUserId: string | null = profile?.channel_user_id;
+
+    // Defensive: nếu started_at vẫn nằm sau hôm nay (VN) thì skip — phòng race với
+    // cron chạy sớm hoặc started_at được set trong giờ tiếp theo.
+    if (!enrollment.started_at) {
+      stats.evening_skipped++;
+      continue;
+    }
+    const startedYmdVN = isoTimestampToVietnamYmd(enrollment.started_at);
+    if (startedYmdVN > today) {
+      console.log(
+        '[rescue-check] evening skip not-started-yet user:',
+        enrollment.user_id,
+        'started_at:',
+        enrollment.started_at,
+      );
+      stats.evening_skipped++;
+      continue;
+    }
 
     // Spec: gửi qua Zalo OA freeform — bỏ qua user không có Zalo connected.
     if (!channelUserId) {

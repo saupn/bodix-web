@@ -44,12 +44,50 @@ export async function POST(request: NextRequest) {
 
   const service = createServiceClient();
 
+  // ── Hard gate: KHÔNG cho hoàn tất onboarding nếu chưa link Zalo ──
+  // channel_user_id chỉ được set bởi webhook khi user gửi mã 5 ký tự vào OA
+  // (app/api/zalo/webhook/route.ts). NULL = user bỏ ngang bước Zalo, hoặc
+  // gọi API trực tiếp (vd Flutter/replay) → KHÔNG set onboarding_completed,
+  // tránh account "ngầm hỏng" (cron Zalo không gửi tới được, webhook reply
+  // check-in trả "chưa tìm thấy tài khoản").
+  // KHÔNG tin body.phone_verified do client gửi — lấy sự thật từ DB.
+  const { data: existingProfile, error: readError } = await service
+    .from("profiles")
+    .select("channel_user_id, phone_verified")
+    .eq("id", user.id)
+    .maybeSingle();
+
+  if (readError) {
+    console.error("[complete-onboarding] read profile:", readError);
+    return NextResponse.json(
+      { error: "Lỗi hệ thống. Vui lòng thử lại." },
+      { status: 500 }
+    );
+  }
+
+  const linkedZaloUid = existingProfile?.channel_user_id?.trim() || null;
+  if (!linkedZaloUid) {
+    console.warn(
+      "[complete-onboarding] BLOCKED zalo_not_linked, user:",
+      user.id
+    );
+    return NextResponse.json(
+      {
+        error: "Vui lòng hoàn tất kết nối Zalo trước khi tiếp tục.",
+        code: "zalo_not_linked",
+      },
+      { status: 400 }
+    );
+  }
+
   // Build update object — trial starts when user selects a program, not here
   const updateData: Record<string, unknown> = {
     full_name: body.full_name?.trim() || null,
     date_of_birth: body.date_of_birth || null,
     gender: body.gender || null,
     fitness_goal: body.fitness_goal || [],
+    // phone_verified từ DB (sự thật, do webhook set), KHÔNG từ client
+    phone_verified: existingProfile?.phone_verified ?? false,
     onboarding_completed: true,
   };
 
@@ -57,7 +95,6 @@ export async function POST(request: NextRequest) {
     const normalizedPhone = normalizePhone(body.phone);
     if (normalizedPhone) {
       updateData.phone = normalizedPhone;
-      updateData.phone_verified = body.phone_verified ?? false;
     }
   }
 

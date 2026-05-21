@@ -10,7 +10,8 @@
     "lint": "eslint",
     "analyze": "ANALYZE=true next build",
     "get-zalo-token": "npx tsx scripts/get-zalo-token-simple.ts",
-    "get-zalo-token:local": "npx tsx scripts/get-zalo-token.ts"
+    "get-zalo-token:local": "npx tsx scripts/get-zalo-token.ts",
+    "test:eligibility": "npx tsx scripts/test-notification-eligibility.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.9.0",

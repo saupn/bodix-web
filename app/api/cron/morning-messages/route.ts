@@ -9,6 +9,10 @@ import {
   isoTimestampToVietnamYmd,
 } from '@/lib/date/vietnam';
 import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
+import {
+  getEligibleForNudge,
+  type EligibleEnrollment,
+} from '@/lib/notifications/eligible-enrollments';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Session metadata (source: lib/workout/video-config.ts)
@@ -240,314 +244,245 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     return !!data;
   }
 
-  // ── Trial: status = trial, ngày 1–3 theo bodix_start_date hoặc enrolled_at + 1 ──
-  const { data: trialEnrollments, error: trialErr } = await supabase
-    .from('enrollments')
-    .select(`
-      id,
-      user_id,
-      program_id,
-      enrolled_at,
-      profiles!inner (
-        id,
-        full_name,
-        channel_user_id,
-        fcm_token,
-        notification_via,
-        bodix_start_date,
-        trial_ends_at
-      )
-    `)
-    .eq('status', 'trial')
-    .eq('program_id', program.id);
+  // ── Lấy eligible enrollments (chung helper với evening) ──
+  const { enrollments: eligible, breakdown } = await getEligibleForNudge(
+    'morning',
+    todayVN,
+    program.id,
+  );
 
-  if (trialErr) {
-    console.error('[morning-messages] trial enrollments:', trialErr);
-  } else if (trialEnrollments?.length) {
-    // Dedup enrollments theo user_id: nếu query trả nhiều rows cùng user, chỉ giữ 1
-    const trialByUser = new Map<string, (typeof trialEnrollments)[number]>();
-    for (const row of trialEnrollments) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profile = Array.isArray((row as any).profiles) ? (row as any).profiles[0] : (row as any).profiles;
-      const uid: string | undefined = profile?.id;
-      if (!uid) continue;
-      if (!trialByUser.has(uid)) trialByUser.set(uid, row);
-    }
-
-    for (const row of trialByUser.values()) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const en = row as any;
-      const profile = Array.isArray(en.profiles) ? en.profiles[0] : en.profiles;
-      const userId: string = profile?.id;
-      const channelUserId: string | null = profile?.channel_user_id ?? null;
-      const fcmToken: string | null = profile?.fcm_token ?? null;
-      const enrolledAt: string = en.enrolled_at;
-
-      console.log(
-        '[morning-messages] processing trial user:',
-        userId,
-        'channel_user_id:',
-        channelUserId,
-        'fcm_token:',
-        !!fcmToken,
-      );
-
-      // Lớp 1: in-memory dedup — nếu vì lý do gì đó user đã được gửi trong cùng run
-      if (sentUserIds.has(userId)) {
-        console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
-        skip(userId, 'trial: DEDUP in-memory – already sent in this run');
-        continue;
-      }
-
-      if (!channelUserId && !fcmToken) {
-        skip(userId, 'trial: no channel (channel_user_id and fcm_token both null)');
-        continue;
-      }
-
-      // Lớp 2: nudge_logs dedup — backup cho cron overlap giữa 2 lần chạy
-      if (await alreadySentToday(userId)) {
-        sentUserIds.add(userId);
-        skip(userId, 'trial: already sent morning_reminder today');
-        continue;
-      }
-
-      if (profile?.trial_ends_at) {
-        const end = new Date(profile.trial_ends_at).getTime();
-        if (end <= Date.now()) {
-          skip(userId, `trial: trial_ends_at (${profile.trial_ends_at}) already passed`);
-          continue;
-        }
-      }
-
-      const anchor = getTrialMorningAnchorDate(profile?.bodix_start_date, enrolledAt);
-      if (todayVN < anchor) {
-        skip(userId, `trial: anchor date ${anchor} is in future (todayVN=${todayVN})`);
-        continue;
-      }
-
-      const trialDay = calendarDaysBetween(anchor, todayVN) + 1;
-      if (trialDay < 1 || trialDay > TRIAL_DAYS) {
-        skip(userId, `trial: trialDay=${trialDay} out of range 1..${TRIAL_DAYS} (anchor=${anchor})`);
-        continue;
-      }
-
-      const { data: workout } = await supabase
-        .from('workout_templates')
-        .select('day_number, title, workout_type')
-        .eq('program_id', en.program_id)
-        .eq('day_number', trialDay)
-        .maybeSingle();
-
-      if (!workout) {
-        fail(userId, `trial: no workout_template for day ${trialDay}`);
-        continue;
-      }
-      if (workout.workout_type === 'review') {
-        fail(userId, `trial: workout_type=review for day ${trialDay} (unexpected in trial range)`);
-        continue;
-      }
-
-      const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
-      const isWeekStart = trialDay === 1;
-      const isRecovery = workout.workout_type === 'recovery';
-      const contentTemplate = isRecovery ? 'morning_recovery_trial' : 'morning_main_trial';
-
-      let session: SessionMeta | null = null;
-      if (!isRecovery) {
-        const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-        session = sessionCode ? SESSIONS[sessionCode] : null;
-        if (!session) {
-          fail(userId, `trial: unknown session title "${workout.title}"`);
-          continue;
-        }
-      }
-
-      const zaloMessage = isRecovery
-        ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart)
-        : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart);
-
-      const logVars = {
-        day_number: trialDay,
-        workout_type: workout.workout_type,
-        trial: true,
-      };
-
-      // Chat mirror — hiện trong BodiX Support history (app user)
-      const chatContent = isRecovery
-        ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
-        : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
-
-      // BƯỚC 1: Ưu tiên Zalo
-      let zaloDone = false;
-      let zaloErrorDetail: string | null = null;
-      if (channelUserId) {
-        try {
-          const result = await sendViaZalo(channelUserId, zaloMessage);
-          if (result.success) {
-            console.log('[morning-messages] Zalo sent:', userId);
-            zaloDone = true;
-            sentCount++;
-            sentUserIds.add(userId);
-            await supabase.from('nudge_logs').insert({
-              user_id: userId,
-              enrollment_id: en.id,
-              nudge_type: 'morning_reminder',
-              channel: 'zalo',
-              content_template: contentTemplate,
-              content_variables: logVars,
-              delivered: true,
-            });
-            await insertSupportSystemMessage(supabase, userId, chatContent);
-          } else {
-            zaloErrorDetail = result.error ?? 'unknown';
-            console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
-          }
-        } catch (zaloErr) {
-          zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
-          console.error('[morning-messages] Zalo threw:', userId, zaloErrorDetail);
-        }
-      }
-
-      if (zaloDone) {
-        await new Promise((r) => setTimeout(r, 100));
-        continue;
-      }
-
-      // BƯỚC 2: Fallback FCM
-      if (fcmToken) {
-        try {
-          const pushTitle = isRecovery
-            ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery 🧘`
-            : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}`;
-          const pushBody = isRecovery
-            ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
-            : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
-
-          const result = await sendFcmMessage(
-            fcmToken,
-            {
-              type: 'morningWorkout',
-              title: pushTitle,
-              body: pushBody,
-              data: {
-                day_number: String(trialDay),
-                workout_type: workout.workout_type,
-                trial: 'true',
-              },
-            },
-            userId,
-          );
-
-          if (result.success) {
-            console.log('[morning-messages] FCM sent:', userId);
-            sentCount++;
-            sentUserIds.add(userId);
-            await supabase.from('nudge_logs').insert({
-              user_id: userId,
-              enrollment_id: en.id,
-              nudge_type: 'morning_reminder',
-              channel: 'push',
-              content_template: contentTemplate,
-              content_variables: logVars,
-              delivered: true,
-            });
-            await insertSupportSystemMessage(supabase, userId, chatContent);
-          } else {
-            fail(userId, `trial: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
-          }
-        } catch (fcmErr) {
-          const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
-          fail(userId, `trial: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
-        }
-      } else {
-        fail(userId, `trial: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
-      }
-
-      await new Promise((r) => setTimeout(r, 100));
-    }
+  // Dedup theo user_id (nếu user có nhiều enrollment, chỉ xử lý 1)
+  const byUser = new Map<string, EligibleEnrollment>();
+  for (const en of eligible) {
+    if (!byUser.has(en.user_id)) byUser.set(en.user_id, en);
   }
 
-  // Lấy enrollments active + profile; cohort optional (fallback enrolled_at)
-  const { data: enrollments, error: enrollError } = await supabase
-    .from('enrollments')
-    .select(`
-      id,
-      user_id,
-      program_id,
-      cohort_id,
-      enrolled_at,
-      started_at,
-      cohorts ( start_date ),
-      profiles!inner (
-        id,
-        full_name,
-        channel_user_id,
-        fcm_token,
-        notification_via
-      )
-    `)
-    .eq('status', 'active')
-    .eq('program_id', program.id);
+  const trialEnrollments = [...byUser.values()].filter(en => en.status === 'trial');
+  const activeEnrollments = [...byUser.values()].filter(en => en.status === 'active');
 
-  if (enrollError) {
-    console.error('[morning-messages] enrollments query:', enrollError);
-    return NextResponse.json(
-      {
-        sent: sentCount,
-        skipped: skippedCount,
-        errors: errorCount + 1,
-        message: enrollError.message,
-        skip_reasons: skipReasons,
-        error_reasons: errorReasons,
-      },
-      { status: 500 }
+  console.log(
+    '[morning-messages] eligibility breakdown:',
+    JSON.stringify({
+      todayVN,
+      total_eligible: breakdown.total,
+      by_status: breakdown.by_status,
+      by_channel: breakdown.by_channel,
+      trial_expired_filtered: breakdown.trial_expired_filtered,
+      after_user_dedup: { trial: trialEnrollments.length, active: activeEnrollments.length },
+    }),
+  );
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // TRIAL LOOP
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  for (const en of trialEnrollments) {
+    const profile = en.profile;
+    const userId = en.user_id;
+    const channelUserId = profile.channel_user_id;
+    const fcmToken = profile.fcm_token;
+
+    console.log(
+      '[morning-messages] processing trial user:',
+      userId,
+      'channel_user_id:',
+      channelUserId,
+      'fcm_token:',
+      !!fcmToken,
     );
+
+    if (sentUserIds.has(userId)) {
+      console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
+      skip(userId, 'trial: DEDUP in-memory – already sent in this run');
+      continue;
+    }
+
+    if (!channelUserId && !fcmToken) {
+      skip(userId, 'trial: no channel (channel_user_id and fcm_token both null)');
+      continue;
+    }
+
+    if (await alreadySentToday(userId)) {
+      sentUserIds.add(userId);
+      skip(userId, 'trial: already sent morning_reminder today');
+      continue;
+    }
+
+    // Helper đã lọc trial_ends_at < todayVN; defensive: kiểm tra lại theo timestamp
+    // chính xác cho edge case trial vừa hết hạn giữa lúc query và lúc gửi.
+    if (profile.trial_ends_at) {
+      const end = new Date(profile.trial_ends_at).getTime();
+      if (end <= Date.now()) {
+        skip(userId, `trial: trial_ends_at (${profile.trial_ends_at}) already passed`);
+        continue;
+      }
+    }
+
+    const anchor = getTrialMorningAnchorDate(profile.bodix_start_date, en.enrolled_at);
+    if (todayVN < anchor) {
+      skip(userId, `trial: anchor date ${anchor} is in future (todayVN=${todayVN})`);
+      continue;
+    }
+
+    const trialDay = calendarDaysBetween(anchor, todayVN) + 1;
+    if (trialDay < 1 || trialDay > TRIAL_DAYS) {
+      skip(userId, `trial: trialDay=${trialDay} out of range 1..${TRIAL_DAYS} (anchor=${anchor})`);
+      continue;
+    }
+
+    const { data: workout } = await supabase
+      .from('workout_templates')
+      .select('day_number, title, workout_type')
+      .eq('program_id', en.program_id)
+      .eq('day_number', trialDay)
+      .maybeSingle();
+
+    if (!workout) {
+      fail(userId, `trial: no workout_template for day ${trialDay}`);
+      continue;
+    }
+    if (workout.workout_type === 'review') {
+      fail(userId, `trial: workout_type=review for day ${trialDay} (unexpected in trial range)`);
+      continue;
+    }
+
+    const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
+    const isWeekStart = trialDay === 1;
+    const isRecovery = workout.workout_type === 'recovery';
+    const contentTemplate = isRecovery ? 'morning_recovery_trial' : 'morning_main_trial';
+
+    let session: SessionMeta | null = null;
+    if (!isRecovery) {
+      const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
+      session = sessionCode ? SESSIONS[sessionCode] : null;
+      if (!session) {
+        fail(userId, `trial: unknown session title "${workout.title}"`);
+        continue;
+      }
+    }
+
+    const zaloMessage = isRecovery
+      ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart)
+      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart);
+
+    const logVars = {
+      day_number: trialDay,
+      workout_type: workout.workout_type,
+      trial: true,
+    };
+
+    const chatContent = isRecovery
+      ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
+      : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
+
+    let zaloDone = false;
+    let zaloErrorDetail: string | null = null;
+    if (channelUserId) {
+      try {
+        const result = await sendViaZalo(channelUserId, zaloMessage);
+        if (result.success) {
+          console.log('[morning-messages] Zalo sent:', userId);
+          zaloDone = true;
+          sentCount++;
+          sentUserIds.add(userId);
+          await supabase.from('nudge_logs').insert({
+            user_id: userId,
+            enrollment_id: en.enrollment_id,
+            nudge_type: 'morning_reminder',
+            channel: 'zalo',
+            content_template: contentTemplate,
+            content_variables: logVars,
+            delivered: true,
+          });
+          await insertSupportSystemMessage(supabase, userId, chatContent);
+        } else {
+          zaloErrorDetail = result.error ?? 'unknown';
+          console.error('[morning-messages] Zalo failed:', userId, zaloErrorDetail);
+        }
+      } catch (zaloErr) {
+        zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
+        console.error('[morning-messages] Zalo threw:', userId, zaloErrorDetail);
+      }
+    }
+
+    if (zaloDone) {
+      await new Promise((r) => setTimeout(r, 100));
+      continue;
+    }
+
+    if (fcmToken) {
+      try {
+        const pushTitle = isRecovery
+          ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery 🧘`
+          : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}`;
+        const pushBody = isRecovery
+          ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
+          : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
+
+        const result = await sendFcmMessage(
+          fcmToken,
+          {
+            type: 'morningWorkout',
+            title: pushTitle,
+            body: pushBody,
+            data: {
+              day_number: String(trialDay),
+              workout_type: workout.workout_type,
+              trial: 'true',
+            },
+          },
+          userId,
+        );
+
+        if (result.success) {
+          console.log('[morning-messages] FCM sent:', userId);
+          sentCount++;
+          sentUserIds.add(userId);
+          await supabase.from('nudge_logs').insert({
+            user_id: userId,
+            enrollment_id: en.enrollment_id,
+            nudge_type: 'morning_reminder',
+            channel: 'push',
+            content_template: contentTemplate,
+            content_variables: logVars,
+            delivered: true,
+          });
+          await insertSupportSystemMessage(supabase, userId, chatContent);
+        } else {
+          fail(userId, `trial: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+        }
+      } catch (fcmErr) {
+        const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+        fail(userId, `trial: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+      }
+    } else {
+      fail(userId, `trial: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
+    }
+
+    await new Promise((r) => setTimeout(r, 100));
   }
 
-  if (!enrollments || enrollments.length === 0) {
-    return NextResponse.json({
-      sent: sentCount,
-      skipped: skippedCount,
-      errors: errorCount,
-      trial_processed: true,
-      active_total: 0,
-      message: 'No active enrollments',
-      skip_reasons: skipReasons,
-      error_reasons: errorReasons,
-    });
-  }
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // ACTIVE LOOP
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-  // Dedup enrollments theo user_id: nếu user có nhiều rows active (re-enrollment, anomaly),
-  // chỉ giữ 1 row để tránh gửi 2 tin trong cùng loop
-  const activeByUser = new Map<string, (typeof enrollments)[number]>();
-  for (const row of enrollments) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const profile = Array.isArray((row as any).profiles) ? (row as any).profiles[0] : (row as any).profiles;
-    const uid: string | undefined = profile?.id;
-    if (!uid) continue;
-    if (!activeByUser.has(uid)) activeByUser.set(uid, row);
-  }
-
-  for (const row of activeByUser.values()) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const enrollment = row as any;
-    const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
-    const cohort = Array.isArray(enrollment.cohorts) ? enrollment.cohorts[0] : enrollment.cohorts;
-    const userId: string = profile?.id;
-    const channelUserId: string | null = profile?.channel_user_id ?? null;
-    const fcmToken: string | null = profile?.fcm_token ?? null;
+  for (const en of activeEnrollments) {
+    const profile = en.profile;
+    const userId = en.user_id;
+    const channelUserId = profile.channel_user_id;
+    const fcmToken = profile.fcm_token;
 
     // Defensive: nếu started_at sau hôm nay VN, user chưa đến ngày tập — skip
-    if (enrollment.started_at) {
-      const startedYmd = isoTimestampToVietnamYmd(enrollment.started_at as string);
+    if (en.started_at) {
+      const startedYmd = isoTimestampToVietnamYmd(en.started_at);
       if (startedYmd > todayVN) {
-        skip(userId, `active: started_at=${enrollment.started_at} in future (todayVN=${todayVN})`);
+        skip(userId, `active: started_at=${en.started_at} in future (todayVN=${todayVN})`);
         continue;
       }
     }
 
     const startAnchor: string =
-      cohort?.start_date ?? isoTimestampToVietnamYmd(enrollment.enrolled_at as string);
+      en.cohort_start_date ?? isoTimestampToVietnamYmd(en.enrolled_at);
 
     console.log(
       '[morning-messages] processing active user:',
@@ -558,7 +493,6 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       !!fcmToken,
     );
 
-    // Lớp 1: in-memory dedup — quan trọng nhất cho case user có cả trial và active enrollment
     if (sentUserIds.has(userId)) {
       console.log('[morning-messages] DEDUP SKIP (in-memory):', userId);
       skip(userId, 'active: DEDUP in-memory – already sent in trial loop or earlier');
@@ -570,7 +504,6 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
-    // Lớp 2: nudge_logs dedup
     if (await alreadySentToday(userId)) {
       sentUserIds.add(userId);
       skip(userId, 'active: already sent morning_reminder today');
@@ -584,11 +517,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
-    // Lấy workout template
     const { data: workout } = await supabase
       .from('workout_templates')
       .select('day_number, title, workout_type')
-      .eq('program_id', enrollment.program_id)
+      .eq('program_id', en.program_id)
       .eq('day_number', dayNumber)
       .maybeSingle();
 
@@ -599,7 +531,6 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const workoutType: string = workout.workout_type;
 
-    // Review → skip
     if (workoutType === 'review') {
       skip(userId, `active: workout_type=review for day ${dayNumber} (Chủ nhật)`);
       continue;
@@ -626,12 +557,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 
-    // Chat mirror — hiện trong BodiX Support history (app user)
     const chatContent = isRecovery
       ? `🧘 Ngày ${dayNumber}/${config.totalDays} – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
       : `📅 Ngày ${dayNumber}/${config.totalDays} – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
 
-    // BƯỚC 1: Ưu tiên Zalo
     let zaloDone = false;
     let zaloErrorDetail: string | null = null;
     if (channelUserId) {
@@ -644,7 +573,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           sentUserIds.add(userId);
           await supabase.from('nudge_logs').insert({
             user_id: userId,
-            enrollment_id: enrollment.id,
+            enrollment_id: en.enrollment_id,
             nudge_type: 'morning_reminder',
             channel: 'zalo',
             content_template: contentTemplate,
@@ -667,7 +596,6 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
-    // BƯỚC 2: Fallback FCM
     if (fcmToken) {
       try {
         const pushTitle = isRecovery
@@ -697,7 +625,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
           sentUserIds.add(userId);
           await supabase.from('nudge_logs').insert({
             user_id: userId,
-            enrollment_id: enrollment.id,
+            enrollment_id: en.enrollment_id,
             nudge_type: 'morning_reminder',
             channel: 'push',
             content_template: contentTemplate,
@@ -716,18 +644,28 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       fail(userId, `active: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
     }
 
-    // Rate limit: 100ms giữa mỗi tin
     await new Promise(r => setTimeout(r, 100));
   }
 
-  return NextResponse.json({
+  const summary = {
+    cron: 'morning-messages',
+    todayVN,
+    eligible_count: breakdown.total,
+    by_status: breakdown.by_status,
+    by_channel: breakdown.by_channel,
     sent: sentCount,
     skipped: skippedCount,
     errors: errorCount,
-    active_total: enrollments.length,
+    trial_expired_filtered: breakdown.trial_expired_filtered,
+    active_total: activeEnrollments.length,
+    trial_total: trialEnrollments.length,
     skip_reasons: skipReasons,
     error_reasons: errorReasons,
-  });
+  };
+
+  console.log('[morning-messages] summary:', JSON.stringify(summary));
+
+  return NextResponse.json(summary);
 }
 
 export async function GET(request: NextRequest) {

@@ -1,14 +1,10 @@
-import { createClient } from "@/lib/supabase/server";
-import { notFound } from "next/navigation";
+import { createServiceClient } from "@/lib/supabase/service";
 import { ReferralLandingClient } from "@/components/landing/ReferralLandingClient";
+import { InvalidReferralPage } from "@/components/referral/InvalidReferralPage";
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 
-const PROGRAM_SLUGS = [
-  { slug: "bodix-21", name: "BodiX 21", duration: "21 ngày" },
-  { slug: "bodix-6w", name: "BodiX 6W", duration: "6 tuần" },
-  { slug: "bodix-12w", name: "BodiX 12W", duration: "12 tuần" },
-] as const;
+const PROGRAM_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
 export default async function ReferralLandingPage({
   params,
@@ -17,75 +13,59 @@ export default async function ReferralLandingPage({
 }) {
   const { code } = await params;
   const codeUpper = code?.trim().toUpperCase();
-  if (!codeUpper) notFound();
 
-  const supabase = await createClient();
+  const renderInvalid = (reason: "not_found" | "inactive" | "expired" | "exhausted") => (
+    <div className="min-h-screen flex flex-col bg-neutral-50">
+      <Header />
+      <main className="flex-1">
+        <InvalidReferralPage code={codeUpper ?? ""} reason={reason} />
+      </main>
+      <Footer />
+    </div>
+  );
 
-  // Ưu tiên referral_codes, fallback profiles.referral_code (mã cá nhân hóa)
-  let referralCode: {
-    id: string;
-    user_id: string;
-    code_type: string;
-    referee_reward_type: string;
-    referee_reward_value: number;
-    is_active: boolean;
-    expires_at: string | null;
-    max_uses: number | null;
-    total_conversions: number;
-  } | null = null;
+  if (!codeUpper) return renderInvalid("not_found");
 
-  const { data: refCode, error: refError } = await supabase
+  const supabase = createServiceClient();
+
+  const { data: referralCode } = await supabase
     .from("referral_codes")
-    .select("id, user_id, code_type, referee_reward_type, referee_reward_value, is_active, expires_at, max_uses, total_conversions")
+    .select(
+      "code, code_type, is_active, expires_at, max_uses, total_conversions, referee_reward_type, referee_reward_value, user_id",
+    )
     .eq("code", codeUpper)
     .maybeSingle();
 
-  if (!refError && refCode) {
-    referralCode = refCode;
-  } else {
-    const { data: profileWithCode } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("referral_code", codeUpper)
-      .maybeSingle();
-    if (profileWithCode) {
-      referralCode = {
-        id: "",
-        user_id: profileWithCode.id,
-        code_type: "referral",
-        referee_reward_type: "discount_percent",
-        referee_reward_value: 10,
-        is_active: true,
-        expires_at: null,
-        max_uses: null,
-        total_conversions: 0,
-      };
-    }
+  if (!referralCode) return renderInvalid("not_found");
+  if (!referralCode.is_active) return renderInvalid("inactive");
+  if (referralCode.expires_at && new Date(referralCode.expires_at) < new Date()) {
+    return renderInvalid("expired");
   }
-
-  if (!referralCode) notFound();
-  if (!referralCode.is_active) notFound();
-  if (referralCode.expires_at && new Date(referralCode.expires_at) < new Date()) notFound();
-  if (referralCode.max_uses != null && referralCode.total_conversions >= referralCode.max_uses) notFound();
+  if (
+    referralCode.max_uses != null &&
+    (referralCode.total_conversions ?? 0) >= referralCode.max_uses
+  ) {
+    return renderInvalid("exhausted");
+  }
 
   const { data: referrerProfile } = await supabase
     .from("profiles")
     .select("full_name")
     .eq("id", referralCode.user_id)
-    .single();
+    .maybeSingle();
 
   const fullName = referrerProfile?.full_name?.trim() ?? "";
-  const referrerName = fullName.split(/\s+/)[0] || "Một người bạn";
+  const referrerName = fullName.split(/\s+/).pop() || "Một người bạn";
 
   const discountPercent =
     referralCode.referee_reward_type === "discount_percent"
-      ? referralCode.referee_reward_value
+      ? (referralCode.referee_reward_value ?? 10)
       : 10;
 
   const { data: programs } = await supabase
     .from("programs")
-    .select("id, slug, name, price_vnd, duration_days")
-    .in("slug", PROGRAM_SLUGS.map((p) => p.slug))
+    .select("slug, name, price_vnd, duration_days")
+    .in("slug", PROGRAM_SLUGS as unknown as string[])
     .eq("is_active", true);
 
   const programList = (programs ?? []).map((p) => ({

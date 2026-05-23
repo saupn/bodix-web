@@ -45,10 +45,19 @@ lib/
   monitoring/           → index.ts (Sentry custom tracking)
   cache/                → index.ts
 supabase/
-  migrations/           → SQL migrations (numbered, sequential)
+  migrations/           → SQL migrations (numbered, sequential) — auto-applied by `supabase db push`
+  rollbacks/            → Manual rollback scripts — NOT auto-applied (see Migration convention)
   functions/            → Deno Edge Functions
 docs/                   → API reference, Flutter setup, data models
 ```
+
+## Migration convention
+- `supabase/migrations/`: chỉ chứa forward migrations. Supabase CLI và `apply_migration` MCP tự động apply mọi file ở đây.
+- `supabase/rollbacks/`: chứa rollback scripts. CHẠY THỦ CÔNG khi cần revert. CLI không quét thư mục này.
+- Đặt tên rollback: `rollback_NNN_<description>.sql` (prefix `rollback_`, KHÔNG để số đầu — tránh CLI parse nhầm thành migration).
+- Mỗi file rollback phải bắt đầu bằng comment `-- DO NOT RUN AUTOMATICALLY.`, có `BEGIN/COMMIT`, có safety check backup tồn tại, có verify block.
+- Rollback KHÔNG dùng `TRUNCATE` trên bảng có inbound FK. Dùng `UPDATE` từ backup table; với row mới được INSERT mà đã bị FK reference, "neutralise" bằng cách clear reward field + `is_active=false` thay vì xóa.
+- Mỗi forward migration UPDATE/DELETE dữ liệu phải tạo backup table trước (`CREATE TABLE <name>_backup_YYYYMMDD AS SELECT * FROM <name>`); giữ backup ≥ 30 ngày.
 
 ## Quy ước code
 - TypeScript strict mode — không dùng `any` nếu không cần thiết

@@ -3,32 +3,39 @@ import type { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import {
-  REFERRAL_DISCOUNT_PERCENT,
-  AFFILIATE_DISCOUNT_PERCENT,
-} from "@/lib/affiliate/config";
+  resolveReferralReward,
+  resolveVoucherReward,
+  NO_REWARD,
+  type ResolvedReward,
+} from "@/lib/checkout/resolve-reward";
+import { calculateCheckoutTotal } from "@/lib/checkout/calculate-total";
 
 const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
-// ─── Referral / affiliate code validation ─────────────────────────────────────
+// ─── Referral / affiliate code resolution ────────────────────────────────────
 
 interface ResolvedCode {
-  /** null khi code đến từ profiles.referral_code (chưa có row referral_codes) */
-  id: string | null
-  code_type: "referral" | "affiliate"
+  id: string | null;
+  user_id: string;
+  code_type: "referral" | "affiliate";
+  reward: ResolvedReward;
 }
 
 async function resolveReferralCode(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
   code: string,
-  userId: string
+  userId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  service: any,
 ): Promise<{ valid: true; info: ResolvedCode } | { valid: false }> {
   const upperCode = code.trim().toUpperCase();
 
-  // Thử bảng referral_codes trước
   const { data } = await supabase
     .from("referral_codes")
-    .select("id, user_id, code_type, is_active, max_uses, total_conversions, expires_at")
+    .select(
+      "id, user_id, code, code_type, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at",
+    )
     .eq("code", upperCode)
     .maybeSingle();
 
@@ -36,59 +43,76 @@ async function resolveReferralCode(
     if (!data.is_active) return { valid: false };
     if (data.expires_at && new Date(data.expires_at) < new Date()) return { valid: false };
     if (data.max_uses != null && data.total_conversions >= data.max_uses) return { valid: false };
-    if (data.user_id === userId) return { valid: false }; // self-referral
+    if (data.user_id === userId) return { valid: false };
+
+    const codeType: "referral" | "affiliate" = data.code_type ?? "referral";
+
+    const { data: referrerProfile } = await service
+      .from("profiles")
+      .select("full_name")
+      .eq("id", data.user_id)
+      .single();
+    const firstName =
+      (referrerProfile?.full_name?.trim() ?? "").split(/\s+/)[0] || "Người dùng";
+
+    const reward = resolveReferralReward({
+      id: data.id,
+      code: data.code,
+      code_type: codeType,
+      referee_reward_type: data.referee_reward_type,
+      referee_reward_value: data.referee_reward_value,
+      referrer_name: firstName,
+    });
+
+    if (reward.type === "none") return { valid: false };
 
     return {
       valid: true,
-      info: {
-        id: data.id,
-        code_type: data.code_type ?? "referral",
-      },
+      info: { id: data.id, user_id: data.user_id, code_type: codeType, reward },
     };
   }
 
-  // Fallback: tìm trong profiles.referral_code (mã user cũ chưa có row referral_codes)
-  const { data: profile } = await supabase
+  // Legacy fallback: profiles.referral_code (no row in referral_codes)
+  const { data: profile } = await service
     .from("profiles")
-    .select("id, referral_code")
+    .select("id, full_name, referral_code")
     .eq("referral_code", upperCode)
     .maybeSingle();
 
   if (!profile) return { valid: false };
-  if (profile.id === userId) return { valid: false }; // self-referral
+  if (profile.id === userId) return { valid: false };
+
+  const firstName = (profile.full_name?.trim() ?? "").split(/\s+/)[0] || "Người dùng";
+  const reward = resolveReferralReward({
+    id: null,
+    code: upperCode,
+    code_type: "referral",
+    referee_reward_type: null,
+    referee_reward_value: null,
+    referrer_name: firstName,
+  });
+  if (reward.type === "none") return { valid: false };
 
   return {
     valid: true,
-    info: {
-      // Không có row referral_codes → id=null. Caller xử lý: không update
-      // total_conversions vì không có row để update.
-      id: null,
-      code_type: "referral",
-    },
+    info: { id: null, user_id: profile.id, code_type: "referral", reward },
   };
 }
 
-function computeDiscount(originalPrice: number, codeType: "referral" | "affiliate"): number {
-  const pct = codeType === "affiliate" ? AFFILIATE_DISCOUNT_PERCENT : REFERRAL_DISCOUNT_PERCENT;
-  return Math.round(originalPrice * (pct / 100));
-}
-
-// ─── Voucher validation ───────────────────────────────────────────────────────
-
 interface ResolvedVoucher {
-  id: string
-  remaining_amount: number
+  id: string;
+  reward: ResolvedReward;
 }
 
 async function resolveVoucher(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   service: any,
   code: string,
-  userId: string
+  userId: string,
 ): Promise<{ valid: true; voucher: ResolvedVoucher } | { valid: false }> {
   const { data } = await service
     .from("vouchers")
-    .select("id, user_id, remaining_amount, status, expires_at")
+    .select("id, code, user_id, remaining_amount, status, expires_at")
     .eq("code", code.trim().toUpperCase())
     .eq("user_id", userId)
     .maybeSingle();
@@ -98,13 +122,17 @@ async function resolveVoucher(
   if (new Date(data.expires_at) < new Date()) return { valid: false };
   if (data.remaining_amount <= 0) return { valid: false };
 
-  return {
-    valid: true,
-    voucher: { id: data.id, remaining_amount: data.remaining_amount },
-  };
+  const reward = resolveVoucherReward({
+    id: data.id,
+    code: data.code,
+    remaining_amount: data.remaining_amount,
+  });
+  if (reward.type === "none") return { valid: false };
+
+  return { valid: true, voucher: { id: data.id, reward } };
 }
 
-// ─── POST ──���────────────────────────────────��─────────────────────────��───────
+// ─── POST ────────────────────────────────────────────────────────────────────
 
 export async function POST(request: NextRequest) {
   const supabase = await createClient();
@@ -122,6 +150,7 @@ export async function POST(request: NextRequest) {
     referral_code?: string;
     voucher_code?: string;
     voucher_codes?: string[];
+    dry_run?: boolean;
   };
   try {
     body = await request.json();
@@ -129,20 +158,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
   }
 
+  const dryRun =
+    body.dry_run === true ||
+    request.nextUrl.searchParams.get("dry_run") === "true";
+
   const slug = body.slug;
   if (!slug || !VALID_SLUGS.includes(slug as (typeof VALID_SLUGS)[number])) {
-    return NextResponse.json({ error: "Ch��ơng trình không hợp lệ." }, { status: 400 });
+    return NextResponse.json({ error: "Chương trình không hợp lệ." }, { status: 400 });
   }
 
   const paymentMethod = body.payment_method ?? "bank_transfer";
   if (paymentMethod !== "bank_transfer") {
     return NextResponse.json(
       { error: "Hiện chỉ hỗ trợ chuyển khoản ngân hàng." },
-      { status: 400 }
+      { status: 400 },
     );
   }
 
-  // ── Fetch program ────────────────���────────────────────────────────────────
   const { data: program } = await supabase
     .from("programs")
     .select("id, name, slug, price_vnd")
@@ -154,22 +186,99 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Chương trình không tồn tại." }, { status: 404 });
   }
 
-  // ── Fetch next cohort (for display only at this stage) ────────────────────
-  const { data: cohort } = await supabase
-    .from("cohorts")
-    .select("id, name, start_date")
-    .eq("program_id", program.id)
-    .in("status", ["upcoming", "active"])
-    .order("start_date", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
   const service = createServiceClient();
 
-  // ── Resolve / promote enrollment cho program này ──────────────────────────
-  // Ai cũng được thanh toán: trial, trial_completed, pending_payment, completed,
-  // hoặc chưa có enrollment cho program này. Chỉ chặn khi đã paid_waiting_cohort
-  // hoặc đang active cho chính program này.
+  // ── Resolve referral / affiliate code ────────────────────────────────────
+  let referralCodeId: string | null = null;
+  let codeType: "referral" | "affiliate" | null = null;
+  let referralReward: ResolvedReward = NO_REWARD;
+
+  if (body.referral_code?.trim()) {
+    const result = await resolveReferralCode(
+      supabase,
+      body.referral_code,
+      user.id,
+      service,
+    );
+    if (result.valid) {
+      referralCodeId = result.info.id;
+      codeType = result.info.code_type;
+      referralReward = result.info.reward;
+    }
+  }
+
+  // ── Resolve voucher(s) ───────────────────────────────────────────────────
+  let voucherId: string | null = null;
+  let voucherReward: ResolvedReward = NO_REWARD;
+
+  const rawCodes: string[] = Array.isArray(body.voucher_codes) && body.voucher_codes.length > 0
+    ? body.voucher_codes.map((c) => String(c).trim()).filter(Boolean)
+    : body.voucher_code?.trim()
+      ? body.voucher_code.split(",").map((c) => c.trim()).filter(Boolean)
+      : [];
+
+  // First compute subtotal after referral discount to know how much voucher cap is
+  const preview = calculateCheckoutTotal({
+    basePriceVnd: program.price_vnd,
+    referralReward,
+  });
+  let voucherRemainingCap = preview.total;
+  let voucherSum = 0;
+  for (const code of rawCodes) {
+    if (voucherRemainingCap <= 0) break;
+    const vResult = await resolveVoucher(service, code, user.id);
+    if (!vResult.valid) continue;
+    const take = Math.min(vResult.voucher.reward.value, voucherRemainingCap);
+    if (take <= 0) continue;
+    voucherSum += take;
+    voucherRemainingCap -= take;
+    if (!voucherId) voucherId = vResult.voucher.id;
+  }
+  if (voucherSum > 0) {
+    voucherReward = {
+      type: "fixed",
+      value: voucherSum,
+      source: "db",
+      label: rawCodes.length > 1 ? `Voucher (${rawCodes.length} mã)` : `Voucher ${rawCodes[0] ?? ""}`.trim(),
+    };
+  }
+
+  // ── Final pricing via single source of truth ─────────────────────────────
+  const breakdown = calculateCheckoutTotal({
+    basePriceVnd: program.price_vnd,
+    referralReward,
+    voucherReward,
+  });
+
+  const referralDiscountAmount =
+    breakdown.discounts.find((d) => d.kind === "referral" || d.kind === "affiliate")?.amount ?? 0;
+  const voucherDiscountAmount =
+    breakdown.discounts.find((d) => d.kind === "voucher")?.amount ?? 0;
+  const finalPrice = breakdown.total;
+
+  const pricingResponse = {
+    original_price: program.price_vnd,
+    subtotal: breakdown.subtotal,
+    referral_discount_amount: referralDiscountAmount,
+    voucher_discount_amount: voucherDiscountAmount,
+    final_price: finalPrice,
+    code_type: codeType,
+    referral_applied: referralCodeId !== null || referralReward.type !== "none",
+    voucher_applied: voucherId !== null,
+    referral_reward_source: referralReward.source,
+    discounts: breakdown.discounts,
+  };
+
+  // ── Dry-run: return pricing only, no DB writes ───────────────────────────
+  if (dryRun) {
+    return NextResponse.json({
+      success: true,
+      dry_run: true,
+      pricing: pricingResponse,
+    });
+  }
+
+  // ── Resolve / promote enrollment ─────────────────────────────────────────
   let pendingEnrollment: { id: string } | null = null;
   {
     const { data: existing } = await supabase
@@ -192,7 +301,7 @@ export async function POST(request: NextRequest) {
     if (existing && (existing.status === "paid_waiting_cohort" || existing.status === "active")) {
       return NextResponse.json(
         { error: "Bạn đã thanh toán chương trình này rồi.", redirect: "/app" },
-        { status: 409 }
+        { status: 409 },
       );
     }
 
@@ -202,7 +311,6 @@ export async function POST(request: NextRequest) {
         existing.status === "trial_completed" ||
         existing.status === "pending_payment")
     ) {
-      // Promote sang pending_payment (idempotent nếu đã pending_payment).
       if (existing.status !== "pending_payment") {
         const { error: promoteErr } = await service
           .from("enrollments")
@@ -212,14 +320,12 @@ export async function POST(request: NextRequest) {
           console.error("[checkout/create] promote enrollment:", promoteErr);
           return NextResponse.json(
             { error: "Không thể cập nhật trạng thái đăng ký." },
-            { status: 500 }
+            { status: 500 },
           );
         }
       }
       pendingEnrollment = { id: existing.id };
     } else {
-      // Không có enrollment cho program này, hoặc đã completed — tạo mới
-      // pending_payment (re-purchase / upgrade lên program khác).
       const { data: newEnrollment, error: createErr } = await service
         .from("enrollments")
         .insert({
@@ -235,56 +341,14 @@ export async function POST(request: NextRequest) {
         console.error("[checkout/create] create enrollment:", createErr);
         return NextResponse.json(
           { error: "Không thể khởi tạo đơn đăng ký." },
-          { status: 500 }
+          { status: 500 },
         );
       }
       pendingEnrollment = { id: newEnrollment.id };
     }
   }
 
-  // ���─ Resolve referral / affiliate code (soft-fail) ���────────────────────────
-  let referralCodeId: string | null = null;
-  let referralDiscountAmount = 0;
-  let codeType: "referral" | "affiliate" | null = null;
-
-  if (body.referral_code?.trim()) {
-    const result = await resolveReferralCode(supabase, body.referral_code, user.id);
-    if (result.valid) {
-      referralDiscountAmount = computeDiscount(program.price_vnd, result.info.code_type);
-      if (referralDiscountAmount > 0) {
-        referralCodeId = result.info.id;
-        codeType = result.info.code_type;
-      }
-    }
-  }
-
-  // ── Resolve voucher(s) (soft-fail), cộng dồn giảm ─────────────────────────
-  let voucherId: string | null = null;
-  let voucherDiscountAmount = 0;
-
-  const priceAfterCodeDiscount = program.price_vnd - referralDiscountAmount;
-
-  const rawCodes: string[] = Array.isArray(body.voucher_codes) && body.voucher_codes.length > 0
-    ? body.voucher_codes.map((c) => String(c).trim()).filter(Boolean)
-    : body.voucher_code?.trim()
-      ? body.voucher_code.split(",").map((c) => c.trim()).filter(Boolean)
-      : [];
-
-  let priceLeft = priceAfterCodeDiscount;
-  for (const code of rawCodes) {
-    if (priceLeft <= 0) break;
-    const vResult = await resolveVoucher(service, code, user.id);
-    if (!vResult.valid) continue;
-    const take = Math.min(vResult.voucher.remaining_amount, priceLeft);
-    if (take <= 0) continue;
-    voucherDiscountAmount += take;
-    priceLeft -= take;
-    if (!voucherId) voucherId = vResult.voucher.id;
-  }
-
-  const finalPrice = Math.max(0, priceAfterCodeDiscount - voucherDiscountAmount);
-
-  // ── Update existing pending_payment enrollment with discount info ────────
+  // ── Update enrollment with discount info ─────────────────────────────────
   const { error } = await service
     .from("enrollments")
     .update({
@@ -300,28 +364,27 @@ export async function POST(request: NextRequest) {
     console.error("[checkout/create] update failed:", error);
     return NextResponse.json(
       { error: "Không thể cập nhật đơn đăng ký. Vui lòng thử lại." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
-  // ── SePay: sinh payment code unique từ DB sequence (atomic) ──────────────
-  const { data: codeData, error: codeError } = await service
-    .rpc("generate_bodix_payment_code");
+  // ── SePay payment code ───────────────────────────────────────────────────
+  const { data: codeData, error: codeError } = await service.rpc(
+    "generate_bodix_payment_code",
+  );
 
   if (codeError || !codeData) {
     console.error("[checkout/create] payment_code rpc:", codeError);
     return NextResponse.json(
       { error: "Không thể tạo mã thanh toán. Vui lòng thử lại." },
-      { status: 500 }
+      { status: 500 },
     );
   }
 
   const paymentCode = codeData as string;
   const paymentSequence = parseInt(paymentCode.replace(/^BX/, ""), 10);
 
-  // ── Insert/upsert orders row gắn với enrollment ──────────────────────────
-  // Reuse pending order nếu có (user submit lại checkout) — match theo
-  // user_id + program slug + status pending. Nếu không có, tạo mới.
+  // ── Insert/update order ──────────────────────────────────────────────────
   const { data: existingPending } = await service
     .from("orders")
     .select("id")
@@ -350,7 +413,7 @@ export async function POST(request: NextRequest) {
       console.error("[checkout/create] order update:", updErr);
       return NextResponse.json(
         { error: "Không thể cập nhật đơn hàng." },
-        { status: 500 }
+        { status: 500 },
       );
     }
     orderId = updated.id;
@@ -375,7 +438,7 @@ export async function POST(request: NextRequest) {
       console.error("[checkout/create] order insert:", insErr);
       return NextResponse.json(
         { error: "Không thể tạo đơn hàng." },
-        { status: 500 }
+        { status: 500 },
       );
     }
     orderId = inserted.id;
@@ -386,15 +449,7 @@ export async function POST(request: NextRequest) {
     enrollment_id: pendingEnrollment.id,
     order_id: orderId,
     payment_code: paymentCode,
-    pricing: {
-      original_price: program.price_vnd,
-      referral_discount_amount: referralDiscountAmount,
-      voucher_discount_amount: voucherDiscountAmount,
-      final_price: finalPrice,
-      code_type: codeType,
-      referral_applied: referralCodeId !== null,
-      voucher_applied: voucherId !== null,
-    },
+    pricing: pricingResponse,
     redirect: `/checkout/${orderId}`,
   });
 }

@@ -1,14 +1,15 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useMemo } from "react";
 import Link from "next/link";
 import { CheckoutForm } from "./CheckoutForm";
 import { PaymentClient } from "./PaymentClient";
 import { formatDateVn as formatDate } from "@/lib/date/vietnam";
-
-function formatPrice(vnd: number): string {
-  return new Intl.NumberFormat("vi-VN").format(vnd) + "đ";
-}
+import {
+  calculateCheckoutTotal,
+  formatVnd,
+} from "@/lib/checkout/calculate-total";
+import { NO_REWARD, type ResolvedReward } from "@/lib/checkout/resolve-reward";
 
 interface Program {
   id: string;
@@ -61,32 +62,27 @@ export function CheckoutContent({
   initialPayment,
   bankConfig,
 }: CheckoutContentProps) {
-  const [referralDiscount, setReferralDiscount] = useState(0);
-  const [referralCodeType, setReferralCodeType] = useState<string | null>(null);
-  const [referrerName, setReferrerName] = useState<string | null>(null);
-  const [voucherDiscount, setVoucherDiscount] = useState(0);
+  const [referralReward, setReferralReward] = useState<ResolvedReward>(NO_REWARD);
+  const [voucherReward, setVoucherReward] = useState<ResolvedReward>(NO_REWARD);
   const [activeOrder, setActiveOrder] = useState<InitialPayment | null>(initialPayment);
   const [paid, setPaid] = useState(false);
 
-  const totalDiscount = referralDiscount + voucherDiscount;
-  const finalPrice = Math.max(0, program.price_vnd - totalDiscount);
-
-  const handleReferralChange = useCallback(
-    (
-      valid: boolean,
-      discount: number,
-      codeType?: string,
-      refName?: string,
-    ) => {
-      setReferralDiscount(valid ? discount : 0);
-      setReferralCodeType(valid && codeType ? codeType : null);
-      setReferrerName(valid && refName ? refName : null);
-    },
-    [],
+  const breakdown = useMemo(
+    () =>
+      calculateCheckoutTotal({
+        basePriceVnd: program.price_vnd,
+        referralReward: referralReward.type !== "none" ? referralReward : undefined,
+        voucherReward: voucherReward.type !== "none" ? voucherReward : undefined,
+      }),
+    [program.price_vnd, referralReward, voucherReward],
   );
 
-  const handleVoucherChange = useCallback((valid: boolean, discount: number) => {
-    setVoucherDiscount(valid ? discount : 0);
+  const handleReferralChange = useCallback((reward: ResolvedReward) => {
+    setReferralReward(reward);
+  }, []);
+
+  const handleVoucherChange = useCallback((reward: ResolvedReward) => {
+    setVoucherReward(reward);
   }, []);
 
   const handlePaymentReady = useCallback(
@@ -100,15 +96,6 @@ export function CheckoutContent({
     setPaid(true);
   }, []);
 
-  const discountLabel = referralCodeType === "affiliate"
-    ? referrerName
-      ? `Giảm 10% từ đối tác ${referrerName}`
-      : "Giảm 10% từ đối tác"
-    : referrerName
-      ? `Giảm 10% từ ${referrerName}`
-      : "Giảm 10% từ mã giới thiệu";
-
-  // ── Paid screen ────────────────────────────────────────────────────────────
   if (paid && activeOrder) {
     return (
       <div className="mx-auto max-w-xl rounded-xl border border-green-200 bg-green-50 p-8 text-center shadow-sm">
@@ -132,7 +119,6 @@ export function CheckoutContent({
     );
   }
 
-  // ── Inline QR view (after submit, or resume from server) ───────────────────
   if (activeOrder) {
     return (
       <div className="space-y-4">
@@ -158,7 +144,6 @@ export function CheckoutContent({
     );
   }
 
-  // ── Form view ──────────────────────────────────────────────────────────────
   return (
     <div className="grid gap-8 lg:grid-cols-2">
       <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
@@ -173,9 +158,9 @@ export function CheckoutContent({
             email={email}
             phone={phone}
             priceVnd={program.price_vnd}
-            referralDiscount={referralDiscount}
-            voucherDiscount={voucherDiscount}
-            finalPrice={finalPrice}
+            referralReward={referralReward}
+            voucherReward={voucherReward}
+            finalPrice={breakdown.total}
             onReferralChange={handleReferralChange}
             onVoucherChange={handleVoucherChange}
             onPaymentReady={handlePaymentReady}
@@ -214,21 +199,18 @@ export function CheckoutContent({
             <div className="flex items-baseline justify-between">
               <span className="text-neutral-600">Giá gốc</span>
               <span className="font-medium text-neutral-800">
-                {formatPrice(program.price_vnd)}
+                {formatVnd(breakdown.subtotal)}
               </span>
             </div>
-            {referralDiscount > 0 && (
-              <div className="flex items-baseline justify-between text-success">
-                <span>{discountLabel}</span>
-                <span className="font-medium">-{formatPrice(referralDiscount)}</span>
+            {breakdown.discounts.map((d, i) => (
+              <div
+                key={`${d.kind}-${i}`}
+                className="flex items-baseline justify-between text-success"
+              >
+                <span>{d.label}</span>
+                <span className="font-medium">-{formatVnd(d.amount)}</span>
               </div>
-            )}
-            {voucherDiscount > 0 && (
-              <div className="flex items-baseline justify-between text-success">
-                <span>Voucher dùng</span>
-                <span className="font-medium">-{formatPrice(voucherDiscount)}</span>
-              </div>
-            )}
+            ))}
           </div>
 
           {cohort && (
@@ -250,7 +232,7 @@ export function CheckoutContent({
           <div className="flex items-baseline justify-between">
             <span className="font-medium text-neutral-700">Tổng thanh toán</span>
             <span className="text-2xl font-bold text-primary">
-              {formatPrice(finalPrice)}
+              {formatVnd(breakdown.total)}
             </span>
           </div>
         </div>

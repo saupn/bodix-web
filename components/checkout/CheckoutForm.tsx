@@ -3,6 +3,11 @@
 import { useState, useEffect } from "react";
 import { Building2, Wallet, Ticket } from "lucide-react";
 import { getSePayQRUrl } from "@/lib/sepay";
+import { formatVnd } from "@/lib/checkout/calculate-total";
+import {
+  NO_REWARD,
+  type ResolvedReward,
+} from "@/lib/checkout/resolve-reward";
 
 const REFERRAL_STORAGE_KEY = "bodix_referral_code";
 
@@ -15,16 +20,11 @@ interface CheckoutFormProps {
   email: string;
   phone: string;
   priceVnd: number;
-  referralDiscount: number;
-  voucherDiscount: number;
+  referralReward: ResolvedReward;
+  voucherReward: ResolvedReward;
   finalPrice: number;
-  onReferralChange?: (
-    valid: boolean,
-    discount: number,
-    codeType?: string,
-    referrerName?: string,
-  ) => void;
-  onVoucherChange?: (valid: boolean, discount: number) => void;
+  onReferralChange: (reward: ResolvedReward) => void;
+  onVoucherChange: (reward: ResolvedReward) => void;
   onPaymentReady: (order: {
     orderId: string;
     paymentCode: string;
@@ -33,8 +33,20 @@ interface CheckoutFormProps {
   }) => void;
 }
 
-function formatVnd(n: number): string {
-  return new Intl.NumberFormat("vi-VN").format(n) + "đ";
+interface ValidateCodeResponse {
+  valid: boolean;
+  code_type: "referral" | "affiliate" | "voucher" | null;
+  reward: ResolvedReward;
+  reason?: string;
+  error?: string;
+}
+
+interface VoucherLine {
+  code: string;
+  valid: boolean;
+  amount: number;
+  remaining: number;
+  reason?: string;
 }
 
 export function CheckoutForm({
@@ -43,8 +55,8 @@ export function CheckoutForm({
   email,
   phone,
   priceVnd,
-  referralDiscount,
-  voucherDiscount,
+  referralReward,
+  voucherReward,
   finalPrice,
   onReferralChange,
   onVoucherChange,
@@ -52,28 +64,24 @@ export function CheckoutForm({
 }: CheckoutFormProps) {
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("bank_transfer");
   const [referralCode, setReferralCode] = useState("");
-  const [referralValid, setReferralValid] = useState<{
-    valid: boolean;
-    reason?: string;
-    referrer_name?: string;
-    code_type?: string;
-    discount_percent?: number;
-    discount_amount?: number;
-  } | null>(null);
+  const [referralReason, setReferralReason] = useState<string | null>(null);
   const [referralValidating, setReferralValidating] = useState(false);
 
-  // Voucher input — supports multiple codes split by comma
   const [voucherInput, setVoucherInput] = useState("");
-  const [voucherLines, setVoucherLines] = useState<
-    { code: string; valid: boolean; amount: number; remaining: number }[]
-  >([]);
+  const [voucherLines, setVoucherLines] = useState<VoucherLine[]>([]);
   const [voucherValidating, setVoucherValidating] = useState(false);
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Cap = giá sau khi đã trừ referral discount. Voucher tối đa = cap.
-  const maxVoucherUsable = Math.max(0, priceVnd - referralDiscount);
+  // Cap voucher tổng: subtotal sau khi áp referral
+  const referralDiscountAmount =
+    referralReward.type === "percent"
+      ? Math.round(priceVnd * (referralReward.value / 100))
+      : referralReward.type === "fixed"
+        ? Math.min(referralReward.value, priceVnd)
+        : 0;
+  const maxVoucherUsable = Math.max(0, priceVnd - referralDiscountAmount);
 
   useEffect(() => {
     try {
@@ -85,58 +93,38 @@ export function CheckoutForm({
     } catch {}
   }, []);
 
-  // ── Referral code validation ──────────────────────────────────────────────
-
+  // ── Referral validation via unified endpoint ─────────────────────────────
   useEffect(() => {
     if (!referralCode.trim()) {
-      setReferralValid(null);
-      onReferralChange?.(false, 0);
+      setReferralReason(null);
+      onReferralChange(NO_REWARD);
       return;
     }
     const timer = setTimeout(async () => {
       setReferralValidating(true);
       try {
-        const res = await fetch(`/api/referral/validate?code=${encodeURIComponent(referralCode.trim())}`);
-        const data = await res.json();
-        if (data.valid && data.referee_reward_type === "discount_percent" && data.referee_reward_value) {
-          const pct = data.referee_reward_value;
-          const discountAmount = Math.round(priceVnd * (pct / 100));
-          setReferralValid({
-            valid: true,
-            referrer_name: data.referrer_name,
-            code_type: data.code_type,
-            discount_percent: pct,
-            discount_amount: discountAmount,
-          });
-          onReferralChange?.(true, discountAmount, data.code_type, data.referrer_name);
-        } else if (data.valid && data.referee_reward_type === "discount_fixed" && data.referee_reward_value) {
-          const discountAmount = Math.min(data.referee_reward_value, priceVnd);
-          setReferralValid({
-            valid: true,
-            referrer_name: data.referrer_name,
-            code_type: data.code_type,
-            discount_amount: discountAmount,
-          });
-          onReferralChange?.(true, discountAmount, data.code_type, data.referrer_name);
-        } else if (data.valid) {
-          setReferralValid({ valid: true, referrer_name: data.referrer_name, code_type: data.code_type, discount_amount: 0 });
-          onReferralChange?.(false, 0);
+        const res = await fetch(
+          `/api/checkout/validate-code?code=${encodeURIComponent(referralCode.trim())}`,
+        );
+        const data = (await res.json()) as ValidateCodeResponse;
+        if (data.valid && data.reward.type !== "none") {
+          setReferralReason(null);
+          onReferralChange(data.reward);
         } else {
-          setReferralValid({ valid: false, reason: data.reason });
-          onReferralChange?.(false, 0);
+          setReferralReason(data.reason ?? "code_invalid");
+          onReferralChange(NO_REWARD);
         }
       } catch {
-        setReferralValid({ valid: false });
-        onReferralChange?.(false, 0);
+        setReferralReason("network_error");
+        onReferralChange(NO_REWARD);
       } finally {
         setReferralValidating(false);
       }
     }, 400);
     return () => clearTimeout(timer);
-  }, [referralCode, priceVnd, onReferralChange]);
+  }, [referralCode, onReferralChange]);
 
-  // ── Voucher validation, capped at maxVoucherUsable ────────────────────────
-
+  // ── Voucher validation (multi-code, capped) ──────────────────────────────
   useEffect(() => {
     const codes = voucherInput
       .split(",")
@@ -144,38 +132,58 @@ export function CheckoutForm({
       .filter(Boolean);
     if (codes.length === 0) {
       setVoucherLines([]);
-      onVoucherChange?.(false, 0);
+      onVoucherChange(NO_REWARD);
       return;
     }
     const timer = setTimeout(async () => {
       setVoucherValidating(true);
       try {
         let priceLeft = maxVoucherUsable;
-        const lines: { code: string; valid: boolean; amount: number; remaining: number }[] = [];
+        const lines: VoucherLine[] = [];
         for (const code of codes) {
           const res = await fetch(
-            `/api/voucher/validate?code=${encodeURIComponent(code)}`,
+            `/api/checkout/validate-code?code=${encodeURIComponent(code)}`,
           );
-          const data = (await res.json()) as {
-            valid?: boolean;
-            remaining_amount?: number;
-          };
-          const remaining = data.remaining_amount ?? 0;
-          if (data.valid && remaining > 0 && priceLeft > 0) {
+          const data = (await res.json()) as ValidateCodeResponse;
+          if (
+            data.valid &&
+            data.code_type === "voucher" &&
+            data.reward.type === "fixed" &&
+            priceLeft > 0
+          ) {
+            const remaining = data.reward.value;
             const take = Math.min(remaining, priceLeft);
             priceLeft -= take;
             lines.push({ code, valid: true, amount: take, remaining });
           } else {
-            lines.push({ code, valid: false, amount: 0, remaining });
+            lines.push({
+              code,
+              valid: false,
+              amount: 0,
+              remaining: data.reward.type === "fixed" ? data.reward.value : 0,
+              reason: data.reason,
+            });
           }
         }
         setVoucherLines(lines);
         const validOnly = lines.filter((l) => l.valid);
         const sum = validOnly.reduce((s, l) => s + l.amount, 0);
-        onVoucherChange?.(validOnly.length > 0 && sum > 0, sum);
+        if (sum > 0) {
+          onVoucherChange({
+            type: "fixed",
+            value: sum,
+            source: "db",
+            label:
+              validOnly.length === 1
+                ? `Voucher ${validOnly[0].code}`
+                : `Voucher (${validOnly.length} mã)`,
+          });
+        } else {
+          onVoucherChange(NO_REWARD);
+        }
       } catch {
         setVoucherLines([]);
-        onVoucherChange?.(false, 0);
+        onVoucherChange(NO_REWARD);
       } finally {
         setVoucherValidating(false);
       }
@@ -183,8 +191,7 @@ export function CheckoutForm({
     return () => clearTimeout(timer);
   }, [voucherInput, maxVoucherUsable, onVoucherChange]);
 
-  // ── Submit: tạo order → swap sang QR view inline ──────────────────────────
-
+  // ── Submit ───────────────────────────────────────────────────────────────
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
@@ -196,7 +203,8 @@ export function CheckoutForm({
         body: JSON.stringify({
           slug,
           payment_method: paymentMethod,
-          referral_code: referralValid?.valid ? referralCode.trim() : undefined,
+          referral_code:
+            referralReward.type !== "none" ? referralCode.trim() : undefined,
           voucher_codes:
             voucherLines.filter((l) => l.valid).length > 0
               ? voucherLines.filter((l) => l.valid).map((l) => l.code)
@@ -249,22 +257,8 @@ export function CheckoutForm({
     },
   ];
 
-  // ── Referral discount label ───────────────────────────────────────────────
-
-  const referralLabel = referralValid?.valid
-    ? referralValid.code_type === "affiliate"
-      ? `Giảm ${referralValid.discount_percent ?? 10}% từ đối tác ${referralValid.referrer_name}`
-      : `Giảm ${referralValid.discount_percent ?? 10}% từ mã giới thiệu ${referralValid.referrer_name}`
-    : null;
-
-  // ── Voucher input cap warning ─────────────────────────────────────────────
-
-  const voucherInputDigits = voucherLines.reduce(
-    (sum, l) => sum + (l.valid ? l.amount : 0),
-    0,
-  );
   const voucherCapHit =
-    voucherDiscount > 0 && voucherInputDigits >= maxVoucherUsable;
+    voucherReward.type === "fixed" && voucherReward.value >= maxVoucherUsable;
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
@@ -327,27 +321,27 @@ export function CheckoutForm({
         {referralValidating && (
           <p className="mt-1 text-xs text-neutral-500">Đang kiểm tra...</p>
         )}
-        {!referralValidating && referralValid?.valid && referralLabel && (
+        {!referralValidating && referralReward.type !== "none" && (
           <p className="mt-1 text-sm text-success">
-            ✓ {referralLabel} – Giảm {formatVnd(referralValid.discount_amount ?? 0)}
+            ✓ {referralReward.label} – Giảm {formatVnd(referralDiscountAmount)}
           </p>
         )}
-        {!referralValidating && referralValid && !referralValid.valid && referralCode.trim() && (
+        {!referralValidating && referralReason && referralCode.trim() && (
           <p className="mt-1 text-xs text-red-600">
-            {referralValid.reason === "self_referral"
+            {referralReason === "self_referral"
               ? "Không thể dùng mã của chính bạn"
-              : referralValid.reason === "code_expired"
+              : referralReason === "code_expired"
                 ? "Mã đã hết hạn"
-                : referralValid.reason === "code_exhausted"
+                : referralReason === "code_exhausted"
                   ? "Mã đã hết lượt sử dụng"
-                  : referralValid.reason === "code_inactive"
+                  : referralReason === "code_inactive"
                     ? "Mã đã ngừng hoạt động"
                     : "Mã không hợp lệ"}
           </p>
         )}
       </div>
 
-      {/* Voucher với cap */}
+      {/* Voucher */}
       <div>
         <label className="flex items-center gap-1.5 text-sm font-medium text-neutral-600">
           <Ticket className="h-4 w-4" />
@@ -389,9 +383,9 @@ export function CheckoutForm({
                     }`}
               </li>
             ))}
-            {voucherLines.some((l) => l.valid) && (
+            {voucherLines.some((l) => l.valid) && voucherReward.type === "fixed" && (
               <li className="font-medium text-neutral-800">
-                Tổng giảm voucher: -{formatVnd(voucherDiscount)}
+                Tổng giảm voucher: -{formatVnd(voucherReward.value)}
               </li>
             )}
           </ul>

@@ -63,8 +63,8 @@ export function Hero() {
         >
           BodiX là hệ thống tập tại nhà cho phụ nữ, với lộ trình từ 3 tuần đến
           12 tuần, thiết kế để bạn hoàn thành – không phải bỏ giữa chừng. 10–20
-          phút mỗi ngày, có rescue khi mệt, có buddy khi nản. Đi đến cuối – và
-          thấy thân mình thon gọn, khỏe hơn.
+          phút mỗi ngày, có ứng cứu khi mệt, có bạn đồng hành khi nản. Tập đến
+          cùng – và chắc chắn có thân hình thon gọn, khỏe hơn.
         </p>
         <div
           className="mt-10 flex flex-col gap-4 justify-center opacity-0 animate-fade-slide-up sm:flex-row sm:gap-4"

@@ -9,6 +9,7 @@ import {
 import type { MessageResult } from '@/lib/messaging/types';
 import { getVietnamDateString, isoTimestampToVietnamYmd } from '@/lib/date/vietnam';
 import { getEligibleForNudge } from '@/lib/notifications/eligible-enrollments';
+import { transitionAffiliateCommissions } from '@/lib/affiliate/commission';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RESCUE MESSAGES (Protocol Levels)
@@ -121,6 +122,13 @@ export async function GET(request: NextRequest) {
     pre_cohort_errors: 0,
     orphan_assigned: 0,
     orphan_skipped: 0,
+    commission_scanned: 0,
+    commission_to_payable: 0,
+    commission_cancelled_timeout: 0,
+    commission_cancelled_dropped: 0,
+    commission_cancelled_no_checkin: 0,
+    commission_flagged_suspicious: 0,
+    commission_errors: 0,
   };
 
   const subTaskResults: Record<string, SubTaskResult> = {};
@@ -869,6 +877,25 @@ export async function GET(request: NextRequest) {
       '[rescue-check] orphan assigned:', stats.orphan_assigned,
       'skipped:', stats.orphan_skipped,
     );
+  });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // SUB-TASK 6: AFFILIATE COMMISSION PROCESSING (V2 cooldown)
+  // Promote pending → payable khi referee active + check-in.
+  // Cancel khi timeout / dropped / no_checkin > 14 ngày sau active.
+  // Flag suspicious khi > 10 conversion / 7 ngày.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  subTaskResults.commission_processing = await runSubTask('commission_processing', async () => {
+    const result = await transitionAffiliateCommissions(supabase);
+    stats.commission_scanned = result.scanned;
+    stats.commission_to_payable = result.to_payable;
+    stats.commission_cancelled_timeout = result.to_cancelled_timeout;
+    stats.commission_cancelled_dropped = result.to_cancelled_dropped;
+    stats.commission_cancelled_no_checkin = result.to_cancelled_no_checkin;
+    stats.commission_flagged_suspicious = result.flagged_suspicious;
+    stats.commission_errors = result.errors;
+    console.log('[rescue-check] commission:', JSON.stringify(result));
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

@@ -44,3 +44,31 @@ export const VOUCHER_EXPIRY_MONTHS = 6;
 
 /** Minimum affiliate payout amount (VND) */
 export const MIN_PAYOUT_AMOUNT = 500_000;
+
+/** Alias matching task spec naming. */
+export const AFFILIATE_MIN_WITHDRAW_VND = MIN_PAYOUT_AMOUNT;
+
+// ---------------------------------------------------------------------------
+// Commission V2 (cooldown) settings
+// ---------------------------------------------------------------------------
+
+/** Default commission rate (%) for affiliate cash commission. */
+export const AFFILIATE_COMMISSION_RATE = DEFAULT_COMMISSION_RATE;
+
+/**
+ * Số ngày tối đa commission ở trạng thái 'pending' trước khi auto-cancel.
+ * Đếm từ purchase_at. KHÔNG đếm nếu referee đang ở 'paid_waiting_cohort'
+ * (cohort chưa start không phải lỗi của họ).
+ */
+export const AFFILIATE_PENDING_TIMEOUT_DAYS = 60;
+
+/**
+ * Số ngày tối đa referee ở 'active' mà chưa check-in trước khi auto-cancel.
+ * Đếm từ enrollment.started_at.
+ */
+export const AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS = 14;
+
+/**
+ * Số conversion trong 7 ngày qua trên một affiliate để flag suspicious.
+ */
+export const AFFILIATE_SUSPICIOUS_THRESHOLD = 10;

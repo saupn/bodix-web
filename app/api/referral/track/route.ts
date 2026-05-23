@@ -343,30 +343,11 @@ async function handleConversion({
       }),
   ])
 
-  // ── Create referral reward for referrer ───────────────────────────────────
-  const { data: reward, error: rewardError } = await service
-    .from('referral_rewards')
-    .insert({
-      user_id: referralCode.user_id,
-      referral_tracking_id: tracking.id,
-      reward_type: referralCode.reward_type === 'credit' ? 'credit' : referralCode.reward_type,
-      reward_value: referralCode.reward_value,
-      reward_description: `Giới thiệu thành công → +${(REFERRAL_REWARD_AMOUNT / 1000).toFixed(0)}k credit`,
-      status: 'approved',
-      approved_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single()
-
-  if (rewardError) {
-    console.error('[referral/track] reward insert:', rewardError)
-    // Non-fatal — tracking updated, reward can be reconciled later
-  }
-
   // ── Credit referrer's wallet ──────────────────────────────────────────────
-  if (!rewardError && reward) {
-    await creditUser(service, referralCode.user_id, REFERRAL_REWARD_AMOUNT, 'referral_reward', reward.id)
-  }
+  // referral_rewards table đã drop (migration 053). user_credits ledger reference
+  // dùng tracking.id thay vì reward.id. Commission row (program_type='referral')
+  // sẽ được tạo trong task BD-REFERRAL-VOUCHER-FLOW.
+  await creditUser(service, referralCode.user_id, REFERRAL_REWARD_AMOUNT, 'referral_reward', tracking.id)
 
   // ── In-app notification for referrer ─────────────────────────────────────
   const { data: refereeProfile } = await supabase

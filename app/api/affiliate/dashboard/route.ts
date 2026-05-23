@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 
@@ -166,6 +166,71 @@ export async function GET() {
   const thisMonthRevenue = (thisMonthData ?? []).reduce((s, c) => s + (c.conversion_amount ?? 0), 0)
   const thisMonthCommission = Math.round(thisMonthRevenue * commissionRate / 100)
 
+  // ── Commissions V2 (program_type='affiliate', user's own rows) ──────────
+  const { data: commissionRows } = await service
+    .from('commissions')
+    .select(`
+      id, status, reward_amount_vnd, reward_rate, order_amount_vnd,
+      purchase_at, payable_at, paid_at, cancelled_at, pending_expires_at,
+      cancel_reason, referee_user_id, enrollment_id
+    `)
+    .eq('beneficiary_user_id', user.id)
+    .eq('program_type', 'affiliate')
+    .order('purchase_at', { ascending: false })
+    .limit(50)
+
+  const commissionRefereeIds = [...new Set((commissionRows ?? [])
+    .map(c => c.referee_user_id)
+    .filter(Boolean))] as string[]
+
+  const { data: commissionProfiles } = commissionRefereeIds.length
+    ? await service.from('profiles').select('id, full_name').in('id', commissionRefereeIds)
+    : { data: [] as Array<{ id: string; full_name: string | null }> }
+
+  const commissionProfileMap = new Map<string, string>(
+    (commissionProfiles ?? []).map(p => [p.id, p.full_name ?? ''])
+  )
+
+  const REASON_LABEL: Record<string, string> = {
+    timeout: 'Người được giới thiệu không tham gia cohort',
+    dropped_before_start: 'Đã ngừng tham gia',
+    no_checkin_after_active: 'Người được giới thiệu không bắt đầu tập',
+  }
+
+  const commissions = (commissionRows ?? []).map(c => {
+    const fullName = commissionProfileMap.get(c.referee_user_id) ?? ''
+    const parts = fullName.trim().split(/\s+/).filter(Boolean)
+    const refereeName = parts[parts.length - 1] || 'Ẩn danh'
+    const reasonRaw = c.cancel_reason ?? null
+    let cancelReasonText: string | null = null
+    if (reasonRaw) {
+      cancelReasonText = REASON_LABEL[reasonRaw]
+        ?? (reasonRaw.startsWith('manual_') ? 'Đã huỷ thủ công' : reasonRaw)
+    }
+    return {
+      id: c.id,
+      status: c.status,
+      reward_amount_vnd: c.reward_amount_vnd,
+      reward_rate: c.reward_rate,
+      order_amount_vnd: c.order_amount_vnd,
+      purchase_at: c.purchase_at,
+      payable_at: c.payable_at,
+      paid_at: c.paid_at,
+      cancelled_at: c.cancelled_at,
+      pending_expires_at: c.pending_expires_at,
+      cancel_reason: cancelReasonText,
+      referee_name: refereeName,
+    }
+  })
+
+  const commission_summary = {
+    pending: commissions.filter(c => c.status === 'pending').reduce((s, c) => s + c.reward_amount_vnd, 0),
+    payable: commissions.filter(c => c.status === 'payable').reduce((s, c) => s + c.reward_amount_vnd, 0),
+    paid: commissions.filter(c => c.status === 'paid').reduce((s, c) => s + c.reward_amount_vnd, 0),
+    cancelled_count: commissions.filter(c => c.status === 'cancelled').length,
+    suspicious_count: commissions.filter(c => c.status === 'suspicious').length,
+  }
+
   // ── Withdrawal history ───────────────────────────────────────────────────
   const { data: withdrawals } = await supabase
     .from('user_credits')
@@ -215,6 +280,8 @@ export async function GET() {
       bank_account_name: affiliateProfile.bank_account_name,
     },
     withdrawal_history,
+    commissions,
+    commission_summary,
   })
 }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { cancelCommissionsByReferee } from '@/lib/affiliate/commission'
 
 // ─── Internal route — service_role only ──────────────────────────────────────
 //
@@ -218,15 +219,22 @@ async function applyFraudPenalty(
     return
   }
 
-  // 2. Reject any pending/approved rewards linked to this tracking
-  const { error: rewardError } = await service
-    .from('referral_rewards')
-    .update({ status: 'rejected' })
-    .eq('referral_tracking_id', trackingId)
-    .in('status', ['pending', 'approved'])
-
-  if (rewardError) {
-    console.error('[anti-fraud] reject rewards:', rewardError)
+  // 2. Cancel any pending/payable commissions for this referee (V2).
+  //    Bảng referral_rewards đã drop (migration 053); thay bằng commissions
+  //    với cancel_reason='manual_fraud_<reasons>'.
+  if (referredId) {
+    try {
+      const cancelled = await cancelCommissionsByReferee(
+        service,
+        referredId,
+        `manual_fraud:${reasons.slice(0, 2).join(',')}`,
+      )
+      if (cancelled > 0) {
+        console.log(`[anti-fraud] cancelled ${cancelled} commission(s) for referee ${referredId}`)
+      }
+    } catch (cancelErr) {
+      console.error('[anti-fraud] cancel commissions:', cancelErr)
+    }
   }
 
   // 3. Reverse any credit already issued (insert negative transaction)

@@ -2,6 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { extractPaymentCodeFromContent, SEPAY_CONFIG } from "@/lib/sepay";
 import { sendPushToUser } from "@/lib/messaging/adapters/push";
+import { createAffiliateCommission } from "@/lib/affiliate/commission";
 
 type AmountStatus = "correct" | "overpaid" | "underpaid";
 
@@ -309,6 +310,28 @@ export async function POST(request: NextRequest) {
             payment_reference: referenceCode ?? String(sepayId),
           })
           .eq("id", enrollment.id);
+
+        // ── Trigger affiliate commission (V2 cooldown) ─────────────────
+        // Chỉ insert nếu enrollment có referral_code_id và code thuộc affiliate.
+        // Helper skip an toàn nếu code không phải affiliate hoặc self-referral.
+        try {
+          const { data: enrollWithRef } = await service
+            .from("enrollments")
+            .select("referral_code_id")
+            .eq("id", enrollment.id)
+            .maybeSingle();
+          if (enrollWithRef?.referral_code_id && order.user_id) {
+            await createAffiliateCommission(service, {
+              referralCodeId: enrollWithRef.referral_code_id,
+              refereeUserId: order.user_id,
+              enrollmentId: enrollment.id,
+              orderId: order.id,
+              conversionAmountVnd: order.amount,
+            });
+          }
+        } catch (commErr) {
+          console.error("[sepay] commission create:", commErr);
+        }
 
         // Trừ voucher (best-effort)
         if (enrollment.voucher_id && enrollment.voucher_discount_amount) {

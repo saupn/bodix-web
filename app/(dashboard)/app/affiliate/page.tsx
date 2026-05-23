@@ -62,7 +62,46 @@ interface DashboardData {
     bank_account_name: string | null;
   };
   withdrawal_history: { id: string; amount: number; created_at: string; description: string }[];
+  commissions: CommissionRow[];
+  commission_summary: {
+    pending: number;
+    payable: number;
+    paid: number;
+    cancelled_count: number;
+    suspicious_count: number;
+  };
 }
+
+interface CommissionRow {
+  id: string;
+  status: "pending" | "payable" | "paid" | "cancelled" | "suspicious";
+  reward_amount_vnd: number;
+  reward_rate: number | null;
+  order_amount_vnd: number;
+  purchase_at: string;
+  payable_at: string | null;
+  paid_at: string | null;
+  cancelled_at: string | null;
+  pending_expires_at: string;
+  cancel_reason: string | null;
+  referee_name: string;
+}
+
+const COMMISSION_STATUS_LABEL: Record<CommissionRow["status"], string> = {
+  pending: "Đang chờ",
+  payable: "Có thể rút",
+  paid: "Đã rút",
+  cancelled: "Đã huỷ",
+  suspicious: "Đang xét",
+};
+
+const COMMISSION_STATUS_CLASS: Record<CommissionRow["status"], string> = {
+  pending: "bg-amber-100 text-amber-800",
+  payable: "bg-emerald-100 text-emerald-800",
+  paid: "bg-neutral-200 text-neutral-700",
+  cancelled: "bg-red-100 text-red-700",
+  suspicious: "bg-orange-100 text-orange-800",
+};
 
 function formatDate(dateStr: string): string {
   if (!dateStr) return "–";
@@ -481,7 +520,78 @@ export default function AffiliatePage() {
         </div>
       </section>
 
-      {/* Recent Conversions */}
+      {/* Commissions V2 (program_type='affiliate') */}
+      <section className="rounded-xl border border-neutral-200 bg-white p-6">
+        <div className="mb-4">
+          <h2 className="font-heading font-semibold text-primary">Hoa hồng</h2>
+          <p className="mt-1 text-sm text-neutral-600">
+            Hoa hồng {dashboard?.profile?.commission_rate ?? COMMISSION_RATE}% được tính khi người bạn giới thiệu thanh toán mua khoá.
+            Hoa hồng chuyển sang trạng thái <strong>Có thể rút</strong> khi người đó bắt đầu tập chính thức –
+            vào nhóm cohort và check-in buổi đầu.
+          </p>
+        </div>
+
+        <div className="mb-4 grid gap-3 sm:grid-cols-3">
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-amber-700">Đang chờ</p>
+            <p className="mt-1 text-lg font-bold text-amber-900">
+              {(dashboard?.commission_summary?.pending ?? 0).toLocaleString("vi-VN")}đ
+            </p>
+          </div>
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Có thể rút</p>
+            <p className="mt-1 text-lg font-bold text-emerald-900">
+              {(dashboard?.commission_summary?.payable ?? 0).toLocaleString("vi-VN")}đ
+            </p>
+          </div>
+          <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-neutral-700">Đã rút</p>
+            <p className="mt-1 text-lg font-bold text-neutral-900">
+              {(dashboard?.commission_summary?.paid ?? 0).toLocaleString("vi-VN")}đ
+            </p>
+          </div>
+        </div>
+
+        {!dashboard?.commissions?.length ? (
+          <p className="py-8 text-center text-neutral-600">Chưa có hoa hồng nào</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-neutral-200 text-left">
+                  <th className="pb-2 font-medium">Ngày mua</th>
+                  <th className="pb-2 font-medium">Người mua</th>
+                  <th className="pb-2 font-medium text-right">Doanh thu</th>
+                  <th className="pb-2 font-medium text-right">Hoa hồng</th>
+                  <th className="pb-2 font-medium">Trạng thái</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dashboard.commissions.map((c) => (
+                  <tr key={c.id} className="border-b border-neutral-100 last:border-0 align-top">
+                    <td className="py-3">{formatDate(c.purchase_at)}</td>
+                    <td className="py-3">{c.referee_name}</td>
+                    <td className="py-3 text-right">{c.order_amount_vnd.toLocaleString("vi-VN")}đ</td>
+                    <td className="py-3 text-right font-medium text-success">
+                      {c.reward_amount_vnd.toLocaleString("vi-VN")}đ
+                    </td>
+                    <td className="py-3">
+                      <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${COMMISSION_STATUS_CLASS[c.status]}`}>
+                        {COMMISSION_STATUS_LABEL[c.status]}
+                      </span>
+                      {c.cancel_reason && (
+                        <p className="mt-1 text-xs text-neutral-500">{c.cancel_reason}</p>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </section>
+
+      {/* Recent Conversions (legacy referral_tracking view) */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 font-heading font-semibold text-primary">Lịch sử đơn hàng</h2>
         {!dashboard?.recent_conversions?.length ? (

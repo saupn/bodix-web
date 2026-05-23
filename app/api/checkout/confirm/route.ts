@@ -11,8 +11,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 import {
   REFERRAL_REWARD_AMOUNT,
   VOUCHER_EXPIRY_MONTHS,
-  DEFAULT_COMMISSION_RATE,
 } from '@/lib/affiliate/config'
+import { createAffiliateCommission } from '@/lib/affiliate/commission'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -133,39 +133,17 @@ async function triggerReferralConversion(
   const isAffiliate = code.code_type === 'affiliate'
 
   if (isAffiliate) {
-    // ── AFFILIATE: cash commission ──────────────────────────────────────────
-    const commissionRate = code.commission_rate ?? DEFAULT_COMMISSION_RATE
-    const commission = Math.round(opts.conversionAmount * (commissionRate / 100))
-
-    if (commission > 0) {
-      const { data: affiliateProfile } = await service
-        .from('affiliate_profiles')
-        .select('id, pending_balance, total_earned')
-        .eq('user_id', code.user_id)
-        .maybeSingle()
-
-      if (affiliateProfile) {
-        await service
-          .from('affiliate_profiles')
-          .update({
-            pending_balance: (affiliateProfile.pending_balance ?? 0) + commission,
-            total_earned: (affiliateProfile.total_earned ?? 0) + commission,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', affiliateProfile.id)
-      }
-
-      // Record in referral_rewards
-      await service.from('referral_rewards').insert({
-        user_id: code.user_id,
-        referral_tracking_id: trackingId,
-        reward_type: 'commission',
-        reward_value: commission,
-        reward_description: `Commission ${commissionRate}% × ${(opts.conversionAmount / 1000).toFixed(0)}k = ${(commission / 1000).toFixed(0)}k`,
-        status: 'approved',
-        approved_at: new Date().toISOString(),
-      })
-    }
+    // ── AFFILIATE: cash commission (V2 cooldown flow) ──────────────────────
+    // Insert vào commissions với status='pending'. Promote → payable
+    // khi referee active + check-in lần đầu (cron rescue-check).
+    // KHÔNG update affiliate_profiles.pending_balance ở đây — chờ payable.
+    await createAffiliateCommission(service, {
+      referralCodeId: opts.referralCodeId,
+      refereeUserId: opts.refereeUserId,
+      enrollmentId: opts.enrollmentId,
+      orderId: null,
+      conversionAmountVnd: opts.conversionAmount,
+    })
   }
 
   // Track voucher code for Zalo notification
@@ -212,22 +190,9 @@ async function triggerReferralConversion(
       console.error('[checkout/confirm] voucher create:', voucherErr)
     }
 
-    // Record in referral_rewards
-    const { data: reward } = await service
-      .from('referral_rewards')
-      .insert({
-        user_id: code.user_id,
-        referral_tracking_id: trackingId,
-        reward_type: 'credit',
-        reward_value: rewardAmount,
-        reward_description: `Voucher ${(rewardAmount / 1000).toFixed(0)}k (${voucherCode})`,
-        status: 'approved',
-        approved_at: new Date().toISOString(),
-      })
-      .select('id')
-      .single()
-
-    // Also credit user_credits ledger for tracking
+    // REFERRAL voucher V2: ghi vào user_credits ledger.
+    // Bảng referral_rewards đã drop (migration 053). Commission row cho referral
+    // sẽ được tạo trong task BD-REFERRAL-VOUCHER-FLOW (commissions program_type='referral').
     const { data: currentBalance } = await service.rpc('get_credit_balance', { p_user_id: code.user_id })
     const balanceBefore = (currentBalance as number) ?? 0
 
@@ -236,7 +201,7 @@ async function triggerReferralConversion(
       amount: rewardAmount,
       balance_after: balanceBefore + rewardAmount,
       transaction_type: 'referral_reward',
-      reference_id: reward?.id ?? voucher?.id ?? null,
+      reference_id: voucher?.id ?? null,
       description: `Voucher ${voucherCode}: +${(rewardAmount / 1000).toFixed(0)}k`,
     })
   }

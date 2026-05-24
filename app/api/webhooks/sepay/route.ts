@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { extractPaymentCodeFromContent, SEPAY_CONFIG } from "@/lib/sepay";
 import { sendPushToUser } from "@/lib/messaging/adapters/push";
 import { createAffiliateCommission } from "@/lib/affiliate/commission";
+import { createReferralCommission } from "@/lib/referral/commission";
 
 type AmountStatus = "correct" | "overpaid" | "underpaid";
 
@@ -311,9 +312,9 @@ export async function POST(request: NextRequest) {
           })
           .eq("id", enrollment.id);
 
-        // ── Trigger affiliate commission (V2 cooldown) ─────────────────
-        // Chỉ insert nếu enrollment có referral_code_id và code thuộc affiliate.
-        // Helper skip an toàn nếu code không phải affiliate hoặc self-referral.
+        // ── Trigger commissions (V2 cooldown) ───────────────────────────
+        // Cả affiliate (cash commission) và referral (voucher reward) đều route
+        // qua đây. Mỗi helper tự skip nếu code_type không khớp → an toàn gọi cả hai.
         try {
           const { data: enrollWithRef } = await service
             .from("enrollments")
@@ -321,13 +322,19 @@ export async function POST(request: NextRequest) {
             .eq("id", enrollment.id)
             .maybeSingle();
           if (enrollWithRef?.referral_code_id && order.user_id) {
-            await createAffiliateCommission(service, {
+            const commissionInput = {
               referralCodeId: enrollWithRef.referral_code_id,
               refereeUserId: order.user_id,
               enrollmentId: enrollment.id,
               orderId: order.id,
               conversionAmountVnd: order.amount,
-            });
+            };
+            // 2 helpers độc lập, gọi song song nhưng wrap riêng — 1 fail không
+            // chặn cái còn lại (referral voucher vs affiliate cash).
+            await Promise.allSettled([
+              createAffiliateCommission(service, commissionInput),
+              createReferralCommission(service, commissionInput),
+            ]);
           }
         } catch (commErr) {
           console.error("[sepay] commission create:", commErr);

@@ -87,6 +87,23 @@ interface VoucherData {
   active_balance: number;
 }
 
+interface CommissionSummary {
+  summary: {
+    pending: number;
+    successful: number;
+    cancelled: number;
+    cancelled_by_reason: Record<string, number>;
+  };
+}
+
+const CANCEL_REASON_LABEL: Record<string, string> = {
+  timeout: "Hết hạn (60 ngày)",
+  dropped_before_start: "Bỏ trước khi bắt đầu",
+  no_checkin_after_active: "Không check-in sau 14 ngày",
+  suspicious_burst: "Bất thường",
+  unknown: "Khác",
+};
+
 function formatDate(dateStr: string): string {
   if (!dateStr) return "–";
   const d = new Date(dateStr);
@@ -101,6 +118,8 @@ export default function ReferralPage() {
   const [codeData, setCodeData] = useState<CodeData | null>(null);
   const [trackingData, setTrackingData] = useState<TrackingData | null>(null);
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null);
+  const [commissionSummary, setCommissionSummary] =
+    useState<CommissionSummary["summary"] | null>(null);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
@@ -112,10 +131,11 @@ export default function ReferralPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [codeRes, trackRes, voucherRes] = await Promise.all([
+        const [codeRes, trackRes, voucherRes, commissionRes] = await Promise.all([
           fetch("/api/referral/code"),
           fetch("/api/referral/tracking"),
           fetch("/api/user/vouchers"),
+          fetch("/api/referral/commissions-summary"),
         ]);
         if (codeRes.ok) {
           const c = await codeRes.json();
@@ -128,6 +148,10 @@ export default function ReferralPage() {
         if (voucherRes.ok) {
           const v = await voucherRes.json();
           setVoucherData(v);
+        }
+        if (commissionRes.ok) {
+          const cs: CommissionSummary = await commissionRes.json();
+          setCommissionSummary(cs.summary);
         }
       } finally {
         setLoading(false);
@@ -322,6 +346,52 @@ export default function ReferralPage() {
           </div>
         </div>
       </section>
+
+      {/* Section 3b — Tổng quan thưởng (theo commission status) */}
+      {commissionSummary && (
+        <section className="rounded-xl border border-neutral-200 bg-white p-6">
+          <h2 className="mb-4 font-heading text-lg font-semibold text-primary">
+            Tổng quan thưởng
+          </h2>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-amber-200 bg-amber-50/50 p-4">
+              <p className="text-2xl font-bold text-amber-700">
+                {commissionSummary.pending}
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">Đang chờ</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Đã mua – chưa active và check-in
+              </p>
+            </div>
+            <div className="rounded-lg border border-green-200 bg-green-50/50 p-4">
+              <p className="text-2xl font-bold text-green-700">
+                {commissionSummary.successful}
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">Đã thành công</p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Voucher đã được trao
+              </p>
+            </div>
+            <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
+              <p className="text-2xl font-bold text-neutral-700">
+                {commissionSummary.cancelled}
+              </p>
+              <p className="mt-1 text-sm text-neutral-700">Đã huỷ</p>
+              {Object.entries(commissionSummary.cancelled_by_reason).length > 0 && (
+                <ul className="mt-1 space-y-0.5 text-xs text-neutral-500">
+                  {Object.entries(commissionSummary.cancelled_by_reason).map(
+                    ([reason, count]) => (
+                      <li key={reason}>
+                        {CANCEL_REASON_LABEL[reason] ?? reason}: {count}
+                      </li>
+                    ),
+                  )}
+                </ul>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Section 4 — Lịch sử giới thiệu */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">

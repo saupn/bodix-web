@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { ensureReferralCodeForUser } from "@/lib/referral/generate-code";
 
 function normalizePhone(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
@@ -113,6 +114,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
+    );
+  }
+
+  // BD-REFERRAL-VOUCHER-FLOW: ensure mọi user onboard xong đều có referral_code.
+  // Chạy sau update profiles (cần full_name đã được persist nếu user vừa đổi tên).
+  // Best-effort: nếu fail KHÔNG block onboarding (user vào dashboard sẽ lazy-create).
+  try {
+    const fullName = (body.full_name?.trim() ?? "").trim();
+    if (fullName) {
+      await ensureReferralCodeForUser(service, user.id, fullName);
+    }
+  } catch (codeErr) {
+    console.error(
+      "[complete-onboarding] ensureReferralCodeForUser failed (non-fatal):",
+      codeErr,
     );
   }
 

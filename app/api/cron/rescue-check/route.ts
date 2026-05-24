@@ -10,6 +10,10 @@ import type { MessageResult } from '@/lib/messaging/types';
 import { getVietnamDateString, isoTimestampToVietnamYmd } from '@/lib/date/vietnam';
 import { getEligibleForNudge } from '@/lib/notifications/eligible-enrollments';
 import { transitionAffiliateCommissions } from '@/lib/affiliate/commission';
+import {
+  transitionReferralCommissions,
+  expireOldVouchers,
+} from '@/lib/referral/commission';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // RESCUE MESSAGES (Protocol Levels)
@@ -129,6 +133,14 @@ export async function GET(request: NextRequest) {
     commission_cancelled_no_checkin: 0,
     commission_flagged_suspicious: 0,
     commission_errors: 0,
+    referral_commission_scanned: 0,
+    referral_commission_to_payable: 0,
+    referral_commission_cancelled_timeout: 0,
+    referral_commission_cancelled_dropped: 0,
+    referral_commission_cancelled_no_checkin: 0,
+    referral_commission_errors: 0,
+    voucher_expired: 0,
+    voucher_expire_errors: 0,
   };
 
   const subTaskResults: Record<string, SubTaskResult> = {};
@@ -896,6 +908,39 @@ export async function GET(request: NextRequest) {
     stats.commission_flagged_suspicious = result.flagged_suspicious;
     stats.commission_errors = result.errors;
     console.log('[rescue-check] commission:', JSON.stringify(result));
+  });
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // SUB-TASK 7: REFERRAL COMMISSION PROCESSING (BD-REFERRAL-VOUCHER-FLOW)
+  // Promote pending → payable + tạo voucher 100K cho beneficiary (idempotent).
+  // Cùng cooldown (60d timeout / 14d no-checkin) như affiliate, KHÔNG suspicious.
+  // Wrap riêng — fail không ảnh hưởng affiliate processing.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  subTaskResults.referral_commission_processing = await runSubTask(
+    'referral_commission_processing',
+    async () => {
+      const result = await transitionReferralCommissions(supabase);
+      stats.referral_commission_scanned = result.scanned;
+      stats.referral_commission_to_payable = result.to_payable;
+      stats.referral_commission_cancelled_timeout = result.to_cancelled_timeout;
+      stats.referral_commission_cancelled_dropped = result.to_cancelled_dropped;
+      stats.referral_commission_cancelled_no_checkin = result.to_cancelled_no_checkin;
+      stats.referral_commission_errors = result.errors;
+      console.log('[rescue-check] referral_commission:', JSON.stringify(result));
+    },
+  );
+
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+  // SUB-TASK 8: VOUCHER EXPIRY (BD-REFERRAL-VOUCHER-FLOW)
+  // active → expired khi expires_at < now. Mỗi voucher 90 ngày sau khi tạo.
+  // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  subTaskResults.voucher_expire = await runSubTask('voucher_expire', async () => {
+    const result = await expireOldVouchers(supabase);
+    stats.voucher_expired = result.expired;
+    stats.voucher_expire_errors = result.errors;
+    console.log('[rescue-check] voucher_expire:', JSON.stringify(result));
   });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

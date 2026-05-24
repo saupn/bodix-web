@@ -7,6 +7,11 @@
  *   payable → paid (admin payout — out of scope task này)
  *
  * KHÔNG xoá row khi cancel. status_history log mọi transition.
+ *
+ * Refactor BD-REFERRAL-VOUCHER-FLOW: transition logic dùng chung shell
+ * `lib/commissions/base-transition.ts` (shared shell, custom kernel). Affiliate
+ * dùng default kernel (chỉ update status='payable'). Referral có kernel riêng
+ * để tạo voucher trước. createAffiliateCommission GIỮ NGUYÊN signature + behaviour.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,16 +21,17 @@ import {
   AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS,
   AFFILIATE_SUSPICIOUS_THRESHOLD,
 } from "./config";
+import {
+  appendHistory,
+  cancelCommission as baseCancelCommission,
+  transitionCommissionsBase,
+  type CommissionRow,
+  type StatusHistoryEntry,
+  type TransitionStats,
+} from "@/lib/commissions/base-transition";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Service = SupabaseClient<any, any, any>;
-
-type StatusHistoryEntry = {
-  at: string;
-  from: string | null;
-  to: string;
-  reason?: string;
-};
 
 // ────────────────────────────────────────────────────────────────────────────
 // CREATE — gọi từ SePay webhook (sau khi enrollment → paid_waiting_cohort)
@@ -144,224 +150,21 @@ export async function createAffiliateCommission(
 // ────────────────────────────────────────────────────────────────────────────
 // TRANSITION — gọi từ cron rescue-check.
 // Xử lý mọi pending commission của affiliate program.
+// Wrap shared shell — affiliate dùng default kernel (chỉ update status='payable').
 // ────────────────────────────────────────────────────────────────────────────
-
-interface TransitionStats {
-  scanned: number;
-  to_payable: number;
-  to_cancelled_timeout: number;
-  to_cancelled_dropped: number;
-  to_cancelled_no_checkin: number;
-  flagged_suspicious: number;
-  errors: number;
-}
 
 export async function transitionAffiliateCommissions(
   service: Service,
 ): Promise<TransitionStats> {
-  const stats: TransitionStats = {
-    scanned: 0,
-    to_payable: 0,
-    to_cancelled_timeout: 0,
-    to_cancelled_dropped: 0,
-    to_cancelled_no_checkin: 0,
-    flagged_suspicious: 0,
-    errors: 0,
-  };
-
-  const nowIso = new Date().toISOString();
-
-  // Pull pending affiliate commissions cùng enrollment status + started_at
-  const { data: rows, error: fetchErr } = await service
-    .from("commissions")
-    .select(`
-      id,
-      beneficiary_user_id,
-      referee_user_id,
-      enrollment_id,
-      pending_expires_at,
-      status,
-      status_history,
-      purchase_at,
-      enrollments!commissions_enrollment_id_fkey (
-        id,
-        status,
-        started_at
-      )
-    `)
-    .eq("program_type", "affiliate")
-    .eq("status", "pending");
-
-  if (fetchErr) {
-    console.error("[commission.transition] fetch failed:", fetchErr);
-    stats.errors++;
-    return stats;
-  }
-
-  stats.scanned = rows?.length ?? 0;
-
-  for (const row of rows ?? []) {
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const enrollment = Array.isArray((row as any).enrollments)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        ? (row as any).enrollments[0]
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        : (row as any).enrollments;
-      const enrollmentStatus: string | null = enrollment?.status ?? null;
-      const startedAt: string | null = enrollment?.started_at ?? null;
-
-      // ── Check 1: dropped/cancelled trước khi vào active ────────────────────
-      if (enrollmentStatus === "dropped") {
-        await cancelCommission(service, row, "dropped_before_start");
-        stats.to_cancelled_dropped++;
-        continue;
-      }
-
-      // ── Check 2: active + có check-in → payable ────────────────────────────
-      if (enrollmentStatus === "active") {
-        const { data: checkin } = await service
-          .from("daily_checkins")
-          .select("id")
-          .eq("enrollment_id", row.enrollment_id)
-          .limit(1)
-          .maybeSingle();
-
-        if (checkin) {
-          await promoteToPayable(service, row);
-          stats.to_payable++;
-          continue;
-        }
-
-        // active mà chưa check-in: check no_checkin timeout
-        if (startedAt) {
-          const daysSinceActive =
-            (new Date(nowIso).getTime() - new Date(startedAt).getTime()) /
-            (1000 * 60 * 60 * 24);
-          if (daysSinceActive > AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS) {
-            await cancelCommission(service, row, "no_checkin_after_active");
-            stats.to_cancelled_no_checkin++;
-            continue;
-          }
-        }
-
-        // Vẫn pending — đợi check-in
-        continue;
-      }
-
-      // ── Check 3: pending timeout, NHƯNG bỏ qua nếu vẫn đang paid_waiting_cohort
-      if (enrollmentStatus === "paid_waiting_cohort") {
-        continue; // chưa cohort start, không phải lỗi referee → giữ pending
-      }
-
-      if (new Date(nowIso) > new Date(row.pending_expires_at)) {
-        await cancelCommission(service, row, "timeout");
-        stats.to_cancelled_timeout++;
-        continue;
-      }
-
-      // Còn lại (trial, trial_completed, pending_payment, paused, completed) → giữ pending
-    } catch (err) {
-      console.error("[commission.transition] row error:", row.id, err);
-      stats.errors++;
-    }
-  }
-
-  // ── Suspicious detection: > N conversion / 7 days theo beneficiary ─────────
-  const sevenDaysAgo = new Date(
-    Date.now() - 7 * 24 * 60 * 60 * 1000,
-  ).toISOString();
-
-  const { data: recentByAffiliate } = await service
-    .from("commissions")
-    .select("beneficiary_user_id")
-    .eq("program_type", "affiliate")
-    .gte("created_at", sevenDaysAgo)
-    .in("status", ["pending", "payable"]);
-
-  const countByAffiliate = new Map<string, number>();
-  for (const r of recentByAffiliate ?? []) {
-    countByAffiliate.set(
-      r.beneficiary_user_id,
-      (countByAffiliate.get(r.beneficiary_user_id) ?? 0) + 1,
-    );
-  }
-
-  for (const [affiliateId, count] of countByAffiliate.entries()) {
-    if (count >= AFFILIATE_SUSPICIOUS_THRESHOLD) {
-      const { data: flagged } = await service
-        .from("commissions")
-        .update({
-          status: "suspicious",
-          cancelled_at: nowIso,
-          cancel_reason: `suspicious_burst:${count}_in_7d`,
-        })
-        .eq("program_type", "affiliate")
-        .eq("beneficiary_user_id", affiliateId)
-        .in("status", ["pending", "payable"])
-        .gte("created_at", sevenDaysAgo)
-        .select("id");
-      stats.flagged_suspicious += flagged?.length ?? 0;
-    }
-  }
-
-  return stats;
-}
-
-// ────────────────────────────────────────────────────────────────────────────
-// Internal helpers
-// ────────────────────────────────────────────────────────────────────────────
-
-async function promoteToPayable(
-  service: Service,
-  row: { id: string; status: string; status_history: StatusHistoryEntry[] | null },
-): Promise<void> {
-  const now = new Date().toISOString();
-  const history = appendHistory(row.status_history, {
-    at: now,
-    from: row.status,
-    to: "payable",
-    reason: "active_and_checked_in",
+  return transitionCommissionsBase(service, {
+    programType: "affiliate",
+    noCheckinTimeoutDays: AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS,
+    suspicious: {
+      thresholdCount: AFFILIATE_SUSPICIOUS_THRESHOLD,
+      windowDays: 7,
+    },
+    // onPromoteToPayable: undefined → defaultPromoteToPayable (status='payable').
   });
-  await service
-    .from("commissions")
-    .update({
-      status: "payable",
-      payable_at: now,
-      status_history: history,
-    })
-    .eq("id", row.id);
-}
-
-async function cancelCommission(
-  service: Service,
-  row: { id: string; status: string; status_history: StatusHistoryEntry[] | null },
-  reason: string,
-): Promise<void> {
-  const now = new Date().toISOString();
-  const history = appendHistory(row.status_history, {
-    at: now,
-    from: row.status,
-    to: "cancelled",
-    reason,
-  });
-  await service
-    .from("commissions")
-    .update({
-      status: "cancelled",
-      cancelled_at: now,
-      cancel_reason: reason,
-      status_history: history,
-    })
-    .eq("id", row.id);
-}
-
-function appendHistory(
-  current: StatusHistoryEntry[] | null,
-  entry: StatusHistoryEntry,
-): StatusHistoryEntry[] {
-  const arr = Array.isArray(current) ? current : [];
-  return [...arr, entry];
 }
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -375,14 +178,19 @@ export async function cancelCommissionsByReferee(
 ): Promise<number> {
   const { data: rows } = await service
     .from("commissions")
-    .select("id, status, status_history")
+    .select("id, status, status_history, beneficiary_user_id, referee_user_id, enrollment_id, pending_expires_at, purchase_at")
     .eq("referee_user_id", refereeUserId)
     .in("status", ["pending", "payable"]);
 
   let count = 0;
-  for (const row of rows ?? []) {
-    await cancelCommission(service, row, reason);
+  for (const row of (rows ?? []) as CommissionRow[]) {
+    await baseCancelCommission(service, row, reason);
     count++;
   }
   return count;
 }
+
+// Re-export StatusHistoryEntry để giữ compat với caller cũ (nếu có).
+export type { StatusHistoryEntry } from "@/lib/commissions/base-transition";
+// appendHistory cũng re-export — một số nơi cần build entry custom.
+export { appendHistory };

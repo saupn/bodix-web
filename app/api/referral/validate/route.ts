@@ -93,8 +93,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ valid: false, reason: 'code_exhausted' })
   }
 
-  // ── Self-referral guard ───────────────────────────────────────────────────
-  if (user && user.id === referralCode.user_id) {
+  // ── Self-referral: chỉ block affiliate ────────────────────────────────────
+  // BD-REFERRAL-VOUCHER-FLOW: referral allow self-use (user nhận discount 10%
+  // + voucher 100K sau check-in D1). Affiliate cash commission vẫn block.
+  if (
+    user &&
+    user.id === referralCode.user_id &&
+    referralCode.code_type === 'affiliate'
+  ) {
     return NextResponse.json({ valid: false, reason: 'self_referral' })
   }
 

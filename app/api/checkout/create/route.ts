@@ -43,9 +43,15 @@ async function resolveReferralCode(
     if (!data.is_active) return { valid: false };
     if (data.expires_at && new Date(data.expires_at) < new Date()) return { valid: false };
     if (data.max_uses != null && data.total_conversions >= data.max_uses) return { valid: false };
-    if (data.user_id === userId) return { valid: false };
 
     const codeType: "referral" | "affiliate" = data.code_type ?? "referral";
+
+    // BD-REFERRAL-VOUCHER-FLOW: cho phép self-referral với code_type='referral'
+    // (user nhận discount 10% + voucher 100K sau khi check-in D1).
+    // Affiliate cash commission KHÔNG được self (risk tài chính 40%).
+    if (data.user_id === userId && codeType === "affiliate") {
+      return { valid: false };
+    }
 
     const { data: referrerProfile } = await service
       .from("profiles")
@@ -80,7 +86,9 @@ async function resolveReferralCode(
     .maybeSingle();
 
   if (!profile) return { valid: false };
-  if (profile.id === userId) return { valid: false };
+  // Legacy fallback path (profiles.referral_code) chỉ phục vụ referral code
+  // (không có affiliate qua path này), nên cho phép self-referral. Không cần
+  // block profile.id === userId nữa.
 
   const firstName = (profile.full_name?.trim() ?? "").split(/\s+/)[0] || "Người dùng";
   const reward = resolveReferralReward({

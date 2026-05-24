@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { AFFILIATE_MIN_WITHDRAW_VND } from '@/lib/affiliate/config'
 
-const MIN_WITHDRAWAL = 200_000   // 200k VND
+const MIN_WITHDRAWAL = AFFILIATE_MIN_WITHDRAW_VND   // 500k VND
 const WITHDRAWAL_NOTIFY_URL = '/admin/affiliates/withdrawals'
 
 // ─── POST — Yêu cầu rút tiền ─────────────────────────────────────────────────

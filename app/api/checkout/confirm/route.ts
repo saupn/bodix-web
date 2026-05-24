@@ -8,39 +8,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import {
-  REFERRAL_REWARD_AMOUNT,
-  VOUCHER_EXPIRY_MONTHS,
-} from '@/lib/affiliate/config'
 import { createAffiliateCommission } from '@/lib/affiliate/commission'
+import { createReferralCommission } from '@/lib/referral/commission'
+import { AFFILIATE_COPY } from '@/lib/copy/affiliate'
+import { REFERRAL_COPY } from '@/lib/copy/referral'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-
-/** Trả về YYYY-MM-DD của ngày thứ Hai gần nhất (hoặc hôm nay nếu là thứ Hai). */
-function nextMonday(from: Date = new Date()): string {
-  const d = new Date(from)
-  const dow = d.getDay() // 0=Sun, 1=Mon, …, 6=Sat
-  const daysUntil = dow === 0 ? 1 : dow === 1 ? 7 : 8 - dow
-  d.setDate(d.getDate() + daysUntil)
-  return d.toISOString().split('T')[0]
-}
-
-/** Cộng thêm N ngày vào date string YYYY-MM-DD. */
-function addDays(dateStr: string, days: number): string {
-  const d = new Date(dateStr)
-  d.setDate(d.getDate() + days)
-  return d.toISOString().split('T')[0]
-}
-
-/** Generate random voucher code: V-XXXXX */
-function generateVoucherCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789' // no I/O/0/1 for clarity
-  let code = 'V-'
-  for (let i = 0; i < 5; i++) {
-    code += chars[Math.floor(Math.random() * chars.length)]
-  }
-  return code
-}
 
 // ─── Referral conversion — triggered after successful payment ─────────────────
 
@@ -132,11 +105,13 @@ async function triggerReferralConversion(
 
   const isAffiliate = code.code_type === 'affiliate'
 
+  // ── Tạo commission row (status='pending') cho cả 2 program type ───────────
+  // Cả 2 đều dùng V2 cooldown flow: cron rescue-check promote pending → payable
+  // khi referee vào cohort + check-in ngày đầu.
+  //  - Affiliate: payable = cash hoa hồng (chờ user yêu cầu rút)
+  //  - Referral: payable = voucher 100K được issue (cron tạo voucher row,
+  //    không tạo trong checkout/confirm để tránh duplicate path).
   if (isAffiliate) {
-    // ── AFFILIATE: cash commission (V2 cooldown flow) ──────────────────────
-    // Insert vào commissions với status='pending'. Promote → payable
-    // khi referee active + check-in lần đầu (cron rescue-check).
-    // KHÔNG update affiliate_profiles.pending_balance ở đây — chờ payable.
     await createAffiliateCommission(service, {
       referralCodeId: opts.referralCodeId,
       refereeUserId: opts.refereeUserId,
@@ -144,65 +119,13 @@ async function triggerReferralConversion(
       orderId: null,
       conversionAmountVnd: opts.conversionAmount,
     })
-  }
-
-  // Track voucher code for Zalo notification
-  let createdVoucherCode: string | null = null
-
-  if (!isAffiliate) {
-    // ── REFERRAL: voucher 100K for referrer ─────────────────────────────────
-    const rewardAmount = REFERRAL_REWARD_AMOUNT
-
-    // Generate unique voucher code
-    let voucherCode = generateVoucherCode()
-    createdVoucherCode = voucherCode
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const { data: existing } = await service
-        .from('vouchers')
-        .select('id')
-        .eq('code', voucherCode)
-        .maybeSingle()
-      if (!existing) break
-      voucherCode = generateVoucherCode()
-    }
-    createdVoucherCode = voucherCode
-
-    // Voucher expires in VOUCHER_EXPIRY_MONTHS months
-    const expiresAt = new Date()
-    expiresAt.setMonth(expiresAt.getMonth() + VOUCHER_EXPIRY_MONTHS)
-
-    const { data: voucher, error: voucherErr } = await service
-      .from('vouchers')
-      .insert({
-        user_id: code.user_id,
-        code: voucherCode,
-        amount: rewardAmount,
-        remaining_amount: rewardAmount,
-        status: 'active',
-        expires_at: expiresAt.toISOString(),
-        source_type: 'referral_reward',
-        source_referral_tracking_id: trackingId,
-      })
-      .select('id')
-      .single()
-
-    if (voucherErr) {
-      console.error('[checkout/confirm] voucher create:', voucherErr)
-    }
-
-    // REFERRAL voucher V2: ghi vào user_credits ledger.
-    // Bảng referral_rewards đã drop (migration 053). Commission row cho referral
-    // sẽ được tạo trong task BD-REFERRAL-VOUCHER-FLOW (commissions program_type='referral').
-    const { data: currentBalance } = await service.rpc('get_credit_balance', { p_user_id: code.user_id })
-    const balanceBefore = (currentBalance as number) ?? 0
-
-    await service.from('user_credits').insert({
-      user_id: code.user_id,
-      amount: rewardAmount,
-      balance_after: balanceBefore + rewardAmount,
-      transaction_type: 'referral_reward',
-      reference_id: voucher?.id ?? null,
-      description: `Voucher ${voucherCode}: +${(rewardAmount / 1000).toFixed(0)}k`,
+  } else {
+    await createReferralCommission(service, {
+      referralCodeId: opts.referralCodeId,
+      refereeUserId: opts.refereeUserId,
+      enrollmentId: opts.enrollmentId,
+      orderId: null,
+      conversionAmountVnd: opts.conversionAmount,
     })
   }
 
@@ -215,13 +138,13 @@ async function triggerReferralConversion(
 
   const fullName = refereeProfile?.full_name?.trim() ?? ''
   const parts = fullName.split(/\s+/).filter(Boolean)
-  const maskedName = parts.length >= 2
+  const refereeShortName = parts.length >= 2
     ? `${parts[parts.length - 1]} ${parts[0][0].toUpperCase()}.`
-    : parts[0] || 'Người dùng'
+    : parts[0] || 'Người bạn'
 
-  const notifContent = isAffiliate
-    ? `Commission đã được cộng vào tài khoản. Tiếp tục giới thiệu để kiếm thêm!`
-    : `Bạn nhận được voucher ${(REFERRAL_REWARD_AMOUNT / 1000).toFixed(0)}k! Dùng khi mua chương trình tiếp theo.`
+  const notif = isAffiliate
+    ? AFFILIATE_COPY.notifications.inAppOnReferralPurchase(refereeShortName)
+    : REFERRAL_COPY.notifications.inAppOnPurchase(refereeShortName)
 
   await service
     .from('notifications')
@@ -229,11 +152,10 @@ async function triggerReferralConversion(
       user_id: code.user_id,
       type: 'referral_conversion',
       channel: 'in_app',
-      title: `🎉 ${maskedName} đã đăng ký qua link của bạn!`,
-      content: notifContent,
+      title: notif.title,
+      content: notif.body,
       metadata: {
         tracking_id: trackingId,
-        reward_amount: REFERRAL_REWARD_AMOUNT,
         action_url: isAffiliate ? '/app/affiliate' : '/app/referral',
       },
     })
@@ -241,26 +163,10 @@ async function triggerReferralConversion(
       if (error) console.error('[checkout/confirm] referral notify:', error)
     })
 
-  // ── Gửi Zalo cho referrer (chỉ referral, không affiliate) ────────────────
-  if (!isAffiliate && createdVoucherCode) {
-    const { data: referrerProfile } = await service
-      .from('profiles')
-      .select('channel_user_id')
-      .eq('id', code.user_id)
-      .single()
-
-    if (referrerProfile?.channel_user_id) {
-      const { sendViaZalo } = await import('@/lib/messaging/adapters/zalo')
-      const expiryDate = new Date()
-      expiryDate.setMonth(expiryDate.getMonth() + VOUCHER_EXPIRY_MONTHS)
-      const expiryStr = expiryDate.toLocaleDateString('vi-VN')
-
-      sendViaZalo(
-        referrerProfile.channel_user_id,
-        `🎁 Bạn bè vừa đăng ký qua link của bạn! Voucher 100.000đ: ${createdVoucherCode}. Hạn: ${expiryStr}.`
-      ).catch(err => console.error('[checkout/confirm] referrer zalo:', err))
-    }
-  }
+  // Voucher KHÔNG tạo tại đây — single point of voucher creation là cron
+  // rescue-check (lib/referral/commission.ts:issueVoucherForCommission) khi
+  // commission được promote pending → payable. Zalo notification về voucher
+  // sẽ được gửi tại cron flow đó nếu cần.
 }
 
 // ─── Deduct voucher after payment ─────────────────────────────────────────────

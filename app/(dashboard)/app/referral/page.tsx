@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { QRCodeCanvas } from "qrcode.react";
 import { Copy } from "lucide-react";
+import { REFERRAL_COPY } from "@/lib/copy/referral";
 
 const REFERRAL_BASE =
   typeof window !== "undefined"
@@ -11,15 +12,7 @@ const REFERRAL_BASE =
       ? `${process.env.NEXT_PUBLIC_APP_URL}/r`
       : "https://bodix.fit/r";
 
-const STATUS_LABEL: Record<string, string> = {
-  clicked: "Đã click",
-  signed_up: "Đã đăng ký",
-  trial_started: "Đã đăng ký",
-  converted: "Đã mua",
-  completed: "Completed",
-  expired: "Hết hạn",
-  fraudulent: "Gian lận",
-};
+const STATUS_LABEL: Record<string, string> = REFERRAL_COPY.trackingStatusLabel;
 
 const STATUS_CLASS: Record<string, string> = {
   clicked: "bg-neutral-200 text-neutral-600",
@@ -31,17 +24,8 @@ const STATUS_CLASS: Record<string, string> = {
   fraudulent: "bg-red-100 text-red-800",
 };
 
-const SOURCE_LABEL: Record<string, string> = {
-  referral_reward: "Thưởng giới thiệu",
-  admin_grant: "BodiX tặng",
-  promotion: "Khuyến mãi",
-};
-
-const VOUCHER_STATUS_LABEL: Record<string, string> = {
-  active: "Còn hiệu lực",
-  used: "Đã dùng",
-  expired: "Hết hạn",
-};
+const SOURCE_LABEL: Record<string, string> = REFERRAL_COPY.voucherSourceLabel;
+const VOUCHER_STATUS_LABEL: Record<string, string> = REFERRAL_COPY.voucherStatusLabel;
 
 const VOUCHER_STATUS_CLASS: Record<string, string> = {
   active: "bg-green-100 text-green-800",
@@ -97,10 +81,7 @@ interface CommissionSummary {
 }
 
 const CANCEL_REASON_LABEL: Record<string, string> = {
-  timeout: "Hết hạn (60 ngày)",
-  dropped_before_start: "Bỏ trước khi bắt đầu",
-  no_checkin_after_active: "Không check-in sau 14 ngày",
-  suspicious_burst: "Bất thường",
+  ...REFERRAL_COPY.cancelReasons,
   unknown: "Khác",
 };
 
@@ -173,7 +154,7 @@ export default function ReferralPage() {
   const shareZalo = () => {
     window.open(
       `https://zalo.me/share?url=${encodeURIComponent(referralLink)}&title=${encodeURIComponent(
-        "Tập cùng mình trên BodiX – giảm 10% khi đăng ký!"
+        REFERRAL_COPY.zaloShareTitle
       )}`,
       "_blank",
       "noopener,noreferrer"
@@ -219,10 +200,10 @@ export default function ReferralPage() {
       {/* Header */}
       <div>
         <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
-          Giới thiệu bạn bè – Nhận thưởng! 🎁
+          {REFERRAL_COPY.shortTagline} 🎁
         </h1>
         <p className="mt-2 text-neutral-600">
-          Mỗi bạn bè đăng ký qua link của bạn, bạn nhận voucher trị giá 100Kđ
+          {REFERRAL_COPY.flowSteps[2].title}
         </p>
       </div>
 
@@ -302,16 +283,24 @@ export default function ReferralPage() {
         </div>
       </section>
 
-      {/* Section 2 — Thưởng của bạn */}
-      <section className="rounded-xl border border-neutral-200 bg-white p-6 text-center">
+      {/* Section 2 — Quy trình nhận thưởng */}
+      <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="font-heading text-lg font-semibold text-primary">
-          Thưởng của bạn
+          Quy trình nhận thưởng
         </h2>
-        <ul className="mt-4 space-y-2 text-left text-neutral-600 sm:mx-auto sm:max-w-md">
-          <li>• Bạn bè đăng ký → Bạn nhận voucher 100Kđ</li>
-          <li>• Bạn bè còn được giảm 10% chương trình đầu tiên</li>
-          <li>• Voucher dùng để mua chương trình tiếp theo hoặc tặng bạn bè</li>
-        </ul>
+        <ol className="mt-4 space-y-3 text-neutral-700">
+          {REFERRAL_COPY.flowSteps.map((step, i) => (
+            <li key={i} className="flex gap-3">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                {i + 1}
+              </span>
+              <div>
+                <p className="font-medium text-neutral-800">{step.title}</p>
+                <p className="mt-0.5 text-sm text-neutral-600">{step.body}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </section>
 
       {/* Section 3 — Thống kê */}
@@ -342,7 +331,7 @@ export default function ReferralPage() {
             <p className="text-2xl font-bold text-success">
               {(trackingData?.stats.total_earned ?? 0).toLocaleString("vi-VN")} đ
             </p>
-            <p className="text-sm text-neutral-600">Đã kiếm</p>
+            <p className="text-sm text-neutral-600">Tổng voucher đã nhận</p>
           </div>
         </div>
       </section>
@@ -358,25 +347,25 @@ export default function ReferralPage() {
               <p className="text-2xl font-bold text-amber-700">
                 {commissionSummary.pending}
               </p>
-              <p className="mt-1 text-sm text-neutral-700">Đang chờ</p>
+              <p className="mt-1 text-sm text-neutral-700">{REFERRAL_COPY.commissionStatusLabel.pending}</p>
               <p className="mt-1 text-xs text-neutral-500">
-                Đã mua – chưa active và check-in
+                {REFERRAL_COPY.pendingTooltip}
               </p>
             </div>
             <div className="rounded-lg border border-green-200 bg-green-50/50 p-4">
               <p className="text-2xl font-bold text-green-700">
                 {commissionSummary.successful}
               </p>
-              <p className="mt-1 text-sm text-neutral-700">Đã thành công</p>
+              <p className="mt-1 text-sm text-neutral-700">{REFERRAL_COPY.commissionStatusLabel.successful}</p>
               <p className="mt-1 text-xs text-neutral-500">
-                Voucher đã được trao
+                {REFERRAL_COPY.successfulTooltip}
               </p>
             </div>
             <div className="rounded-lg border border-neutral-200 bg-neutral-50/50 p-4">
               <p className="text-2xl font-bold text-neutral-700">
                 {commissionSummary.cancelled}
               </p>
-              <p className="mt-1 text-sm text-neutral-700">Đã huỷ</p>
+              <p className="mt-1 text-sm text-neutral-700">{REFERRAL_COPY.commissionStatusLabel.cancelled}</p>
               {Object.entries(commissionSummary.cancelled_by_reason).length > 0 && (
                 <ul className="mt-1 space-y-0.5 text-xs text-neutral-500">
                   {Object.entries(commissionSummary.cancelled_by_reason).map(
@@ -410,7 +399,7 @@ export default function ReferralPage() {
                   <th className="pb-2 font-medium">Tên</th>
                   <th className="pb-2 font-medium">Trạng thái</th>
                   <th className="pb-2 font-medium">Ngày</th>
-                  <th className="pb-2 font-medium text-right">Reward</th>
+                  <th className="pb-2 font-medium text-right">Voucher</th>
                 </tr>
               </thead>
               <tbody>
@@ -454,7 +443,7 @@ export default function ReferralPage() {
           {(voucherData?.active_balance ?? 0).toLocaleString("vi-VN")} đ
         </p>
         <p className="mt-1 text-sm text-neutral-600">
-          Tổng voucher còn hiệu lực – dùng tại bước thanh toán
+          {REFERRAL_COPY.voucherListSubtitle}
         </p>
 
         {voucherData && voucherData.vouchers.length > 0 ? (
@@ -511,10 +500,28 @@ export default function ReferralPage() {
           </div>
         ) : (
           <p className="mt-4 text-sm text-neutral-600">
-            Chưa có voucher nào. Mời bạn bè để nhận voucher đầu tiên!
+            {REFERRAL_COPY.emptyVouchersMessage}
           </p>
         )}
       </section>
+
+      {/* Section 6 — Điều kiện chi tiết */}
+      <details className="rounded-xl border border-neutral-200 bg-white p-6">
+        <summary className="cursor-pointer list-none font-heading font-semibold text-primary marker:hidden">
+          <span className="inline-flex items-center gap-2">
+            <span className="text-neutral-400">▸</span>
+            Điều kiện chi tiết
+          </span>
+        </summary>
+        <ul className="mt-4 space-y-2 text-sm text-neutral-700">
+          {REFERRAL_COPY.conditions.map((c, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="mt-1 text-primary">•</span>
+              <span>{c}</span>
+            </li>
+          ))}
+        </ul>
+      </details>
     </div>
   );
 }

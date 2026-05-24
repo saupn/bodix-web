@@ -35,8 +35,11 @@ export const AFFILIATE_DISCOUNT_PERCENT = 10;
 // Voucher settings
 // ---------------------------------------------------------------------------
 
-/** Voucher expiry in months from issue date */
-export const VOUCHER_EXPIRY_MONTHS = 6;
+/**
+ * Voucher expiry days — single source of truth is REFERRAL_VOUCHER_EXPIRY_DAYS
+ * trong lib/referral/commission.ts. Voucher chỉ được tạo bởi cron rescue-check
+ * khi commission V2 transition pending → payable.
+ */
 
 // ---------------------------------------------------------------------------
 // Payout settings

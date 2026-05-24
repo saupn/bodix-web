@@ -192,9 +192,9 @@ export async function GET() {
   )
 
   const REASON_LABEL: Record<string, string> = {
-    timeout: 'Người được giới thiệu không tham gia cohort',
-    dropped_before_start: 'Đã ngừng tham gia',
-    no_checkin_after_active: 'Người được giới thiệu không bắt đầu tập',
+    timeout: 'Người bạn không tham gia cohort trong 60 ngày',
+    no_checkin_after_active: 'Người bạn không check-in trong 14 ngày sau khi vào cohort',
+    dropped_before_start: 'Người bạn đã ngừng tham gia',
   }
 
   const commissions = (commissionRows ?? []).map(c => {

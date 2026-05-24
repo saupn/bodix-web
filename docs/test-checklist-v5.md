@@ -1,7 +1,15 @@
-# BodiX Test Checklist v4
+# BodiX Test Checklist v5
 
-> Cập nhật: 2026-03-31 — Sau CC-01 → CC-13
+> Cập nhật: 2026-05-24 — Sau BD-COPY-AUDIT (affiliate/referral V2 commission flow)
 > Dựa trên codebase thực tế, không liệt kê tính năng chưa tồn tại.
+>
+> **Thay đổi chính so với v4:**
+> - Affiliate: hợp nhất 2 endpoint register/apply → chỉ còn `/api/affiliate/apply` (auto-approve, login required). Public `/affiliate` page là marketing-only với CTA login/signup.
+> - Affiliate commission V2 cooldown flow: `pending` → `payable` khi referee vào cohort + check-in D1 (timeout 60d, no-checkin 14d cancel).
+> - Self-referral: Affiliate BLOCK, Referral ALLOW (user nhận cả discount 10% và voucher 100K khi self).
+> - Voucher 100K chỉ được tạo trong cron rescue-check (single point of voucher creation), expire 90 ngày. Bỏ luồng tạo voucher tại checkout/confirm.
+> - Min withdraw 500.000đ. Withdraw on-demand (KHÔNG phải ngày 1 và 15). Tính năng rút tiền sẽ mở giai đoạn tiếp theo.
+> - Copy về affiliate/referral phải import từ `lib/copy/affiliate.ts` + `lib/copy/referral.ts` (single source of truth).
 
 ---
 
@@ -63,8 +71,8 @@
 
 - [ ] **Step 5: Referral — hiện mã theo tên + lợi ích**
   - Làm: Tự động chuyển từ step 4
-  - Đúng: Hiện 2 cards lợi ích (Voucher 100.000đ, Bạn bè giảm 10%) + mã referral (tự sinh từ tên) + copy link + chia sẻ Zalo. Link format: `bodix.fit?ref=CODE`
-  - DB: `SELECT * FROM referral_codes WHERE owner_id = '<user_id>' AND code_type = 'referral'` → có record
+  - Đúng: Hiện thông tin chương trình giới thiệu (voucher 100.000đ khi bạn bè vào cohort + check-in D1, bạn bè giảm 10%) + mã referral (tự sinh từ tên) + copy link + chia sẻ Zalo. Link format: `bodix.fit?ref=CODE`
+  - DB: `SELECT * FROM referral_codes WHERE user_id = '<user_id>' AND code_type = 'referral'` → có record (auto-create lúc onboarding)
 
 - [ ] **Smart skip: quay lại onboarding → nhảy đến step chưa xong**
   - Làm: Hoàn thành step 1-2, đóng tab, mở lại `/onboarding`
@@ -213,10 +221,25 @@
   - Đúng: User nhận Zalo: "✅ Thanh toán xác nhận! Bạn sẽ được thông báo ngày bắt đầu..."
   - DB: Không cần verify (kiểm tra Zalo)
 
-- [ ] **Referrer nhận voucher 100K khi bạn bè thanh toán**
-  - Làm: User B đăng ký qua ref code của User A → thanh toán
-  - Đúng: User A nhận Zalo: "🎁 Bạn bè vừa đăng ký qua link của bạn! Voucher 100.000đ: V-XXXXX..." Voucher hạn 6 tháng.
-  - DB: `SELECT * FROM referral_rewards WHERE referrer_id = '<user_a_id>' AND reward_type = 'credit'` → có record; `SELECT * FROM user_credits WHERE user_id = '<user_a_id>'` → có voucher credit
+- [ ] **Referrer KHÔNG nhận voucher ngay khi bạn bè thanh toán (V2 cooldown flow)**
+  - Làm: User B đăng ký qua ref code của User A → thanh toán xong
+  - Đúng: User A nhận in-app notif: "🎉 {B} đã mua khoá qua link của bạn! Voucher 100.000đ sẽ được tạo khi {B} vào cohort và check-in ngày đầu." User A CHƯA nhận voucher tại điểm này.
+  - DB: `SELECT id, status, reward_type, reward_amount_vnd FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND program_type = 'referral' ORDER BY created_at DESC LIMIT 1` → 1 row `status='pending'`, `reward_type='voucher'`, `reward_amount_vnd=100000`. KHÔNG có row trong `vouchers` tại điểm này.
+
+- [ ] **Voucher 100K được tạo khi referee check-in D1 (cron promote pending→payable)**
+  - Làm: User B (đã thanh toán) vào cohort active → check-in ngày đầu → chờ cron `rescue-check` chạy
+  - Đúng: Commission row chuyển sang `status='payable'`. Voucher row được insert vào `vouchers` (idempotent qua `source_commission_id`). Voucher có `expires_at = created_at + 90 ngày`.
+  - DB: `SELECT status, payable_at FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND referee_user_id = '<user_b_id>'` → `status='payable'`, `payable_at IS NOT NULL`. `SELECT id, code, amount, expires_at FROM vouchers WHERE source_commission_id = '<commission_id>'` → 1 row, `amount=100000`, `expires_at - created_at ≈ 90 days`.
+
+- [ ] **Self-referral cho phép trong referral (user dùng mã của chính mình)**
+  - Làm: User A dùng chính mã ref của mình tại checkout (code_type='referral')
+  - Đúng: Validate API trả `valid=true`, discount 10% được áp. Sau khi A thanh toán + active + check-in D1 → A vẫn nhận voucher 100K (self-referral commission row tạo bình thường).
+  - DB: `SELECT reward_description FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND referee_user_id = '<user_a_id>'` → description chứa "self-referral".
+
+- [ ] **Self-affiliate KHÔNG được phép (user dùng mã affiliate của chính mình)**
+  - Làm: User A là affiliate dùng chính mã ref của mình (code_type='affiliate') tại checkout
+  - Đúng: Validate API trả `valid=false`, `reason='self_affiliate'`. UI checkout hiện: "Bạn không thể dùng mã Đối tác của chính mình. Mã giới thiệu thông thường thì được..."
+  - DB: Order vẫn được tạo nhưng KHÔNG có affiliate commission. `SELECT count(*) FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND referee_user_id = '<user_a_id>' AND program_type = 'affiliate'` → 0.
 
 ---
 
@@ -387,40 +410,85 @@
 
 ## 11. AFFILIATE
 
-- [ ] **Dashboard → Profile → link "Trở thành Đối tác"**
-  - Làm: Vào `/app/profile` với user chưa đăng ký affiliate
-  - Đúng: Hiện CTA "Trở thành Đối tác — Nhận 40% hoa hồng →" link đến `/app/affiliate`
-  - DB: `SELECT * FROM affiliate_profiles WHERE user_id = '<user_id>'` → 0 rows
-
-- [ ] **Click → thông tin 40% hoa hồng + form nhập ngân hàng**
-  - Làm: Vào `/app/affiliate` khi chưa đăng ký
-  - Đúng: Hiện bảng hoa hồng (BodiX 21: ~200K, 6W: ~480K, 12W: ~800K) + form 3 trường: Tên ngân hàng, Số tài khoản, Tên chủ tài khoản
+- [ ] **Public `/affiliate` là marketing page (không có form, không có API call)**
+  - Làm: Vào `/affiliate` ở chế độ logged-out
+  - Đúng: Hiện hero, 3 bước nhận hoa hồng, bảng "Dành cho ai", điều kiện chi tiết collapsible, FAQ, 2 CTA "Đăng ký ngay" (→ `/signup?next=/app/affiliate`) + "Đã có tài khoản – Đăng nhập" (→ `/login?next=/app/affiliate`). KHÔNG còn form nhập email/SĐT/partner_type.
   - DB: Không cần verify (UI check)
 
-- [ ] **Submit → affiliate_profiles.is_approved = true ngay (auto-approve)**
+- [ ] **`/api/affiliate/register` đã bị xoá**
+  - Làm: `curl -X POST https://bodix.fit/api/affiliate/register` (hoặc local)
+  - Đúng: Trả 404 (route file đã xoá). Mọi luồng đăng ký giờ qua `/api/affiliate/apply`.
+  - DB: Không cần verify
+
+- [ ] **Profile → CTA "Trở thành Đối tác – Nhận 40% hoa hồng" khi chưa đăng ký**
+  - Làm: Vào `/app/profile` với user chưa có affiliate_profile
+  - Đúng: Hiện CTA link đến `/app/affiliate`
+  - DB: `SELECT * FROM affiliate_profiles WHERE user_id = '<user_id>'` → 0 rows
+
+- [ ] **`/app/affiliate` (chưa đăng ký): hiện tagline + 3 bước + bảng hoa hồng + form bank info**
+  - Làm: Vào `/app/affiliate` khi đã login nhưng chưa đăng ký affiliate
+  - Đúng: Hiện tagline "Nhận 40% hoa hồng tiền mặt khi bạn bè bắt đầu hành trình BodiX qua giới thiệu của bạn. Người bạn được giảm 10% khi mua khoá đầu tiên." + quy trình 3 bước + điều kiện chi tiết collapsible + bảng hoa hồng (BodiX 21: 449.100đ → 179.640đ hoa hồng; 6W: 1.791.000đ → 716.400đ; 12W: 3.141.000đ → 1.256.400đ) + form 3 trường bank info
+  - DB: Không cần verify
+
+- [ ] **Submit form bank info → `/api/affiliate/apply` → auto-approve**
   - Làm: Điền form ngân hàng → bấm "Trở thành Đối tác ngay"
-  - Đúng: API POST `/api/affiliate/apply` → auto-approve với `affiliate_tier = 'basic'` (40%)
+  - Đúng: API POST `/api/affiliate/apply` → trả `{status: 'approved'}` ngay lập tức (KHÔNG còn "1-2 ngày xét duyệt")
   - DB: `SELECT is_approved, affiliate_tier, approved_at FROM affiliate_profiles WHERE user_id = '<user_id>'` → `is_approved = true`, `affiliate_tier = 'basic'`, `approved_at IS NOT NULL`
 
-- [ ] **Nhận Zalo xác nhận đối tác**
-  - Làm: Submit form affiliate
-  - Đúng: Nhận Zalo: "🤝 Chúc mừng {name}! Bạn là Đối tác BodiX! Hoa hồng 40% cho mỗi đơn hàng qua link của bạn."
-  - DB: Không cần verify (kiểm tra Zalo)
+- [ ] **Nhận Zalo chúc mừng đối tác (copy mới)**
+  - Làm: Submit form affiliate thành công
+  - Đúng: Nhận Zalo gồm: "🤝 Chúc mừng {firstName}! Bạn là Đối tác BodiX." + giải thích 40% hoa hồng tiền mặt + điều kiện "chuyển sang 'có thể rút' khi người bạn vào cohort và check-in ngày đầu" + min withdraw 500.000đ + link dashboard.
+  - DB: Không cần verify (kiểm tra Zalo); `SELECT content FROM notifications WHERE user_id = '<user_id>' AND type LIKE '%affiliate%' ORDER BY sent_at DESC LIMIT 1` để cross-check.
 
-- [ ] **Menu "Đối tác" hiện trong sidebar sau khi đăng ký**
-  - Làm: Refresh trang sau khi đăng ký affiliate thành công
-  - Đúng: Sidebar hiện link "Đối tác" (`/app/affiliate`) — DashboardShell chỉ hiện khi `isAffiliate === true`
-  - DB: `SELECT is_approved FROM affiliate_profiles WHERE user_id = '<user_id>'` → `true`
+- [ ] **Bảng hoa hồng tính ĐÚNG (sau giảm giá 10%, không trên giá gốc)**
+  - Làm: Vào `/app/affiliate` (chưa đăng ký) → đọc bảng hoa hồng
+  - Đúng: 3 cột "Giá gốc / Bạn bè trả / Hoa hồng (40%)". BodiX 21: 499.000đ → 449.100đ → 179.640đ. 6W: 1.990.000đ → 1.791.000đ → 716.400đ. 12W: 3.490.000đ → 3.141.000đ → 1.256.400đ. (KHÔNG còn các con số sai cũ 199.600đ / 796.000đ / 1.396.000đ tính trên giá gốc.)
+  - DB: Không cần verify (UI check)
 
-- [ ] **User thường KHÔNG thấy menu Đối tác**
-  - Làm: Đăng nhập user chưa đăng ký affiliate
-  - Đúng: Sidebar KHÔNG hiện link "Đối tác"
-  - DB: `SELECT * FROM affiliate_profiles WHERE user_id = '<user_id>'` → 0 rows hoặc `is_approved = false`
+- [ ] **Affiliate commission pending → payable khi referee active + check-in D1**
+  - Làm: User B mua khoá qua mã affiliate của User A → vào cohort active → check-in ngày đầu → chờ cron `rescue-check`
+  - Đúng: Commission row của A chuyển từ `status='pending'` → `status='payable'`. Dashboard `/app/affiliate` của A hiển thị số tiền "Có thể rút" tăng đúng (= conversion_amount × 40%).
+  - DB: `SELECT status, reward_amount_vnd, payable_at FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND referee_user_id = '<user_b_id>' AND program_type = 'affiliate'` → `status='payable'`, `payable_at IS NOT NULL`.
 
-- [ ] **Affiliate dashboard hiện stats + QR code + biểu đồ**
+- [ ] **Affiliate commission cancel — timeout 60 ngày**
+  - Làm: User B mua khoá nhưng không vào cohort trong 60 ngày → cron `rescue-check` chạy
+  - Đúng: Commission row chuyển sang `status='cancelled'`, `cancel_reason='timeout'`. Dashboard A hiển thị trong "Đã huỷ" với label "Người bạn không tham gia cohort trong 60 ngày".
+  - DB: `SELECT status, cancel_reason FROM commissions WHERE referee_user_id = '<user_b_id>'` → `status='cancelled'`, `cancel_reason='timeout'`.
+
+- [ ] **Affiliate commission cancel — no_checkin 14 ngày**
+  - Làm: User B vào cohort active nhưng không check-in trong 14 ngày → cron chạy
+  - Đúng: Commission chuyển `status='cancelled'`, `cancel_reason='no_checkin_after_active'`. Dashboard A hiển thị "Người bạn không check-in trong 14 ngày sau khi vào cohort".
+  - DB: `SELECT status, cancel_reason FROM commissions WHERE referee_user_id = '<user_b_id>'` → `cancel_reason='no_checkin_after_active'`.
+
+- [ ] **Affiliate self-referral KHÔNG được phép (DB constraint hoặc API guard)**
+  - Làm: User A là affiliate dùng chính mã của mình tại checkout
+  - Đúng: API `/api/checkout/validate-code` trả `valid=false`, `reason='self_affiliate'`. UI checkout hiện thông báo. Order vẫn được tạo nhưng KHÔNG có affiliate commission cho A.
+  - DB: `SELECT count(*) FROM commissions WHERE beneficiary_user_id = '<user_a_id>' AND referee_user_id = '<user_a_id>' AND program_type = 'affiliate'` → 0.
+
+- [ ] **Affiliate dashboard overview cards (V2 commission summary)**
   - Làm: Vào `/app/affiliate` với user đã được duyệt
-  - Đúng: Hiện 4 KPI cards (Doanh thu tháng, Hoa hồng tháng, Chờ thanh toán, Đã thanh toán) + mã referral + link + QR code + biểu đồ hàng tháng + bảng conversions
-  - DB: `SELECT * FROM affiliate_profiles WHERE user_id = '<user_id>'`
+  - Đúng: 4 KPI cards: "Doanh thu tháng này", "Hoa hồng tháng này", "Có thể rút" (= `commission_summary.payable`), "Đã rút" (= `commission_summary.paid`). KHÔNG còn dùng legacy `pending_balance` / `paid_total`.
+  - DB: `SELECT status, sum(reward_amount_vnd) FROM commissions WHERE beneficiary_user_id = '<user_id>' AND program_type='affiliate' GROUP BY status`
+
+- [ ] **Withdraw button DISABLED + message đúng**
+  - Làm: User affiliate có `commission_summary.payable ≥ 500.000đ` → vào section "Rút tiền"
+  - Đúng: Button "Yêu cầu rút tiền" disabled với tooltip "Tính năng sẽ mở trong giai đoạn tiếp theo. Hoa hồng đang được tích luỹ an toàn." Card "Có thể rút" hiển thị hint "Tính năng rút tiền sẽ mở giai đoạn tiếp theo".
+  - DB: Không cần verify (UI check, `WITHDRAWAL_ENABLED = false` trong source of truth)
+
+- [ ] **Withdraw min 500.000đ (không phải 200.000đ)**
+  - Làm: User có `payable < 500.000đ` → vào "Rút tiền"
+  - Đúng: Card hiển thị "Cần ≥ 500.000đ để rút (còn thiếu X)". Constant `AFFILIATE_MIN_WITHDRAW_VND = 500_000` trong `lib/affiliate/config.ts`.
+  - DB: Không cần verify
+
+- [ ] **KHÔNG còn copy "ngày 1 và 15" / "200.000đ" trong codebase**
+  - Làm: `grep -r "ngày 1 và 15" .` và `grep -r "200\.000đ.*tối thiểu" .`
+  - Đúng: 0 matches (đã xoá hoàn toàn)
+  - DB: Không cần verify
+
+- [ ] **Menu "Đối tác" trong sidebar sau khi đăng ký**
+  - Làm: Refresh trang sau khi đăng ký affiliate thành công
+  - Đúng: Sidebar hiện link "Đối tác" (`/app/affiliate`)
+  - DB: `SELECT is_approved FROM affiliate_profiles WHERE user_id = '<user_id>'` → `true`
 
 ---
 
@@ -569,14 +637,14 @@
 | 2 | Onboarding (Smart Skip) | 10 | | | |
 | 3 | Dashboard (chưa có enrollment) | 4 | | | |
 | 4 | Trial 3 ngày | 10 | | | |
-| 5 | Chờ được chọn + Thanh toán | 11 | | | |
+| 5 | Chờ được chọn + Thanh toán | 14 | | | |
 | 6 | Cohort + Tập luyện | 4 | | | |
 | 7 | Zalo Messaging | 9 | | | |
 | 8 | Cron Jobs | 6 | | | |
 | 9 | Rescue | 5 | | | |
 | 10 | Referral | 5 | | | |
-| 11 | Affiliate | 7 | | | |
+| 11 | Affiliate (V2 cooldown) | 15 | | | |
 | 12 | Buddy | 7 | | | |
 | 13 | UI/UX | 9 | | | |
 | 14 | Admin | 9 | | | |
-| **TỔNG** | | **100** | | | |
+| **TỔNG** | | **116** | | | |

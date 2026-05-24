@@ -14,10 +14,12 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { formatDateVn } from "@/lib/date/vietnam";
+import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 
 const REFERRAL_BASE = "https://bodix.fit";
-const COMMISSION_RATE = 40;
-const MIN_WITHDRAWAL = 200_000;
+const COMMISSION_RATE = AFFILIATE_COPY.commissionRate;
+const MIN_WITHDRAWAL = AFFILIATE_COPY.minWithdrawVnd;
+const WITHDRAWAL_ENABLED = AFFILIATE_COPY.withdrawalEnabled;
 const TIER_LABEL: Record<string, string> = {
   basic: "Basic",
   silver: "Silver",
@@ -87,13 +89,8 @@ interface CommissionRow {
   referee_name: string;
 }
 
-const COMMISSION_STATUS_LABEL: Record<CommissionRow["status"], string> = {
-  pending: "Đang chờ",
-  payable: "Có thể rút",
-  paid: "Đã rút",
-  cancelled: "Đã huỷ",
-  suspicious: "Đang xét",
-};
+const COMMISSION_STATUS_LABEL: Record<CommissionRow["status"], string> =
+  AFFILIATE_COPY.statusLabel as Record<CommissionRow["status"], string>;
 
 const COMMISSION_STATUS_CLASS: Record<CommissionRow["status"], string> = {
   pending: "bg-amber-100 text-amber-800",
@@ -116,6 +113,82 @@ const TIPS = [
   "Tận dụng Zalo – nhắn riêng cho từng bạn bè phù hợp, hiệu quả hơn đăng đại trà.",
   "Nhấn mạnh \"Thử miễn phí 3 ngày, không mất gì\" – rào cản thấp = nhiều click hơn.",
 ];
+
+const PILL_CLASS_BY_LABEL: Record<string, string> = {
+  "Đang chờ": "bg-amber-100 text-amber-800",
+  "Có thể rút": "bg-emerald-100 text-emerald-800",
+  "Đã rút": "bg-neutral-200 text-neutral-700",
+};
+
+function CommissionFlowSteps() {
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white p-6">
+      <h2 className="font-heading font-semibold text-primary">Quy trình nhận hoa hồng</h2>
+      <ol className="mt-4 space-y-4">
+        {AFFILIATE_COPY.flowSteps.map((step, i) => (
+          <li key={i} className="flex gap-4">
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+              {i + 1}
+            </span>
+            <div className="flex-1">
+              <p className="font-medium text-neutral-800">{step.title}</p>
+              <p className="mt-1 text-sm text-neutral-600">{step.body}</p>
+              <span
+                className={`mt-2 inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${
+                  PILL_CLASS_BY_LABEL[step.pillLabel] ?? "bg-primary/10 text-primary"
+                }`}
+              >
+                {step.pillLabel}
+              </span>
+            </div>
+          </li>
+        ))}
+      </ol>
+    </div>
+  );
+}
+
+function CommissionTerms({ defaultOpen = false }: { defaultOpen?: boolean }) {
+  return (
+    <details className="rounded-xl border border-neutral-200 bg-white p-6" open={defaultOpen}>
+      <summary className="cursor-pointer list-none font-heading font-semibold text-primary marker:hidden">
+        <span className="inline-flex items-center gap-2">
+          <span className="text-neutral-400 transition-transform group-open:rotate-90">▸</span>
+          Điều kiện chi tiết
+        </span>
+      </summary>
+      <ul className="mt-4 space-y-2 text-sm text-neutral-700">
+        {AFFILIATE_COPY.conditions.map((t, i) => (
+          <li key={i} className="flex gap-2">
+            <span className="mt-1 text-primary">•</span>
+            <span>{t}</span>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+function FaqSection() {
+  return (
+    <section className="rounded-xl border border-neutral-200 bg-white p-6">
+      <h2 className="mb-4 font-heading font-semibold text-primary">Câu hỏi thường gặp</h2>
+      <div className="space-y-2">
+        {AFFILIATE_COPY.faq.map((item, i) => (
+          <details key={i} className="rounded-lg border border-neutral-100 px-4 py-3 open:bg-neutral-50">
+            <summary className="cursor-pointer list-none text-sm font-medium text-neutral-800 marker:hidden">
+              <span className="inline-flex items-center gap-2">
+                <span className="text-neutral-400">▸</span>
+                {item.q}
+              </span>
+            </summary>
+            <p className="mt-2 pl-5 text-sm text-neutral-600">{item.a}</p>
+          </details>
+        ))}
+      </div>
+    </section>
+  );
+}
 
 export default function AffiliatePage() {
   const [status, setStatus] = useState<StatusData | null>(null);
@@ -142,9 +215,6 @@ export default function AffiliatePage() {
 
   const partnerLink = dashboard?.code
     ? `${REFERRAL_BASE}?ref=${dashboard.code.code}`
-    : "";
-  const shareMessage = dashboard?.code
-    ? `Mình đang tập BodiX – chương trình fitness hoàn thành được! 💪\nDùng link của mình để giảm 10%.\n👉 ${partnerLink}`
     : "";
 
   useEffect(() => {
@@ -273,30 +343,40 @@ export default function AffiliatePage() {
   if (!status?.has_profile || !status?.is_approved) {
     return (
       <div className="mx-auto max-w-2xl space-y-8 pb-16">
+        {/* Lớp 1 – Tagline */}
         <div>
           <h1 className="font-heading text-2xl font-bold text-primary sm:text-3xl">
             Trở thành Đối tác BodiX
           </h1>
-          <p className="mt-2 text-neutral-700">
+          <p className="mt-3 text-base text-neutral-700 sm:text-lg">
             Nhận{" "}
             <span className="font-bold text-primary">{COMMISSION_RATE}%</span>{" "}
-            hoa hồng tiền mặt cho mỗi đơn hàng qua link của bạn. Ngoài ra,
-            người mua qua link của bạn cũng được giảm{" "}
-            <span className="font-bold text-primary">10%</span>.
-          </p>
-          <p className="mt-1 text-sm text-neutral-700">
-            Thanh toán ngày 1 và 15 hàng tháng. Tối thiểu 200.000đ.
+            hoa hồng tiền mặt khi bạn bè bắt đầu hành trình BodiX qua giới thiệu
+            của bạn. Người bạn được giảm{" "}
+            <span className="font-bold text-primary">10%</span> khi mua khoá đầu
+            tiên.
           </p>
         </div>
+
+        {/* Lớp 2 – 3 bước nhận hoa hồng */}
+        <CommissionFlowSteps />
+
+        {/* Lớp 3 – Điều kiện chi tiết */}
+        <CommissionTerms />
 
         {/* Bảng hoa hồng */}
         <div className="rounded-xl border border-neutral-200 bg-white p-6">
           <h2 className="font-heading font-semibold text-primary mb-4">Bảng hoa hồng</h2>
+          <p className="mb-4 text-xs text-neutral-600">
+            Hoa hồng {COMMISSION_RATE}% tính trên số tiền người bạn đã thanh toán (sau khi
+            áp giảm giá 10%).
+          </p>
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-left">
                 <th className="pb-2 font-medium">Chương trình</th>
-                <th className="pb-2 font-medium text-right">Giá</th>
+                <th className="pb-2 font-medium text-right">Giá gốc</th>
+                <th className="pb-2 font-medium text-right">Bạn bè trả</th>
                 <th className="pb-2 font-medium text-right">Hoa hồng ({COMMISSION_RATE}%)</th>
               </tr>
             </thead>
@@ -304,17 +384,20 @@ export default function AffiliatePage() {
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 21</td>
                 <td className="py-2.5 text-right">499.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">199.600đ</td>
+                <td className="py-2.5 text-right">449.100đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">179.640đ</td>
               </tr>
               <tr className="border-b border-neutral-100">
                 <td className="py-2.5">BodiX 6W</td>
                 <td className="py-2.5 text-right">1.990.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">796.000đ</td>
+                <td className="py-2.5 text-right">1.791.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">716.400đ</td>
               </tr>
               <tr>
                 <td className="py-2.5">BodiX 12W</td>
                 <td className="py-2.5 text-right">3.490.000đ</td>
-                <td className="py-2.5 text-right font-semibold text-success">1.396.000đ</td>
+                <td className="py-2.5 text-right">3.141.000đ</td>
+                <td className="py-2.5 text-right font-semibold text-success">1.256.400đ</td>
               </tr>
             </tbody>
           </table>
@@ -406,15 +489,15 @@ export default function AffiliatePage() {
           </p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
-          <p className="text-sm text-neutral-600">Chờ thanh toán</p>
-          <p className="mt-1 text-xl font-bold text-primary">
-            {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")}đ
+          <p className="text-sm text-neutral-600">Có thể rút</p>
+          <p className="mt-1 text-xl font-bold text-success">
+            {(dashboard?.commission_summary?.payable ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white p-4">
-          <p className="text-sm text-neutral-600">Đã thanh toán</p>
+          <p className="text-sm text-neutral-600">Đã rút</p>
           <p className="mt-1 text-xl font-bold text-neutral-700">
-            {(dashboard?.stats.paid_total ?? 0).toLocaleString("vi-VN")}đ
+            {(dashboard?.commission_summary?.paid ?? 0).toLocaleString("vi-VN")}đ
           </p>
         </div>
       </div>
@@ -525,9 +608,9 @@ export default function AffiliatePage() {
         <div className="mb-4">
           <h2 className="font-heading font-semibold text-primary">Hoa hồng</h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Hoa hồng {dashboard?.profile?.commission_rate ?? COMMISSION_RATE}% được tính khi người bạn giới thiệu thanh toán mua khoá.
-            Hoa hồng chuyển sang trạng thái <strong>Có thể rút</strong> khi người đó bắt đầu tập chính thức –
-            vào nhóm cohort và check-in buổi đầu.
+            Hoa hồng {dashboard?.profile?.commission_rate ?? COMMISSION_RATE}% được
+            tạo khi người bạn giới thiệu thanh toán mua khoá, và chuyển sang{" "}
+            <strong>Có thể rút</strong> khi họ vào cohort và check-in ngày đầu.
           </p>
         </div>
 
@@ -537,12 +620,32 @@ export default function AffiliatePage() {
             <p className="mt-1 text-lg font-bold text-amber-900">
               {(dashboard?.commission_summary?.pending ?? 0).toLocaleString("vi-VN")}đ
             </p>
+            <p className="mt-1 text-xs text-amber-700">
+              Chờ người bạn vào cohort và check-in ngày đầu
+            </p>
           </div>
           <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-emerald-700">Có thể rút</p>
             <p className="mt-1 text-lg font-bold text-emerald-900">
               {(dashboard?.commission_summary?.payable ?? 0).toLocaleString("vi-VN")}đ
             </p>
+            {(() => {
+              const payable = dashboard?.commission_summary?.payable ?? 0;
+              if (payable < MIN_WITHDRAWAL) {
+                const remaining = MIN_WITHDRAWAL - payable;
+                return (
+                  <p className="mt-1 text-xs text-emerald-700">
+                    Cần ≥ {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ để rút (còn thiếu{" "}
+                    {remaining.toLocaleString("vi-VN")}đ)
+                  </p>
+                );
+              }
+              return (
+                <p className="mt-1 text-xs text-emerald-700">
+                  Tính năng rút tiền sẽ mở giai đoạn tiếp theo
+                </p>
+              );
+            })()}
           </div>
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
             <p className="text-xs font-medium uppercase tracking-wide text-neutral-700">Đã rút</p>
@@ -626,9 +729,14 @@ export default function AffiliatePage() {
 
       {/* Rút tiền */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
-        <h2 className="mb-4 font-heading font-semibold text-primary">Rút tiền</h2>
-        <p className="text-lg font-bold text-primary">
-          Số dư: {(dashboard?.stats.pending_balance ?? 0).toLocaleString("vi-VN")}đ
+        <h2 className="mb-2 font-heading font-semibold text-primary">Rút tiền</h2>
+        <p className="text-sm text-neutral-600">
+          Số dư có thể rút: <span className="font-bold text-primary">
+            {(dashboard?.commission_summary?.payable ?? 0).toLocaleString("vi-VN")}đ
+          </span>
+        </p>
+        <p className="mt-1 text-sm text-neutral-600">
+          Tối thiểu {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ cho mỗi lần rút.
         </p>
 
         <div className="mt-4 space-y-4">
@@ -666,29 +774,48 @@ export default function AffiliatePage() {
             </button>
           </div>
 
-          <form onSubmit={handleWithdraw} className="flex flex-wrap items-end gap-4">
-            <div>
-              <label className="block text-sm font-medium">Số tiền (tối thiểu {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ)</label>
-              <input
-                type="text"
-                value={withdrawAmount}
-                onChange={(e) => setWithdrawAmount(e.target.value.replace(/\D/g, ""))}
-                placeholder={MIN_WITHDRAWAL.toLocaleString("vi-VN")}
-                className="mt-1 w-40 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
+          {WITHDRAWAL_ENABLED ? (
+            <form onSubmit={handleWithdraw} className="flex flex-wrap items-end gap-4">
+              <div>
+                <label className="block text-sm font-medium">
+                  Số tiền (tối thiểu {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ)
+                </label>
+                <input
+                  type="text"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value.replace(/\D/g, ""))}
+                  placeholder={MIN_WITHDRAWAL.toLocaleString("vi-VN")}
+                  className="mt-1 w-40 rounded-lg border border-neutral-300 px-3 py-2 text-sm"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={withdrawSubmitting}
+                className="rounded-lg bg-primary px-4 py-2.5 font-medium text-white hover:bg-primary-dark disabled:opacity-50"
+              >
+                {withdrawSubmitting ? "Đang xử lý..." : "Yêu cầu rút tiền"}
+              </button>
+            </form>
+          ) : (
+            <div className="rounded-lg border border-dashed border-neutral-300 bg-neutral-50 p-4">
+              <button
+                type="button"
+                disabled
+                title="Tính năng sẽ mở trong giai đoạn tiếp theo. Hoa hồng đang được tích luỹ an toàn."
+                className="cursor-not-allowed rounded-lg bg-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-500"
+              >
+                Yêu cầu rút tiền
+              </button>
+              <p className="mt-2 text-sm text-neutral-600">
+                Tính năng yêu cầu rút tiền sẽ mở trong giai đoạn tiếp theo. Hoa hồng
+                của bạn đang được tích luỹ an toàn – bạn có thể theo dõi trong dashboard.
+              </p>
             </div>
-            <button
-              type="submit"
-              disabled={withdrawSubmitting}
-              className="rounded-lg bg-primary px-4 py-2.5 font-medium text-white hover:bg-primary-dark disabled:opacity-50"
-            >
-              {withdrawSubmitting ? "Đang xử lý..." : "Yêu cầu rút tiền"}
-            </button>
-          </form>
+          )}
         </div>
 
-        {withdrawError && <p className="mt-2 text-sm text-red-600">{withdrawError}</p>}
-        {withdrawSuccess && <p className="mt-2 text-sm text-success">Yêu cầu rút tiền đã được ghi nhận.</p>}
+        {WITHDRAWAL_ENABLED && withdrawError && <p className="mt-2 text-sm text-red-600">{withdrawError}</p>}
+        {WITHDRAWAL_ENABLED && withdrawSuccess && <p className="mt-2 text-sm text-success">Yêu cầu rút tiền đã được ghi nhận.</p>}
 
         {dashboard?.withdrawal_history?.length ? (
           <div className="mt-6">
@@ -722,6 +849,12 @@ export default function AffiliatePage() {
           ))}
         </ol>
       </section>
+
+      {/* Điều kiện chi tiết */}
+      <CommissionTerms />
+
+      {/* FAQ */}
+      <FaqSection />
     </div>
   );
 }

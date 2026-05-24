@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { AffiliateRegistrationClient } from "./AffiliateRegistrationClient";
+import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 
 export const metadata: Metadata = {
   title: "Chương trình Đối tác BodiX",
-  description: "Nhận 40% hoa hồng cho mỗi người đăng ký thành công qua bạn. Dành cho PT, KOL, blogger, chủ phòng gym.",
+  description: AFFILIATE_COPY.metaDescription,
 };
 
 export default function AffiliateRegistrationPage() {

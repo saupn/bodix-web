@@ -71,12 +71,18 @@ export async function GET(request: NextRequest) {
         reason: "code_exhausted",
       });
     }
-    if (user && user.id === referralCode.user_id) {
+    // Self-referral: chỉ block affiliate (cash commission, risk tài chính 40%).
+    // Referral cho phép self-use — user nhận discount 10% + voucher 100K sau check-in D1.
+    if (
+      user &&
+      user.id === referralCode.user_id &&
+      referralCode.code_type === "affiliate"
+    ) {
       return NextResponse.json<ValidateResponse>({
         valid: false,
-        code_type: referralCode.code_type ?? "referral",
+        code_type: referralCode.code_type ?? "affiliate",
         reward: NO_REWARD,
-        reason: "self_referral",
+        reason: "self_affiliate",
       });
     }
 
@@ -114,14 +120,8 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (profileCode) {
-    if (user && user.id === profileCode.id) {
-      return NextResponse.json<ValidateResponse>({
-        valid: false,
-        code_type: "referral",
-        reward: NO_REWARD,
-        reason: "self_referral",
-      });
-    }
+    // profiles.referral_code (legacy fallback) — code_type='referral' by default,
+    // self-use ALLOWED (referral cho phép).
     const firstName = (profileCode.full_name?.trim() ?? "").split(/\s+/)[0] || "Người dùng";
     const reward = resolveReferralReward({
       id: null,

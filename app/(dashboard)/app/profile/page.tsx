@@ -2,6 +2,8 @@ import Link from "next/link";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
+import { REFERRAL_COPY } from "@/lib/copy/referral";
+import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 
 function maskPhone(phone: string): string {
   if (phone.length < 6) return phone;
@@ -172,7 +174,7 @@ export default async function ProfilePage() {
         </div>
         {!vouchers?.length ? (
           <p className="py-4 text-center text-sm text-neutral-600">
-            Chưa có voucher nào. Giới thiệu bạn bè để nhận voucher 100K!
+            {REFERRAL_COPY.emptyVouchersOnProfile}
           </p>
         ) : (
           <ul className="space-y-3">
@@ -216,7 +218,7 @@ export default async function ProfilePage() {
             href="/app/affiliate"
             className="inline-flex items-center rounded-lg border-2 border-primary/20 bg-primary/5 px-4 py-3 text-sm font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
           >
-            Trở thành Đối tác – Nhận 40% hoa hồng &rarr;
+            Trở thành Đối tác – Nhận {AFFILIATE_COPY.commissionRateDisplay} hoa hồng &rarr;
           </Link>
         </div>
       )}

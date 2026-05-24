@@ -182,7 +182,8 @@ export default function TermsPage() {
           </li>
           <li>
             Mã giới thiệu (referral code) được áp dụng tại bước checkout. Một
-            đơn hàng chỉ áp dụng được một mã.
+            đơn hàng chỉ áp dụng được một mã giới thiệu, nhưng có thể kết hợp
+            với voucher giảm giá.
           </li>
         </ul>
       </section>

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
 import { DEFAULT_COMMISSION_RATE, REFERRAL_REWARD_AMOUNT, REFERRAL_DISCOUNT_PERCENT } from '@/lib/affiliate/config'
+import { AFFILIATE_COPY } from '@/lib/copy/affiliate'
 import { normalizeForCode } from '@/lib/referral/utils'
 
 interface ApplyBody {
@@ -142,12 +143,10 @@ export async function POST(request: NextRequest) {
     .single()
 
   if (profileData?.channel_user_id) {
-    const name = profileData.full_name?.split(' ').pop() || 'bạn'
+    const firstName = profileData.full_name?.split(' ').pop() || 'bạn'
     sendViaZalo(
       profileData.channel_user_id,
-      `🤝 Chúc mừng ${name}! Bạn là Đối tác BodiX!\n` +
-      `Hoa hồng ${DEFAULT_COMMISSION_RATE}% cho mỗi đơn hàng qua link của bạn.\n` +
-      `Xem dashboard tại bodix.fit/app/affiliate`
+      AFFILIATE_COPY.notifications.zaloAfterApply(firstName)
     ).catch(err => console.error('[affiliate/apply] zalo:', err))
   }
 

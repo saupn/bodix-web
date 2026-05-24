@@ -7,6 +7,8 @@ import {
   isValidReferralCode,
 } from "@/lib/referral/utils";
 import { useToast } from "@/components/ui/Toast";
+import { REFERRAL_COPY } from "@/lib/copy/referral";
+import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 
 interface Props {
   fullName: string;
@@ -128,7 +130,7 @@ export function ReferralCodeSelector({
   const showResult = selectedCode && !error;
 
   const shareMessage = displayCode
-    ? `Mình đang tập với BodiX – chương trình 21 ngày thay đổi thật sự. Bạn được giảm 10% khi đăng ký qua link này: https://bodix.fit?ref=${displayCode}. Tập thử 3 ngày miễn phí!`
+    ? REFERRAL_COPY.shareMessage(`https://bodix.fit?ref=${displayCode}`)
     : "";
 
   const shareZaloUrl = displayCode
@@ -177,33 +179,37 @@ export function ReferralCodeSelector({
             </h2>
             <div className="mt-4 space-y-4 text-sm text-neutral-700">
               <div>
-                <p className="font-semibold text-neutral-900">🎁 Giới thiệu bạn bè</p>
+                <p className="font-semibold text-neutral-900">{REFERRAL_COPY.promoModal.headline}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   <li>
-                    Mỗi bạn bè đăng ký qua link → bạn nhận voucher{" "}
-                    <span className="text-lg font-bold text-primary">100.000đ</span>
+                    Bạn bè vào cohort và check-in ngày đầu → bạn nhận voucher{" "}
+                    <span className="text-lg font-bold text-primary">{REFERRAL_COPY.voucherValueDisplay}</span>
                   </li>
                   <li>
                     Bạn bè được giảm{" "}
-                    <span className="text-lg font-bold text-primary">10%</span> khi đăng ký
+                    <span className="text-lg font-bold text-primary">{REFERRAL_COPY.refereeDiscountDisplay}</span> khi đăng ký
                   </li>
-                  <li>Voucher dùng cho BodiX hoặc tặng tiếp cho người khác</li>
+                  <li>
+                    Voucher dùng để giảm giá khi bạn mua khoá BodiX tiếp theo (hạn{" "}
+                    {REFERRAL_COPY.voucherExpireDays} ngày)
+                  </li>
                 </ul>
               </div>
               <div>
-                <p className="font-semibold text-neutral-900">💰 Chương trình Đối tác</p>
-                <p className="mt-1 text-neutral-600">(Dành cho người muốn kiếm thu nhập từ BodiX)</p>
+                <p className="font-semibold text-neutral-900">{AFFILIATE_COPY.promoModal.headline}</p>
+                <p className="mt-1 text-neutral-600">{AFFILIATE_COPY.promoModal.forWho}</p>
                 <ul className="mt-2 list-disc space-y-1 pl-5">
                   <li>
                     Hoa hồng{" "}
-                    <span className="text-lg font-bold text-primary">40%</span> tiền mặt cho mỗi đơn đăng ký
+                    <span className="text-lg font-bold text-primary">{AFFILIATE_COPY.commissionRateDisplay}</span> tiền mặt cho mỗi đơn người bạn đã thanh toán
                   </li>
                   <li>
-                    Người đăng ký qua link đối tác được giảm{" "}
-                    <span className="text-lg font-bold text-primary">10%</span>
+                    Người mua qua link của bạn được giảm{" "}
+                    <span className="text-lg font-bold text-primary">{AFFILIATE_COPY.refereeDiscountDisplay}</span>
                   </li>
-                  <li>Đăng ký 1 click trong Dashboard sau khi đăng nhập</li>
-                  <li>Theo dõi thu nhập realtime</li>
+                  <li>Hoa hồng chuyển thành tiền có thể rút khi người bạn vào cohort và check-in ngày đầu</li>
+                  <li>Tối thiểu {AFFILIATE_COPY.minWithdrawDisplay} mỗi lần rút</li>
+                  <li>Đăng ký 1 click trong dashboard sau khi đăng nhập</li>
                   <li>
                     Chi tiết tại:{" "}
                     <a
@@ -321,7 +327,7 @@ export function ReferralCodeSelector({
           </p>
           <div className="rounded-xl border border-neutral-200 bg-neutral-50 p-4 text-sm leading-relaxed text-neutral-800">
             <p>Mình đang tập với BodiX – chương trình 21 ngày thay đổi thật sự.</p>
-            <p className="mt-1">Bạn được giảm 10% khi đăng ký qua link này:</p>
+            <p className="mt-1">Bạn được giảm {REFERRAL_COPY.refereeDiscountDisplay} khi đăng ký qua link này:</p>
             <p className="mt-1 break-all font-medium text-primary">
               https://bodix.fit?ref={displayCode}
             </p>

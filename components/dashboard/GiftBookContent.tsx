@@ -1,9 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { ReferralCodeSelector } from "@/components/referral/ReferralCodeSelector";
 import { useToast } from "@/components/ui/Toast";
+import { REFERRAL_COPY } from "@/lib/copy/referral";
 
 interface GiftBookContentProps {
   fullName: string | null;
@@ -14,19 +12,18 @@ interface GiftBookContentProps {
 }
 
 export function GiftBookContent({
-  fullName,
   referralCode,
   remaining,
   total,
   baseUrl,
 }: GiftBookContentProps) {
-  const router = useRouter();
   const { success: toastSuccess } = useToast();
-  const [referralModalOpen, setReferralModalOpen] = useState(false);
 
-  // Trạng thái: chưa có code, hết suất, hoặc còn suất
-  const kind: "need_code" | "exhausted" | "active" = !referralCode
-    ? "need_code"
+  // Mọi user đều có sẵn referralCode (auto-create lúc onboarding). Nếu
+  // referralCode null ở đây là edge case race condition → hiển thị
+  // fallback hướng dẫn reload, không cần form tạo code.
+  const kind: "missing_code" | "exhausted" | "active" = !referralCode
+    ? "missing_code"
     : remaining <= 0
       ? "exhausted"
       : "active";
@@ -51,18 +48,11 @@ export function GiftBookContent({
         </a>
       </div>
 
-      {kind === "need_code" && (
+      {kind === "missing_code" && (
         <div className="mt-6">
           <p className="text-sm text-neutral-700">
-            Bạn chưa có mã giới thiệu. Tạo mã để bắt đầu tặng sách cho bạn bè.
+            {REFERRAL_COPY.giftBookNoCodeFallback}
           </p>
-          <button
-            type="button"
-            onClick={() => setReferralModalOpen(true)}
-            className="mt-3 rounded-xl bg-[#2D4A3E] px-4 py-3 text-sm font-semibold text-white hover:bg-[#243d32]"
-          >
-            Tạo mã giới thiệu
-          </button>
         </div>
       )}
 
@@ -145,37 +135,6 @@ export function GiftBookContent({
         </div>
       )}
 
-      {referralModalOpen && kind === "need_code" && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="referral-gift-modal-title"
-        >
-          <div className="relative max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <button
-              type="button"
-              onClick={() => setReferralModalOpen(false)}
-              className="absolute right-4 top-4 rounded-lg p-1 text-neutral-600 hover:bg-neutral-100"
-              aria-label="Đóng"
-            >
-              ✕
-            </button>
-            <h2 id="referral-gift-modal-title" className="sr-only">
-              Tạo mã giới thiệu
-            </h2>
-            <div className="mt-1">
-              <ReferralCodeSelector
-                fullName={fullName ?? ""}
-                onCodeSet={() => {
-                  setReferralModalOpen(false);
-                  router.refresh();
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

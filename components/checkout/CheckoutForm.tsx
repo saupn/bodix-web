@@ -328,8 +328,8 @@ export function CheckoutForm({
         )}
         {!referralValidating && referralReason && referralCode.trim() && (
           <p className="mt-1 text-xs text-red-600">
-            {referralReason === "self_referral"
-              ? "Không thể dùng mã của chính bạn"
+            {referralReason === "self_affiliate"
+              ? "Bạn không thể dùng mã Đối tác của chính mình. Mã giới thiệu thông thường thì được – sẽ tạo voucher cho bạn khi bạn check-in ngày đầu."
               : referralReason === "code_expired"
                 ? "Mã đã hết hạn"
                 : referralReason === "code_exhausted"

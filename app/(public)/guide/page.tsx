@@ -412,8 +412,8 @@ export default function GuidePage() {
           </li>
           <li>Có thể chia sẻ thành tích lên cộng đồng cohort.</li>
           <li>
-            Nhận credit giới thiệu nếu có người dùng code của bạn để mua trong
-            quá trình bạn đang tập.
+            Nhận voucher giới thiệu khi bạn bè dùng mã của bạn để mua khoá –
+            voucher được trao sau khi họ vào cohort và check-in ngày đầu.
           </li>
         </ul>
         <p className="text-gray-700 leading-relaxed">

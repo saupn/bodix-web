@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { REFERRAL_COPY } from "@/lib/copy/referral";
 
 /**
  * Small teaser card linking to /app/tang-sach. Rendered at the bottom of
@@ -13,8 +14,7 @@ export function GiftBookCard() {
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900">Tặng sách cho bạn bè</h3>
           <p className="text-sm text-gray-600 mt-1">
-            Tặng sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn
-            bè – nhận voucher 100K khi họ tham gia.
+            {REFERRAL_COPY.giftBookSubtext}
           </p>
           <Link
             href="/app/tang-sach"

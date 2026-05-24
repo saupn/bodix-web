@@ -41,6 +41,8 @@ interface BankConfig {
   bankAccountName: string;
 }
 
+type TrialState = "trial_active" | "trial_completed" | "no_trial";
+
 interface CheckoutContentProps {
   slug: string;
   program: Program;
@@ -49,6 +51,7 @@ interface CheckoutContentProps {
   email: string;
   phone: string;
   initialPayment: InitialPayment | null;
+  trialState: TrialState;
   bankConfig: BankConfig;
 }
 
@@ -60,6 +63,7 @@ export function CheckoutContent({
   email,
   phone,
   initialPayment,
+  trialState,
   bankConfig,
 }: CheckoutContentProps) {
   const [referralReward, setReferralReward] = useState<ResolvedReward>(NO_REWARD);
@@ -213,19 +217,41 @@ export function CheckoutContent({
             ))}
           </div>
 
-          {cohort && (
-            <div className="mt-3 text-sm">
-              <p className="font-medium text-neutral-700">
-                {cohort.name} – Bắt đầu {formatDate(cohort.start_date)}
+          {/* Cohort + trial info block — visible by default, not hidden */}
+          <div className="mt-4 rounded-lg border border-primary/20 bg-primary/5 p-3 text-sm text-neutral-800">
+            <p className="font-medium text-primary">Thông tin tập luyện</p>
+            {cohort ? (
+              <p className="mt-1.5">
+                Cohort tập chính thức bắt đầu:{" "}
+                <span className="font-semibold text-primary">
+                  {formatDate(cohort.start_date)}
+                </span>
+                {cohort.name && ` (${cohort.name})`}.
               </p>
-            </div>
-          )}
-
-          {!cohort && (
-            <p className="mt-3 text-sm text-neutral-500">
-              Đợt sắp tới sẽ được cập nhật
-            </p>
-          )}
+            ) : (
+              <p className="mt-1.5 text-neutral-600">
+                Đợt cohort sắp tới sẽ được thông báo qua Zalo trong 1–2 tuần.
+              </p>
+            )}
+            {trialState === "trial_active" && (
+              <p className="mt-1.5 text-neutral-700">
+                Bạn đang trong giai đoạn tập thử. Sau khi thanh toán, bạn vẫn
+                tiếp tục tập thử đủ 3 ngày như đã đăng ký – không bị rút ngắn.
+              </p>
+            )}
+            {trialState === "no_trial" && (
+              <p className="mt-1.5 text-neutral-700">
+                Sau khi thanh toán, bạn có 3 ngày tập thử để làm quen với BodiX
+                trước khi cohort chính thức bắt đầu.
+              </p>
+            )}
+            {trialState === "trial_completed" && (
+              <p className="mt-1.5 text-neutral-700">
+                Trong thời gian chờ cohort start, bạn có thể xem lại tài liệu
+                chuẩn bị – BodiX sẽ nhắc bạn trước ngày D1.
+              </p>
+            )}
+          </div>
 
           <div className="my-4 border-t border-neutral-200" />
 

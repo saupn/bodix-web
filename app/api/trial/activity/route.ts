@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
-import { VALID_ACTIVITY_TYPES, type ActivityType } from '@/lib/trial/utils'
+import {
+  VALID_ACTIVITY_TYPES,
+  type ActivityType,
+  TRIAL_ACCESSIBLE_STATUSES,
+} from '@/lib/trial/utils'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -46,13 +50,17 @@ export async function POST(request: NextRequest) {
       ? body.metadata
       : {}
 
-  // --- Kiểm tra user đang có trial active cho program này ---
+  // --- Kiểm tra user đang có enrollment cho program này ở status accessible trial ---
+  // Cho phép trial / pending_payment / paid_waiting_cohort (overlap) — user paid
+  // vẫn check-in được trial D1-D3 đến khi cohort chính thức start.
   const { data: enrollment } = await supabase
     .from('enrollments')
     .select('id, status')
     .eq('user_id', user.id)
     .eq('program_id', programId)
-    .eq('status', 'trial')
+    .in('status', Array.from(TRIAL_ACCESSIBLE_STATUSES))
+    .order('enrolled_at', { ascending: false })
+    .limit(1)
     .maybeSingle()
 
   if (!enrollment) {

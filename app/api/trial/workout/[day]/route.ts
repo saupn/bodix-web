@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { canAccessTrialContent } from "@/lib/trial/utils";
-import { isWithinTrialContentLimit } from "@/lib/trial/utils";
+import {
+  canAccessTrialContent,
+  isWithinTrialContentLimit,
+  TRIAL_ACCESSIBLE_STATUSES,
+} from "@/lib/trial/utils";
 import { getTrialExperienceDay } from "@/lib/trial/calendar";
 
 export async function GET(
@@ -34,7 +37,8 @@ export async function GET(
     .from("enrollments")
     .select("id, program_id, status")
     .eq("user_id", user.id)
-    .eq("status", "trial")
+    .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
+    .order("enrolled_at", { ascending: false })
     .limit(1)
     .maybeSingle();
 

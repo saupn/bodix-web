@@ -260,6 +260,11 @@ export default async function AppPage() {
 
   // --- State 2: Paid, waiting for cohort to start ---
   if (paidWaitingEnrollment) {
+    // Trial overlap: user paid trong khi trial chưa hết → vẫn check-in được trial.
+    const trialStillActive =
+      profile?.trial_ends_at && new Date(profile.trial_ends_at) > new Date();
+    const trialEndsAt = profile?.trial_ends_at ?? null;
+
     // Fetch cohort name + start_date — nếu chưa gán cohort, query upcoming gần nhất
     let cohortName: string | null = null;
     let cohortStartDate: string | null = null;
@@ -311,6 +316,29 @@ export default async function AppPage() {
     }
     const hasBuddy = !!buddyName;
 
+    const nowMs = new Date().getTime();
+    const cohortDaysAway = cohortStartDate
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(cohortStartDate + "T00:00:00+07:00").getTime() - nowMs) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : null;
+    const trialDaysLeft = trialEndsAt
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(trialEndsAt).getTime() - nowMs) /
+              (1000 * 60 * 60 * 24),
+          ),
+        )
+      : 0;
+    const paidProgramSlug =
+      (paidWaitingEnrollment.programs as unknown as { slug?: string } | null)?.slug ??
+      null;
+
     return (
       <div className="space-y-8">
         {pendingBanner}
@@ -319,25 +347,55 @@ export default async function AppPage() {
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
             Thanh toán xác nhận!
           </h2>
+          {trialStillActive && (
+            <div className="mt-4 rounded-lg border border-accent/30 bg-accent/5 p-3 text-left text-sm sm:text-base">
+              <p className="font-medium text-primary">
+                Bạn đang tập thử: còn {trialDaysLeft} ngày
+              </p>
+              <p className="mt-1 text-neutral-700">
+                Tiếp tục check-in D1/D2/D3 để hoàn thành tập thử trước khi cohort
+                chính thức bắt đầu.
+              </p>
+              <Link
+                href="/app/trial"
+                className="mt-2 inline-block text-sm font-medium text-primary hover:underline"
+              >
+                Mở trang tập thử →
+              </Link>
+            </div>
+          )}
           {cohortName && cohortStartDate ? (
-            <>
-              <p className="mt-3 text-neutral-700">
-                Đợt tập sắp tới:{" "}
-                <span className="font-semibold text-primary">{cohortName}</span>{" "}
-                – bắt đầu ngày{" "}
-                <span className="font-semibold text-primary">
-                  {formatDateVn(cohortStartDate)}
-                </span>
-                .
-              </p>
-              <p className="mt-2 text-neutral-600">
-                Bạn sẽ nhận thông báo qua Zalo trước khi đợt mở.
-              </p>
-            </>
+            <p className="mt-3 text-neutral-700">
+              Cohort chính thức bắt đầu:{" "}
+              <span className="font-semibold text-primary">
+                {formatDateVn(cohortStartDate)}
+              </span>
+              {cohortDaysAway !== null && cohortDaysAway > 0 && (
+                <> (còn {cohortDaysAway} ngày)</>
+              )}
+              {cohortName && <> · {cohortName}</>}.
+            </p>
           ) : (
             <p className="mt-3 text-neutral-700">
-              Bạn sẽ nhận thông báo khi đợt tập tiếp theo mở (thường trong 1-2
+              Bạn sẽ nhận thông báo khi đợt tập tiếp theo mở (thường trong 1–2
               tuần).
+            </p>
+          )}
+          {!trialStillActive && cohortStartDate && (
+            <p className="mt-2 text-sm text-neutral-600">
+              Trong thời gian chờ, BodiX sẽ nhắc bạn qua Zalo trước ngày D1.
+              {paidProgramSlug && (
+                <>
+                  {" "}
+                  Cần ôn lại tài liệu?{" "}
+                  <Link
+                    href="/guide"
+                    className="font-medium text-primary hover:underline"
+                  >
+                    Mở cẩm nang
+                  </Link>
+                </>
+              )}
             </p>
           )}
         </div>

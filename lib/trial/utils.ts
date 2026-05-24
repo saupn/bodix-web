@@ -73,6 +73,22 @@ export function getTrialStatus(profile: ProfileTrialFields): TrialStatus {
 }
 
 /**
+ * Status enrollment được phép xem nội dung trial (D1/D2/D3) chừng nào
+ * `trial_ends_at` còn hiệu lực:
+ *  - 'trial'              — user đang trải nghiệm bình thường
+ *  - 'pending_payment'    — user đã bấm "Đăng ký đầy đủ" nhưng chưa thanh toán
+ *  - 'paid_waiting_cohort' — user đã trả tiền nhưng còn nằm trong 3 ngày trial
+ *
+ * Cohort chính thức chuyển enrollment sang 'active' → khi đó không còn truy cập
+ * nội dung trial nữa (đã có content cohort thật).
+ */
+const TRIAL_ACCESSIBLE_STATUSES = new Set([
+  'trial',
+  'pending_payment',
+  'paid_waiting_cohort',
+])
+
+/**
  * Kiểm tra enrollment có quyền xem nội dung trial không.
  * Truyền trial_ends_at từ profile vào nếu có để kiểm tra thời hạn chính xác.
  */
@@ -80,10 +96,12 @@ export function canAccessTrialContent(enrollment: {
   status: string
   trial_ends_at?: string | null
 }): boolean {
-  if (enrollment.status !== 'trial') return false
+  if (!TRIAL_ACCESSIBLE_STATUSES.has(enrollment.status)) return false
   if (!enrollment.trial_ends_at) return true
   return new Date(enrollment.trial_ends_at) > new Date()
 }
+
+export { TRIAL_ACCESSIBLE_STATUSES }
 
 /**
  * Kiểm tra day_number có nằm trong giới hạn nội dung trial không.

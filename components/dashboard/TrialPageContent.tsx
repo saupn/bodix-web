@@ -20,6 +20,12 @@ interface Program {
   price_vnd: number;
 }
 
+interface UpcomingCohort {
+  id: string;
+  name: string;
+  start_date: string;
+}
+
 interface TrialData {
   is_trial: boolean;
   is_expired: boolean;
@@ -33,11 +39,14 @@ interface TrialData {
   enrollment: {
     id: string;
     program_id: string;
+    status?: string;
     enrolled_at: string;
     started_at: string | null;
     current_day: number;
   } | null;
   activity_summary: Record<string, number>;
+  upcoming_cohort: UpcomingCohort | null;
+  completed_trial_days: number;
 }
 
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
@@ -254,7 +263,7 @@ export function TrialPageContent() {
         <p className="font-heading font-semibold text-primary">
           Thích chương trình này?
         </p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <Link
             href={
               program?.slug
@@ -265,11 +274,29 @@ export function TrialPageContent() {
           >
             Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
           </Link>
-          {trial.daysRemainingText && (
-            <p className="text-center text-sm text-neutral-700 sm:text-left">
-              {trial.daysRemainingText}
-            </p>
-          )}
+          <div className="text-center text-sm text-neutral-700 sm:text-right">
+            {data.upcoming_cohort && (
+              <p>
+                <span className="text-neutral-500">▸ Đợt tập gần nhất:</span>{" "}
+                <span className="font-medium text-primary">
+                  {formatVnYmd(data.upcoming_cohort.start_date)}
+                </span>
+              </p>
+            )}
+            {data.completed_trial_days < 3 && (
+              <p className="mt-1 text-neutral-600">
+                ▸ Bạn vẫn tập thử đủ 3 ngày
+              </p>
+            )}
+            {data.completed_trial_days >= 3 && (
+              <p className="mt-1 text-neutral-600">
+                ▸ Sẵn sàng vào nhóm tập
+              </p>
+            )}
+            {trial.daysRemainingText && (
+              <p className="mt-1 text-neutral-500">{trial.daysRemainingText}</p>
+            )}
+          </div>
         </div>
       </div>
     </div>

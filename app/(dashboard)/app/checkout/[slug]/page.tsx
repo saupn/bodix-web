@@ -26,9 +26,19 @@ export default async function CheckoutPage({
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("full_name, phone")
+    .select("full_name, phone, trial_ends_at")
     .eq("id", user.id)
     .single();
+
+  // Determine trial state for cohort-info copy: "trial_active" (in trial period),
+  // "trial_completed" (had trial, expired), or "no_trial" (never trialled).
+  let trialState: "trial_active" | "trial_completed" | "no_trial" = "no_trial";
+  if (profile?.trial_ends_at) {
+    trialState =
+      new Date(profile.trial_ends_at) > new Date()
+        ? "trial_active"
+        : "trial_completed";
+  }
 
   const { data: program } = await supabase
     .from("programs")
@@ -97,6 +107,7 @@ export default async function CheckoutPage({
         email={email}
         phone={phone}
         initialPayment={initialPayment}
+        trialState={trialState}
         bankConfig={{
           bankCode: SEPAY_CONFIG.bankCode,
           bankAccount: SEPAY_CONFIG.bankAccount,

@@ -55,7 +55,7 @@ const SESSIONS: Record<SessionCode, SessionMeta> = {
   E: {
     code: 'E',
     focus: 'Toàn thân liên tục',
-    exercises: ['Burpee nhẹ', 'Mountain Climber', 'Squat to Press', 'Lunge Twist', 'Inchworm'],
+    exercises: ['Light Burpee', 'Mountain Climber', 'Squat to Press', 'Lunge Twist', 'Inchworm'],
   },
   F: {
     code: 'F',

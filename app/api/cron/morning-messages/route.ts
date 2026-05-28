@@ -13,6 +13,11 @@ import {
   getEligibleForNudge,
   type EligibleEnrollment,
 } from '@/lib/notifications/eligible-enrollments';
+import {
+  loadExerciseTranslations,
+  translateExerciseName,
+  type ExerciseTranslationMap,
+} from '@/lib/exercises/translate';
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Session metadata (source: lib/workout/video-config.ts)
@@ -87,8 +92,11 @@ function buildMainMessage(
   session: SessionMeta,
   sessionTitle: string,
   isWeekStart: boolean,
+  translationMap: ExerciseTranslationMap,
 ): string {
-  const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
+  const exerciseList = session.exercises
+    .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
+    .join('\n');
   const weekStartTip = isWeekStart
     ? '\n\n💡 Tuần này có thắc mắc gì – nhắn mình bất cứ lúc nào nha!'
     : '';
@@ -141,8 +149,11 @@ function buildTrialMainMessage(
   session: SessionMeta,
   sessionTitle: string,
   isWeekStart: boolean,
+  translationMap: ExerciseTranslationMap,
 ): string {
-  const exerciseList = session.exercises.map(ex => `- ${ex}`).join('\n');
+  const exerciseList = session.exercises
+    .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
+    .join('\n');
   const weekTip = isWeekStart
     ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha – đang tập thử mà, thoải mái đi!'
     : '';
@@ -243,6 +254,9 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       .maybeSingle();
     return !!data;
   }
+
+  // Load translation map MỘT lần đầu cron (~29 rows) — tránh N+1 query
+  const translationMap = await loadExerciseTranslations(supabase);
 
   // ── Lấy eligible enrollments (chung helper với evening) ──
   const { enrollments: eligible, breakdown } = await getEligibleForNudge(
@@ -363,7 +377,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const zaloMessage = isRecovery
       ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart)
-      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart);
+      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart, translationMap);
 
     const logVars = {
       day_number: trialDay,
@@ -553,7 +567,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const zaloMessage = isRecovery
       ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart)
-      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart);
+      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart, translationMap);
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 

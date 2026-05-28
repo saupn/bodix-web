@@ -431,12 +431,12 @@ export default async function AppPage() {
         {pendingBanner}
         <GiftBookCard />
         <div className="rounded-xl border-2 border-primary/30 bg-primary/5 p-6 sm:p-8 text-center">
-          <div className="text-4xl mb-4">🎉</div>
+          <div className="text-4xl mb-4">💳</div>
           <h2 className="font-heading text-xl font-bold text-primary sm:text-2xl">
-            Bạn đã được chọn!
+            Hoàn tất thanh toán để vào đợt tập
           </h2>
           <p className="mt-3 text-neutral-600">
-            Thanh toán để giữ chỗ trong đợt tập sắp tới.
+            Thanh toán ngay để giữ chỗ trong đợt tập gần nhất.
           </p>
           <Link
             href={`/app/checkout/${slug}`}
@@ -461,7 +461,7 @@ export default async function AppPage() {
             Tập thử hoàn thành!
           </h2>
           <p className="mt-3 text-neutral-600">
-            Đăng ký tập chính thức và chờ thông báo nếu bạn được chọn tham gia!
+            Sẵn sàng cho hành trình đầy đủ? Đăng ký ngay để giữ nhịp tập của bạn.
           </p>
           <Link
             href="/app/checkout/bodix-21"
@@ -489,6 +489,14 @@ export default async function AppPage() {
               {trial.headingText}
             </h2>
             <p className="mt-2 text-neutral-700">{trial.subtextTop}</p>
+            {trial.ctaLink && trial.ctaText && (
+              <Link
+                href={trial.ctaLink}
+                className="mt-4 inline-flex items-center rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-secondary-light transition-colors hover:bg-primary-dark"
+              >
+                {trial.ctaText}
+              </Link>
+            )}
           </div>
           <GiftBookCard />
         </div>

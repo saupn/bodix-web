@@ -72,6 +72,43 @@ docs/                   → API reference, Flutter setup, data models
 
 ---
 
+## Enrollment & Payment Flow (logic hiện hành)
+
+**QUAN TRỌNG: User được thanh toán BẤT CỨ LÚC NÀO, KHÔNG cần chờ thông báo hay "được chọn".**
+
+3 thời điểm thanh toán hợp lệ:
+1. **Ngay khi đăng ký, chưa tập trial buổi nào** (Path B – "Mua khoá ngay")
+2. **Giữa chừng trial** (Path A – "Đăng ký đầy đủ")
+3. **Sau khi trial kết thúc**
+
+Dù thanh toán ở thời điểm nào, user vẫn được tập thử đủ 3 ngày trước khi cohort bắt đầu. Trial và thanh toán KHÔNG loại trừ nhau – user có thể đang `trial` vừa đã thanh toán (status `paid_waiting_cohort` nhưng `trial_ends_at` còn hạn → vẫn check-in trial được, đã xử lý qua `TRIAL_ACCESSIBLE_STATUSES`).
+
+### Enrollment status flow
+```
+trial → trial_completed → pending_payment → paid_waiting_cohort → active → completed/dropped
+```
+
+### Logic LỖI THỜI (KHÔNG dùng nữa)
+- ❌ "Chờ thông báo từ BodiX" sau khi hết trial
+- ❌ "Chờ được chọn" để tham gia
+- ❌ Bất kỳ thông điệp nào khiến user ở trạng thái thụ động chờ admin duyệt
+- ❌ Giả định "chỉ thanh toán được sau khi trial kết thúc" – thanh toán được cả trước/trong/sau trial
+
+### Logic ĐÚNG
+- Sau trial (hết 3 ngày hoặc `trial_completed`): user thấy CTA "Đăng ký đầy đủ" → thanh toán ngay, KHÔNG hiển thị "chờ"
+- Sau thanh toán: status → `paid_waiting_cohort` → chờ cohort gần nhất bắt đầu
+- `pre_cohort` notification (D-4 đến D-1) nhắc user trước ngày khai giảng
+- KHÔNG có bước admin "duyệt" hay "chọn" user
+
+### Quy tắc viết copy cho user
+- Phân biệt rõ 2 trạng thái:
+  - **CHƯA thanh toán** (trial/trial_completed/pending_payment) → push payment, CTA rõ ràng
+  - **ĐÃ thanh toán đợi cohort** (paid_waiting_cohort) → trấn an + thông tin về ngày khai giảng
+- KHÔNG dùng từ "được chọn", "chờ duyệt", "chờ thông báo" cho user CHƯA thanh toán
+- Mỗi thông điệp cho user sau trial PHẢI dẫn đến hành động thanh toán
+
+---
+
 ## Database Tables (29 tables)
 
 ### Auth & Profiles

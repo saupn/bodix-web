@@ -28,6 +28,8 @@ export type TrialDisplayStatus = {
   daysRemainingText: string; // "" nếu không hiển thị
   showWorkoutCard: boolean;
   progressPercent: number; // 0-100
+  ctaText?: string;
+  ctaLink?: string;
 };
 
 const NOT_STARTED: TrialDisplayStatus = {
@@ -72,10 +74,13 @@ export function getTrialDisplayStatus(input: {
       daysRemaining: 0,
       isEnded: true,
       headingText: "Trải nghiệm thử đã kết thúc",
-      subtextTop: "Chờ thông báo từ BodiX!",
+      subtextTop:
+        "Sẵn sàng cho hành trình đầy đủ? Đăng ký ngay để giữ nhịp tập của bạn.",
       daysRemainingText: "",
       showWorkoutCard: false,
       progressPercent: 100,
+      ctaText: "Đăng ký đầy đủ",
+      ctaLink: "/app/checkout/bodix-21",
     };
   }
 

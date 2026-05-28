@@ -479,7 +479,7 @@ export async function GET(request: NextRequest) {
 
         const result = await sendViaZalo(
           trialProfile.channel_user_id,
-          `🎯 ${trialDisplayName} ơi, 3 ngày tập thử hoàn thành!\n\nĐăng ký tập chính thức tại bodix.fit/app và chờ thông báo nếu bạn được chọn tham gia nhé!`,
+          `🎯 ${trialDisplayName} ơi, 3 ngày tập thử hoàn thành!\n\nĐăng ký khoá đầy đủ ngay tại bodix.fit/app để tham gia đợt tập gần nhất – có thể thanh toán bất cứ lúc nào nhé!`,
         );
 
         await supabase.from('nudge_logs').insert({

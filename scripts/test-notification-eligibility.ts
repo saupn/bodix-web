@@ -3,18 +3,20 @@
  *
  * End-to-end test cho getEligibleForNudge().
  *
- * Tạo 8 test enrollment ở mọi trạng thái:
- *   - active                                    → eligible
- *   - trial (trial_ends_at = today + 1 day)     → eligible
- *   - trial (trial_ends_at = today, đúng ngày)  → eligible (so sánh >=)
- *   - trial (trial_ends_at = yesterday)         → NOT eligible
- *   - trial (trial_ends_at = NULL)              → NOT eligible (an toàn)
- *   - trial_completed                           → NOT eligible
- *   - pending_payment                           → NOT eligible
- *   - paid_waiting_cohort                       → NOT eligible
- *   - completed                                 → NOT eligible
- *   - dropped                                   → NOT eligible
- *   - paused                                    → NOT eligible
+ * Tạo test enrollment ở mọi trạng thái:
+ *   - active                                                 → eligible (bucket=active)
+ *   - trial (trial_ends_at = today + 1 day)                  → eligible (bucket=trial)
+ *   - trial (trial_ends_at = today, đúng ngày)               → eligible (so sánh >=)
+ *   - trial (trial_ends_at = yesterday)                      → NOT eligible
+ *   - trial (trial_ends_at = NULL)                           → NOT eligible (an toàn)
+ *   - pending_payment (trial_ends_at = tomorrow)             → eligible (paid in-trial)
+ *   - paid_waiting_cohort (trial_ends_at = tomorrow)         → eligible (paid in-trial)
+ *   - pending_payment (trial_ends_at = NULL)                 → NOT eligible
+ *   - paid_waiting_cohort (trial_ends_at = NULL)             → NOT eligible
+ *   - trial_completed                                        → NOT eligible
+ *   - completed                                              → NOT eligible
+ *   - dropped                                                → NOT eligible
+ *   - paused                                                 → NOT eligible
  *
  * Chạy: npx tsx scripts/test-notification-eligibility.ts
  *
@@ -85,8 +87,12 @@ const SCENARIOS: Scenario[] = [
   { label: "trial-yesterday", status: "trial", trialEndsAt: addDaysIso(-1), expectedEligible: false },
   { label: "trial-null-end", status: "trial", trialEndsAt: null, expectedEligible: false },
   { label: "trial_completed", status: "trial_completed", trialEndsAt: addDaysIso(-3), expectedEligible: false },
-  { label: "pending_payment", status: "pending_payment", trialEndsAt: null, expectedEligible: false },
-  { label: "paid_waiting_cohort", status: "paid_waiting_cohort", trialEndsAt: null, expectedEligible: false },
+  // Paid in-trial: user thanh toán trong khi vẫn còn hạn trial → vẫn cần morning/evening reminder
+  { label: "pending_payment-in-trial", status: "pending_payment", trialEndsAt: addDaysIso(1), expectedEligible: true },
+  { label: "paid_waiting_cohort-in-trial", status: "paid_waiting_cohort", trialEndsAt: addDaysIso(1), expectedEligible: true },
+  // Paid after-trial: trial_ends_at NULL hoặc đã qua → KHÔNG còn ở giai đoạn trial
+  { label: "pending_payment-null-end", status: "pending_payment", trialEndsAt: null, expectedEligible: false },
+  { label: "paid_waiting_cohort-null-end", status: "paid_waiting_cohort", trialEndsAt: null, expectedEligible: false },
   { label: "completed", status: "completed", trialEndsAt: null, expectedEligible: false },
   { label: "dropped", status: "dropped", trialEndsAt: null, expectedEligible: false },
   { label: "paused", status: "paused", trialEndsAt: null, expectedEligible: false },

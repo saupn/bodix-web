@@ -5,10 +5,17 @@
  * Nếu lệch → có user nhận tin sáng nhưng không nhận tin tối (hoặc ngược lại) → bối rối.
  *
  * Eligibility (chung cho cả 2 timing):
- *   - status='active'  → luôn eligible
- *   - status='trial'   → eligible CHỈ khi trial chưa hết hạn (theo ngày VN)
- *   - mọi status khác  → KHÔNG eligible (trial_completed, pending_payment,
- *                        paid_waiting_cohort, completed, dropped, paused, ...)
+ *   - status='active'                              → luôn eligible, bucket='active'
+ *   - status ∈ TRIAL_ACCESSIBLE_STATUSES           → eligible CHỈ khi trial_ends_at
+ *     ('trial', 'pending_payment',                   còn hạn (theo ngày VN), bucket='trial'
+ *      'paid_waiting_cohort')                        — bao gồm cả user đã thanh toán sớm
+ *                                                    trong khi trial vẫn còn hiệu lực
+ *   - mọi status khác                              → KHÔNG eligible (trial_completed,
+ *                                                    completed, dropped, paused, ...)
+ *
+ * Bucket 'trial' (return.status='trial') là bucket NORMALISED — bất kể status thật
+ * là 'trial' / 'pending_payment' / 'paid_waiting_cohort'. Consumer (morning trial loop,
+ * evening reminder) chỉ cần xét bucket để build message; không cần biết status gốc.
  *
  * Cột trial cutoff: profiles.trial_ends_at (timestamptz). So sánh sau khi convert
  * sang YYYY-MM-DD VN — tránh edge case timestamp lệch giờ.
@@ -16,6 +23,7 @@
 
 import { isoTimestampToVietnamYmd } from "@/lib/date/vietnam";
 import { createServiceClient } from "@/lib/supabase/service";
+import { TRIAL_ACCESSIBLE_STATUSES } from "@/lib/trial/utils";
 
 export type NudgeTiming = "morning" | "evening";
 
@@ -73,8 +81,13 @@ export async function getEligibleForNudge(
 ): Promise<GetEligibleResult> {
   const supabase = createServiceClient();
 
-  // Query: lấy mọi enrollment status IN ('active','trial') trước, lọc trial-expired
-  // ở application layer vì so sánh date-only an toàn hơn so với inline SQL.
+  // Query: lấy mọi enrollment 'active' + trong TRIAL_ACCESSIBLE_STATUSES
+  // (trial, pending_payment, paid_waiting_cohort). Lọc trial-expired ở application
+  // layer vì so sánh date-only an toàn hơn so với inline SQL.
+  const queryStatuses = Array.from(
+    new Set<string>(["active", ...Array.from(TRIAL_ACCESSIBLE_STATUSES)]),
+  );
+
   let query = supabase
     .from("enrollments")
     .select(
@@ -99,7 +112,7 @@ export async function getEligibleForNudge(
       )
     `,
     )
-    .in("status", ["active", "trial"]);
+    .in("status", queryStatuses);
 
   if (programId) {
     query = query.eq("program_id", programId);
@@ -142,11 +155,17 @@ export async function getEligibleForNudge(
     if (seenEnrollmentIds.has(r.id as string)) continue;
     seenEnrollmentIds.add(r.id as string);
 
-    const status = r.status as "active" | "trial";
+    const rawStatus = r.status as string;
 
-    // Trial: chỉ giữ nếu trial_ends_at >= todayVN (theo ngày VN).
-    // NULL trial_ends_at → loại (không thể xác định hạn → an toàn là không gửi).
-    if (status === "trial") {
+    // Bucket normalisation: 'active' giữ nguyên; mọi status trong
+    // TRIAL_ACCESSIBLE_STATUSES (trial / pending_payment / paid_waiting_cohort)
+    // → bucket='trial' miễn là trial_ends_at còn hiệu lực.
+    let bucket: "active" | "trial";
+    if (rawStatus === "active") {
+      bucket = "active";
+    } else if (TRIAL_ACCESSIBLE_STATUSES.has(rawStatus)) {
+      // Trial bucket: chỉ giữ nếu trial_ends_at >= todayVN (theo ngày VN).
+      // NULL trial_ends_at → loại (không thể xác định hạn → an toàn là không gửi).
       if (!profile.trial_ends_at) {
         trialExpiredFiltered++;
         continue;
@@ -156,6 +175,10 @@ export async function getEligibleForNudge(
         trialExpiredFiltered++;
         continue;
       }
+      bucket = "trial";
+    } else {
+      // Defensive: query đã filter, nhưng phòng status lạ lọt vào.
+      continue;
     }
 
     result.push({
@@ -164,7 +187,7 @@ export async function getEligibleForNudge(
       program_id: r.program_id,
       cohort_id: r.cohort_id ?? null,
       cohort_start_date: cohort?.start_date ?? null,
-      status,
+      status: bucket,
       enrolled_at: r.enrolled_at,
       started_at: r.started_at ?? null,
       current_day: r.current_day ?? 1,

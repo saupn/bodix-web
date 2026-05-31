@@ -9,6 +9,7 @@ import {
   type ResolvedReward,
 } from "@/lib/checkout/resolve-reward";
 import { calculateCheckoutTotal } from "@/lib/checkout/calculate-total";
+import { readCommissionContext } from "@/lib/checkout/resolve-commission-type";
 
 const VALID_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
@@ -216,6 +217,20 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ── Resolve commission context (Cách 1.5 dual-URL) ────────────────────────
+  // "Đóng băng" loại commission lên enrollment vì SePay webhook không thấy
+  // cookie của user. Chỉ áp dụng khi code thực sự được resolve (referralCodeId).
+  //   - Cookie code_context (set bởi /af/ hoặc /r/) thắng — và chỉ khi code
+  //     trong cookie KHỚP code đang dùng.
+  //   - Không cookie → fallback về code_type tự nhiên (giữ flow ?ref= cũ).
+  let commissionProgramType: "referral" | "affiliate" | null = null;
+  if (referralCodeId) {
+    const ctx = readCommissionContext(request.cookies);
+    const usedCode = (body.referral_code ?? "").trim().toUpperCase();
+    commissionProgramType =
+      ctx && ctx.code.trim().toUpperCase() === usedCode ? ctx.type : codeType;
+  }
+
   // ── Resolve voucher(s) ───────────────────────────────────────────────────
   let voucherId: string | null = null;
   let voucherReward: ResolvedReward = NO_REWARD;
@@ -364,6 +379,7 @@ export async function POST(request: NextRequest) {
       payment_method: paymentMethod,
       referral_code_id: referralCodeId,
       referral_discount_amount: referralDiscountAmount,
+      commission_program_type: commissionProgramType,
       voucher_id: voucherId,
       voucher_discount_amount: voucherDiscountAmount,
     })

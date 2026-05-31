@@ -7,7 +7,15 @@ import { Footer } from "@/components/layout/Footer";
 
 const PROGRAM_SLUGS = ["bodix-21", "bodix-6w", "bodix-12w"] as const;
 
-export default async function ReferralLandingPage({
+/**
+ * Affiliate landing — /af/[code] (Cách 1.5 dual-URL).
+ *
+ * Cùng 1 referral code với /r/, nhưng set cookie code_context='affiliate' →
+ * conversion tạo affiliate cash commission thay vì referral voucher.
+ *
+ * KHÔNG hiển thị thông tin commission cho người được giới thiệu (privacy).
+ */
+export default async function AffiliateLandingPage({
   params,
 }: {
   params: Promise<{ code: string }>;
@@ -56,7 +64,7 @@ export default async function ReferralLandingPage({
     .maybeSingle();
 
   const fullName = referrerProfile?.full_name?.trim() ?? "";
-  const referrerName = fullName.split(/\s+/).pop() || "Một người bạn";
+  const referrerName = fullName.split(/\s+/).pop() || "một đối tác BodiX";
 
   const discountPercent =
     referralCode.referee_reward_type === "discount_percent"
@@ -84,7 +92,7 @@ export default async function ReferralLandingPage({
 
   return (
     <div className="min-h-screen flex flex-col bg-neutral-50">
-      <CommissionContextSetter code={codeUpper} context="referral" />
+      <CommissionContextSetter code={codeUpper} context="affiliate" />
       <Header />
       <main className="flex-1">
         <ReferralLandingClient
@@ -92,6 +100,7 @@ export default async function ReferralLandingPage({
           referrerName={referrerName}
           discountPercent={discountPercent}
           programList={programList}
+          headline={`Bạn được giới thiệu BodiX bởi ${referrerName}`}
         />
       </main>
       <Footer />

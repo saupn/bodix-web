@@ -58,24 +58,39 @@ export const AFFILIATE_COPY = {
     },
   ],
 
-  // ── Điều kiện chi tiết ────────────────────────────────────────────────────
+  // ── Thông điệp đối tác (partner, không transaction) ───────────────────────
+  partnerMessage:
+    "Bạn là đối tác cùng BodiX giúp người được giới thiệu vào nhịp tập. Khi họ check-in ngày đầu, đồng nghĩa hành trình đã thật sự bắt đầu – và hoa hồng của bạn được kích hoạt.",
+
+  // ── Điều kiện chi tiết (tinh thần partner) ────────────────────────────────
   conditions: [
-    `Hoa hồng tính trên số tiền người bạn đã thanh toán (sau khi áp giảm giá ${AFFILIATE_DISCOUNT_PERCENT}%).`,
-    `Hoa hồng KHÔNG được trả nếu người bạn không tham gia cohort trong ${AFFILIATE_PENDING_TIMEOUT_DAYS} ngày kể từ ngày thanh toán.`,
-    `Hoa hồng KHÔNG được trả nếu người bạn vào cohort nhưng không check-in trong ${AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS} ngày đầu.`,
-    `Tối thiểu ${formatVnd(AFFILIATE_MIN_WITHDRAW_VND)} cho mỗi lần rút – tích luỹ qua nhiều lần giới thiệu thành công.`,
-    "Bạn không thể dùng mã của chính mình để nhận hoa hồng affiliate.",
-    "Tính năng yêu cầu rút tiền sẽ mở trong giai đoạn tiếp theo. Hiện tại bạn có thể theo dõi tích luỹ trong dashboard.",
+    `Hoa hồng tính trên số tiền người được giới thiệu đã thanh toán (sau khi áp giảm giá ${AFFILIATE_DISCOUNT_PERCENT}%).`,
+    "Bạn và BodiX cùng đồng hành – khi người được giới thiệu vào cohort và check-in ngày đầu, hoa hồng của bạn được kích hoạt.",
+    `Bạn có thể giúp người được giới thiệu bắt đầu sớm để hoa hồng sớm được kích hoạt. Nếu họ chưa kịp tham gia đợt tập trong ${AFFILIATE_PENDING_TIMEOUT_DAYS} ngày, hành trình này tạm khép lại.`,
+    `Tối thiểu ${formatVnd(AFFILIATE_MIN_WITHDRAW_VND)} cho mỗi lần rút – tích luỹ qua nhiều lần đồng hành thành công.`,
+    "Mã Đối tác chỉ dành cho người khác. Muốn tự nhận ưu đãi, hãy dùng link Giới thiệu bạn bè (referral).",
+    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
   ],
 
-  // ── Cancel reasons (friendly Vietnamese) ──────────────────────────────────
+  // ── Cancel reasons (tinh thần partner, không transaction) ──────────────────
   cancelReasons: {
-    timeout: `Người bạn không tham gia cohort trong ${AFFILIATE_PENDING_TIMEOUT_DAYS} ngày`,
-    no_checkin_after_active: `Người bạn không check-in trong ${AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS} ngày sau khi vào cohort`,
-    dropped_before_start: "Người bạn đã ngừng tham gia",
+    timeout: `Bạn và người được giới thiệu cùng đồng hành chưa thành – chưa kịp tham gia đợt tập trong ${AFFILIATE_PENDING_TIMEOUT_DAYS} ngày`,
+    no_checkin_after_active: `Hành trình chưa thật sự bắt đầu – người được giới thiệu chưa check-in trong ${AFFILIATE_NO_CHECKIN_TIMEOUT_DAYS} ngày sau khi vào cohort`,
+    dropped_before_start: "Người được giới thiệu chưa tham gia cohort lần này",
     suspicious_burst: "Hoa hồng đang được rà soát",
     manual: "Đã huỷ thủ công",
   } as Record<string, string>,
+
+  // ── Referee list status (section "Người được giới thiệu") ─────────────────
+  refereeStatusLabel: {
+    pending: "Đang chờ check-in",
+    payable: "Hoa hồng đã được kích hoạt",
+    paid: "Hoa hồng đã được rút",
+    cancelled: "Đã huỷ",
+    suspicious: "Đang rà soát",
+  } as Record<string, string>,
+  refereeEmptyState:
+    "Chưa có ai được giới thiệu qua link của bạn. Hãy chia sẻ link để bắt đầu hành trình đồng hành cùng BodiX!",
 
   // ── Status pill labels ────────────────────────────────────────────────────
   statusLabel: {
@@ -90,13 +105,14 @@ export const AFFILIATE_COPY = {
   pendingHint: "Chờ người bạn vào cohort và check-in ngày đầu",
   payableBelowMinHint: (remaining: number) =>
     `Cần ≥ ${formatVnd(AFFILIATE_MIN_WITHDRAW_VND)} để rút (còn thiếu ${formatVnd(remaining)})`,
-  payableAboveMinHint: "Tính năng rút tiền sẽ mở giai đoạn tiếp theo",
+  payableAboveMinHint:
+    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
 
   // ── Withdraw section ──────────────────────────────────────────────────────
   withdrawDisabledMessage:
-    "Tính năng yêu cầu rút tiền sẽ mở trong giai đoạn tiếp theo. Hoa hồng của bạn đang được tích luỹ an toàn – bạn có thể theo dõi trong dashboard.",
+    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
   withdrawDisabledTooltip:
-    "Tính năng sẽ mở trong giai đoạn tiếp theo. Hoa hồng đang được tích luỹ an toàn.",
+    "Tính năng rút tiền sẽ được mở trong thời gian tới. Hoa hồng đang được tích luỹ và lưu trữ an toàn.",
 
   // ── FAQ ───────────────────────────────────────────────────────────────────
   faq: [

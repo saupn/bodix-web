@@ -52,6 +52,12 @@ interface CreateReferralCommissionInput {
   sourceUrl?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+  /**
+   * Dual-URL (Cách 1.5): khi caller đã quyết định loại commission từ context
+   * URL (enrollment.commission_program_type='referral'), bỏ qua guard code_type.
+   * Cho phép code_type='affiliate' tạo referral voucher khi user vào qua /r/.
+   */
+  contextOverride?: boolean;
 }
 
 /**
@@ -78,7 +84,9 @@ export async function createReferralCommission(
     return null;
   }
 
-  if (code.code_type !== "referral") {
+  // contextOverride: caller đã resolve loại commission từ context URL (/r/) →
+  // bỏ qua guard để code_type='affiliate' vẫn tạo được referral voucher.
+  if (!input.contextOverride && code.code_type !== "referral") {
     // Affiliate flow handled by createAffiliateCommission separately.
     return null;
   }

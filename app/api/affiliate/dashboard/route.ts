@@ -5,6 +5,8 @@ import { createServiceClient } from '@/lib/supabase/service'
 const PARTNER_LINK_BASE = 'https://bodix.fit/p'
 
 import { TIER_COMMISSION } from '@/lib/affiliate/config'
+import { AFFILIATE_COPY } from '@/lib/copy/affiliate'
+import { maskFullName } from '@/lib/format/mask-name'
 
 // ─── GET — Affiliate dashboard ────────────────────────────────────────────────
 
@@ -191,22 +193,20 @@ export async function GET() {
     (commissionProfiles ?? []).map(p => [p.id, p.full_name ?? ''])
   )
 
-  const REASON_LABEL: Record<string, string> = {
-    timeout: 'Người bạn không tham gia cohort trong 60 ngày',
-    no_checkin_after_active: 'Người bạn không check-in trong 14 ngày sau khi vào cohort',
-    dropped_before_start: 'Người bạn đã ngừng tham gia',
+  // Cancel reason → friendly text (single source: AFFILIATE_COPY, đã reframe partner).
+  // cancel_reason có thể có suffix (vd 'suspicious_burst:5_in_7d') → match prefix.
+  const resolveCancelReason = (raw: string | null): string | null => {
+    if (!raw) return null
+    if (AFFILIATE_COPY.cancelReasons[raw]) return AFFILIATE_COPY.cancelReasons[raw]
+    if (raw.startsWith('suspicious')) return AFFILIATE_COPY.cancelReasons.suspicious_burst
+    if (raw.startsWith('manual')) return AFFILIATE_COPY.cancelReasons.manual
+    return raw
   }
 
   const commissions = (commissionRows ?? []).map(c => {
     const fullName = commissionProfileMap.get(c.referee_user_id) ?? ''
     const parts = fullName.trim().split(/\s+/).filter(Boolean)
     const refereeName = parts[parts.length - 1] || 'Ẩn danh'
-    const reasonRaw = c.cancel_reason ?? null
-    let cancelReasonText: string | null = null
-    if (reasonRaw) {
-      cancelReasonText = REASON_LABEL[reasonRaw]
-        ?? (reasonRaw.startsWith('manual_') ? 'Đã huỷ thủ công' : reasonRaw)
-    }
     return {
       id: c.id,
       status: c.status,
@@ -218,8 +218,9 @@ export async function GET() {
       paid_at: c.paid_at,
       cancelled_at: c.cancelled_at,
       pending_expires_at: c.pending_expires_at,
-      cancel_reason: cancelReasonText,
+      cancel_reason: resolveCancelReason(c.cancel_reason ?? null),
       referee_name: refereeName,
+      referee_name_masked: maskFullName(fullName),
     }
   })
 

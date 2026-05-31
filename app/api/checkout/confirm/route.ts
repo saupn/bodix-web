@@ -26,6 +26,8 @@ async function triggerReferralConversion(
     programId: string
     enrollmentId: string
     conversionAmount: number   // actual VND paid (after all discounts)
+    /** Loại commission đã "đóng băng" từ context URL (Cách 1.5). NULL → code_type. */
+    commissionProgramType: 'referral' | 'affiliate' | null
   }
 ): Promise<void> {
   // ── Fetch code (referrer + config) ────────────────────────────────────────
@@ -103,14 +105,20 @@ async function triggerReferralConversion(
       .eq('id', opts.referralCodeId)
   }
 
-  const isAffiliate = code.code_type === 'affiliate'
+  // Dual-URL (Cách 1.5): context "đóng băng" từ checkout thắng code_type.
+  // NULL (enrollment cũ) → fallback về code_type. 1 conversion → 1 commission.
+  const resolvedType = opts.commissionProgramType ?? code.code_type
+  const isAffiliate = resolvedType === 'affiliate'
 
-  // ── Tạo commission row (status='pending') cho cả 2 program type ───────────
+  // ── Tạo commission row (status='pending') ─────────────────────────────────
   // Cả 2 đều dùng V2 cooldown flow: cron rescue-check promote pending → payable
   // khi referee vào cohort + check-in ngày đầu.
   //  - Affiliate: payable = cash hoa hồng (chờ user yêu cầu rút)
   //  - Referral: payable = voucher 100K được issue (cron tạo voucher row,
   //    không tạo trong checkout/confirm để tránh duplicate path).
+  // contextOverride: bật khi context được resolve rõ ràng (≠ NULL) → cho phép
+  // code khác loại tạo commission đúng theo URL user đến.
+  const contextOverride = opts.commissionProgramType != null
   if (isAffiliate) {
     await createAffiliateCommission(service, {
       referralCodeId: opts.referralCodeId,
@@ -118,6 +126,7 @@ async function triggerReferralConversion(
       enrollmentId: opts.enrollmentId,
       orderId: null,
       conversionAmountVnd: opts.conversionAmount,
+      contextOverride,
     })
   } else {
     await createReferralCommission(service, {
@@ -126,6 +135,7 @@ async function triggerReferralConversion(
       enrollmentId: opts.enrollmentId,
       orderId: null,
       conversionAmountVnd: opts.conversionAmount,
+      contextOverride,
     })
   }
 
@@ -237,7 +247,7 @@ export async function POST(request: NextRequest) {
     .from('enrollments')
     .select(
       `id, user_id, program_id, status, referral_code_id, referral_discount_amount,
-       voucher_id, voucher_discount_amount,
+       commission_program_type, voucher_id, voucher_discount_amount,
        program:programs (id, name, price_vnd, duration_days)`
     )
     .eq('id', enrollmentId)
@@ -353,6 +363,8 @@ export async function POST(request: NextRequest) {
       programId: program.id,
       enrollmentId,
       conversionAmount: amountPaid,
+      commissionProgramType:
+        (enrollment.commission_program_type as 'referral' | 'affiliate' | null) ?? null,
     }).catch(err => console.error('[checkout/confirm] referral conversion:', err))
   }
 

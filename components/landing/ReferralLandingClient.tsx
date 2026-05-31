@@ -16,6 +16,8 @@ interface ReferralLandingClientProps {
   referrerName: string;
   discountPercent: number;
   programList: ProgramItem[];
+  /** Tiêu đề tuỳ biến (vd /af/ dùng "Bạn được giới thiệu bởi ..."). */
+  headline?: string;
 }
 
 function formatPrice(vnd: number): string {
@@ -27,6 +29,7 @@ export function ReferralLandingClient({
   referrerName,
   discountPercent,
   programList,
+  headline,
 }: ReferralLandingClientProps) {
   useEffect(() => {
     fetch("/api/referral/track", {
@@ -44,7 +47,7 @@ export function ReferralLandingClient({
     <div className="mx-auto max-w-4xl px-4 py-16 sm:py-24">
       <div className="text-center">
         <h1 className="font-heading text-3xl font-bold text-primary sm:text-4xl">
-          {referrerName} đã giới thiệu bạn đến BodiX!
+          {headline ?? `${referrerName} đã giới thiệu bạn đến BodiX!`}
         </h1>
         <p className="mt-4 text-lg text-neutral-600">
           Đăng ký ngay và nhận giảm {discountPercent}% chương trình đầu tiên

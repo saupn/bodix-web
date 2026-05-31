@@ -318,7 +318,7 @@ export async function POST(request: NextRequest) {
         try {
           const { data: enrollWithRef } = await service
             .from("enrollments")
-            .select("referral_code_id")
+            .select("referral_code_id, commission_program_type")
             .eq("id", enrollment.id)
             .maybeSingle();
           if (enrollWithRef?.referral_code_id && order.user_id) {
@@ -329,12 +329,30 @@ export async function POST(request: NextRequest) {
               orderId: order.id,
               conversionAmountVnd: order.amount,
             };
-            // 2 helpers độc lập, gọi song song nhưng wrap riêng — 1 fail không
-            // chặn cái còn lại (referral voucher vs affiliate cash).
-            await Promise.allSettled([
-              createAffiliateCommission(service, commissionInput),
-              createReferralCommission(service, commissionInput),
-            ]);
+            // Dual-URL (Cách 1.5): commission_program_type được "đóng băng" từ
+            // context URL tại checkout. 1 conversion → đúng 1 commission.
+            // NULL (enrollment cũ) → fallback gọi cả 2, mỗi helper tự skip theo
+            // code_type (giữ nguyên hành vi trước).
+            const ctxType = enrollWithRef.commission_program_type as
+              | "referral"
+              | "affiliate"
+              | null;
+            if (ctxType === "affiliate") {
+              await createAffiliateCommission(service, {
+                ...commissionInput,
+                contextOverride: true,
+              });
+            } else if (ctxType === "referral") {
+              await createReferralCommission(service, {
+                ...commissionInput,
+                contextOverride: true,
+              });
+            } else {
+              await Promise.allSettled([
+                createAffiliateCommission(service, commissionInput),
+                createReferralCommission(service, commissionInput),
+              ]);
+            }
           }
         } catch (commErr) {
           console.error("[sepay] commission create:", commErr);

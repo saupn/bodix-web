@@ -15,6 +15,7 @@ import {
 } from "recharts";
 import { formatDateVn } from "@/lib/date/vietnam";
 import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
+import { BankInfoForm } from "@/components/affiliate/BankInfoForm";
 
 const REFERRAL_BASE = "https://bodix.fit";
 const COMMISSION_RATE = AFFILIATE_COPY.commissionRate;
@@ -87,6 +88,7 @@ interface CommissionRow {
   pending_expires_at: string;
   cancel_reason: string | null;
   referee_name: string;
+  referee_name_masked: string;
 }
 
 const COMMISSION_STATUS_LABEL: Record<CommissionRow["status"], string> =
@@ -190,11 +192,75 @@ function FaqSection() {
   );
 }
 
+// Sort: pending (cần attention) → payable → paid → suspicious → cancelled.
+const REFEREE_SORT_ORDER: Record<CommissionRow["status"], number> = {
+  pending: 0,
+  payable: 1,
+  paid: 2,
+  suspicious: 3,
+  cancelled: 4,
+};
+
+const REFEREE_STATUS_LABEL = AFFILIATE_COPY.refereeStatusLabel as Record<
+  CommissionRow["status"],
+  string
+>;
+
+function refereeReferenceDate(c: CommissionRow): string {
+  if (c.status === "payable" || c.status === "paid") return c.payable_at ?? c.purchase_at;
+  if (c.status === "cancelled") return c.cancelled_at ?? c.purchase_at;
+  return c.purchase_at;
+}
+
+function RefereeList({ commissions }: { commissions: CommissionRow[] }) {
+  const sorted = [...commissions].sort(
+    (a, b) => REFEREE_SORT_ORDER[a.status] - REFEREE_SORT_ORDER[b.status],
+  );
+
+  return (
+    <section className="rounded-xl border border-neutral-200 bg-white p-6">
+      <h2 className="font-heading font-semibold text-primary">Người được giới thiệu</h2>
+      <p className="mt-1 text-sm text-neutral-600">{AFFILIATE_COPY.partnerMessage}</p>
+
+      {sorted.length === 0 ? (
+        <p className="mt-4 rounded-lg bg-neutral-50 p-4 text-sm text-neutral-600">
+          {AFFILIATE_COPY.refereeEmptyState}
+        </p>
+      ) : (
+        <ul className="mt-4 space-y-3">
+          {sorted.map((c) => {
+            const statusText =
+              c.status === "cancelled" && c.cancel_reason
+                ? c.cancel_reason
+                : REFEREE_STATUS_LABEL[c.status] ?? c.status;
+            return (
+              <li
+                key={c.id}
+                className="flex flex-col gap-1 rounded-lg border border-neutral-100 p-3 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <div>
+                  <p className="font-medium text-neutral-800">{c.referee_name_masked}</p>
+                  <p className="text-xs text-neutral-500">{formatDate(refereeReferenceDate(c))}</p>
+                </div>
+                <span
+                  className={`inline-flex w-fit rounded-full px-2.5 py-0.5 text-xs font-medium ${COMMISSION_STATUS_CLASS[c.status]}`}
+                >
+                  {statusText}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 export default function AffiliatePage() {
   const [status, setStatus] = useState<StatusData | null>(null);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
-  const [copied, setCopied] = useState<"code" | "link" | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
 
   // Registration form
@@ -206,16 +272,15 @@ export default function AffiliatePage() {
 
   // Withdraw state
   const [withdrawAmount, setWithdrawAmount] = useState("");
-  const [editBank, setEditBank] = useState({ bank_name: "", bank_account_number: "", bank_account_name: "" });
   const [withdrawSubmitting, setWithdrawSubmitting] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
 
-  const partnerLink = dashboard?.code
-    ? `${REFERRAL_BASE}?ref=${dashboard.code.code}`
-    : "";
+  const affiliateCode = dashboard?.code?.code ?? "";
+  const afLink = affiliateCode ? `${REFERRAL_BASE}/af/${affiliateCode}` : "";
+  const refLink = affiliateCode ? `${REFERRAL_BASE}/r/${affiliateCode}` : "";
 
   useEffect(() => {
     const load = async () => {
@@ -229,11 +294,6 @@ export default function AffiliatePage() {
             if (dashRes.ok) {
               const d = await dashRes.json();
               setDashboard(d);
-              setEditBank({
-                bank_name: d.bank_info?.bank_name ?? "",
-                bank_account_number: d.bank_info?.bank_account_number ?? "",
-                bank_account_name: d.bank_info?.bank_account_name ?? "",
-              });
             }
           }
         }
@@ -244,7 +304,7 @@ export default function AffiliatePage() {
     load();
   }, [chartYear]);
 
-  const copyToClipboard = async (text: string, key: "code" | "link") => {
+  const copyToClipboard = async (text: string, key: string) => {
     try {
       await navigator.clipboard.writeText(text);
       setCopied(key);
@@ -287,17 +347,6 @@ export default function AffiliatePage() {
       }
     } finally {
       setRegistering(false);
-    }
-  };
-
-  const handleUpdateBank = async () => {
-    const res = await fetch("/api/affiliate/profile", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(editBank),
-    });
-    if (res.ok && dashboard) {
-      setDashboard({ ...dashboard, bank_info: { ...editBank } });
     }
   };
 
@@ -502,44 +551,74 @@ export default function AffiliatePage() {
         </div>
       </div>
 
-      {/* Mã + Chia sẻ */}
+      {/* Mã + 2 link (dual-URL Cách 1.5) */}
       {dashboard?.code && (
         <section className="rounded-xl border-2 border-primary/20 bg-primary/5 p-6">
-          <h2 className="mb-4 font-heading font-semibold text-primary">Link giới thiệu</h2>
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="font-heading font-semibold text-primary">Link giới thiệu của bạn</h2>
+          <div className="mt-3 flex items-center justify-between rounded-lg border border-primary/20 bg-white px-4 py-2.5">
             <div>
-              <p className="text-sm text-neutral-600">Mã</p>
-              <p className="font-mono text-2xl font-bold text-primary">{dashboard.code.code}</p>
+              <p className="text-xs text-neutral-500">Mã của bạn</p>
+              <p className="font-mono text-xl font-bold text-primary">{affiliateCode}</p>
             </div>
             <button
               type="button"
-              onClick={() => copyToClipboard(dashboard.code!.code, "code")}
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-white px-4 py-2 font-medium text-primary"
+              onClick={() => copyToClipboard(affiliateCode, "code")}
+              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary"
             >
               {copied === "code" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
               {copied === "code" ? "Đã copy!" : "Copy mã"}
             </button>
           </div>
-          <div className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm text-neutral-600">Link</p>
-              <p className="break-all font-mono text-sm text-primary">{partnerLink}</p>
+
+          {/* Link Đối tác — /af/ */}
+          <div className="mt-4 rounded-lg border border-primary/20 bg-white p-4">
+            <p className="text-sm font-semibold text-primary">
+              Đối tác chính thức ({COMMISSION_RATE}% hoa hồng tiền)
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="break-all font-mono text-sm text-neutral-700">{afLink}</p>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(afLink, "af")}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-primary/30 px-3 py-2 text-sm font-medium text-primary"
+              >
+                {copied === "af" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied === "af" ? "Đã copy!" : "Copy"}
+              </button>
             </div>
-            <button
-              type="button"
-              onClick={() => copyToClipboard(partnerLink, "link")}
-              className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-white px-4 py-2 font-medium text-primary"
-            >
-              {copied === "link" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-              {copied === "link" ? "Đã copy!" : "Copy link"}
-            </button>
+            <p className="mt-2 text-xs text-neutral-500">
+              Dùng khi giới thiệu cho audience của bạn (followers, KOL network).
+            </p>
           </div>
+
+          {/* Link Giới thiệu bạn bè — /r/ */}
+          <div className="mt-3 rounded-lg border border-neutral-200 bg-white p-4">
+            <p className="text-sm font-semibold text-neutral-800">
+              Giới thiệu bạn bè (voucher 100.000đ)
+            </p>
+            <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <p className="break-all font-mono text-sm text-neutral-700">{refLink}</p>
+              <button
+                type="button"
+                onClick={() => copyToClipboard(refLink, "ref")}
+                className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700"
+              >
+                {copied === "ref" ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                {copied === "ref" ? "Đã copy!" : "Copy"}
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-neutral-500">
+              Dùng khi giới thiệu cho người quen, gia đình, bạn bè.
+            </p>
+          </div>
+
+          {/* QR + share cho link Đối tác */}
           <div ref={qrRef} className="mt-4 flex justify-center">
-            <QRCodeCanvas value={partnerLink} size={140} level="M" />
+            <QRCodeCanvas value={afLink} size={140} level="M" />
           </div>
           <div className="mt-4 flex flex-wrap gap-2">
             <a
-              href={`https://zalo.me/share?url=${encodeURIComponent(partnerLink)}&title=${encodeURIComponent(
+              href={`https://zalo.me/share?url=${encodeURIComponent(afLink)}&title=${encodeURIComponent(
                 "Tập cùng mình trên BodiX – giảm 10% khi đăng ký!"
               )}`}
               target="_blank"
@@ -549,20 +628,13 @@ export default function AffiliatePage() {
               Zalo
             </a>
             <a
-              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(partnerLink)}`}
+              href={`https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(afLink)}`}
               target="_blank"
               rel="noopener noreferrer"
               className="rounded-lg bg-[#1877F2] px-4 py-2.5 text-sm font-medium text-white"
             >
               Facebook
             </a>
-            <button
-              type="button"
-              onClick={() => copyToClipboard(partnerLink, "link")}
-              className="rounded-lg border border-neutral-300 bg-white px-4 py-2.5 text-sm font-medium"
-            >
-              Copy link
-            </button>
             <button
               type="button"
               onClick={downloadQR}
@@ -631,20 +703,12 @@ export default function AffiliatePage() {
             </p>
             {(() => {
               const payable = dashboard?.commission_summary?.payable ?? 0;
-              if (payable < MIN_WITHDRAWAL) {
-                const remaining = MIN_WITHDRAWAL - payable;
-                return (
-                  <p className="mt-1 text-xs text-emerald-700">
-                    Cần ≥ {MIN_WITHDRAWAL.toLocaleString("vi-VN")}đ để rút (còn thiếu{" "}
-                    {remaining.toLocaleString("vi-VN")}đ)
-                  </p>
-                );
-              }
-              return (
-                <p className="mt-1 text-xs text-emerald-700">
-                  Tính năng rút tiền sẽ mở giai đoạn tiếp theo
-                </p>
-              );
+              // Phân biệt 2 case: chưa đủ min withdraw vs đủ min nhưng tính năng chưa mở.
+              const hint =
+                payable < MIN_WITHDRAWAL
+                  ? AFFILIATE_COPY.payableBelowMinHint(MIN_WITHDRAWAL - payable)
+                  : AFFILIATE_COPY.payableAboveMinHint;
+              return <p className="mt-1 text-xs text-emerald-700">{hint}</p>;
             })()}
           </div>
           <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3">
@@ -694,6 +758,9 @@ export default function AffiliatePage() {
         )}
       </section>
 
+      {/* Người được giới thiệu (referee list, masked) */}
+      <RefereeList commissions={dashboard?.commissions ?? []} />
+
       {/* Recent Conversions (legacy referral_tracking view) */}
       <section className="rounded-xl border border-neutral-200 bg-white p-6">
         <h2 className="mb-4 font-heading font-semibold text-primary">Lịch sử đơn hàng</h2>
@@ -740,39 +807,12 @@ export default function AffiliatePage() {
         </p>
 
         <div className="mt-4 space-y-4">
-          <div>
-            <label className="block text-sm font-medium">Thông tin ngân hàng</label>
-            <div className="mt-2 grid gap-3 sm:grid-cols-3">
-              <input
-                type="text"
-                placeholder="Ngân hàng"
-                value={editBank.bank_name}
-                onChange={(e) => setEditBank((p) => ({ ...p, bank_name: e.target.value }))}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Số tài khoản"
-                value={editBank.bank_account_number}
-                onChange={(e) => setEditBank((p) => ({ ...p, bank_account_number: e.target.value }))}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-              <input
-                type="text"
-                placeholder="Tên chủ tài khoản"
-                value={editBank.bank_account_name}
-                onChange={(e) => setEditBank((p) => ({ ...p, bank_account_name: e.target.value }))}
-                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={handleUpdateBank}
-              className="mt-2 text-sm font-medium text-primary hover:underline"
-            >
-              Lưu thông tin
-            </button>
-          </div>
+          <BankInfoForm
+            initial={dashboard?.bank_info}
+            onSaved={(info) =>
+              setDashboard((prev) => (prev ? { ...prev, bank_info: info } : prev))
+            }
+          />
 
           {WITHDRAWAL_ENABLED ? (
             <form onSubmit={handleWithdraw} className="flex flex-wrap items-end gap-4">
@@ -801,14 +841,13 @@ export default function AffiliatePage() {
               <button
                 type="button"
                 disabled
-                title="Tính năng sẽ mở trong giai đoạn tiếp theo. Hoa hồng đang được tích luỹ an toàn."
+                title={AFFILIATE_COPY.withdrawDisabledTooltip}
                 className="cursor-not-allowed rounded-lg bg-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-500"
               >
                 Yêu cầu rút tiền
               </button>
               <p className="mt-2 text-sm text-neutral-600">
-                Tính năng yêu cầu rút tiền sẽ mở trong giai đoạn tiếp theo. Hoa hồng
-                của bạn đang được tích luỹ an toàn – bạn có thể theo dõi trong dashboard.
+                {AFFILIATE_COPY.withdrawDisabledMessage}
               </p>
             </div>
           )}

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getAccessToken } from '@/lib/messaging/helpers';
 import { matchFAQ, isNonsenseMessage, FALLBACK_REPLY, NONSENSE_REPLY } from '@/lib/zalo/faq';
+import { parseCheckin, roundsToMode } from '@/lib/zalo/parse-checkin';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -93,32 +94,6 @@ export async function POST(request: NextRequest) {
     console.error('[webhook] POST handler error:', err?.message, err?.stack);
     return NextResponse.json({ ok: true }, { status: 200 });
   }
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// PARSE TIN NHẮN CHECK-IN
-// Hard (3 lượt) / Light (2 lượt) / Easy (1 lượt) / Recovery
-// Cả 3+ đều = Done → streak +1
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-function parseCheckinType(text: string): 'hard' | 'light' | 'easy' | 'recovery' | null {
-  const t = text.trim().toUpperCase();
-
-  // CHỈ match exact hoặc "KEYWORD ...". KHÔNG dùng includes()
-  // vì sẽ khớp sai với text bất kỳ (ví dụ "hello" có "E" → easy).
-  const hard = ['HARD', 'H', '3', 'FULL', 'DONE', 'XONG', '✅', 'DA TAP'];
-  const light = ['LIGHT', 'L', '2', 'NHE'];
-  const easy = ['EASY', 'E', '1', 'DE', 'OK'];
-  const recovery = ['REC', 'RECOVERY', 'R'];
-
-  const match = (keys: string[]) =>
-    keys.some((k) => t === k || t.startsWith(k + ' '));
-
-  if (match(hard)) return 'hard';
-  if (match(light)) return 'light';
-  if (match(easy)) return 'easy';
-  if (match(recovery)) return 'recovery';
-
-  return null;
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -276,7 +251,7 @@ async function handleUserMessage(payload: any) {
     }
   }
 
-  const checkinType = parseCheckinType(messageText);
+  const checkin = parseCheckin(messageText);
   const feelingScore = parseFeelingScore(messageText);
 
   // 1. Tìm profile theo channel_user_id (Zalo UID). KHÔNG .single() — duplicate
@@ -294,8 +269,9 @@ async function handleUserMessage(payload: any) {
     .maybeSingle();
 
   // 2. Nếu có profile + enrollment đang chạy: xử lý LỆNH chức năng
-  //    (feeling review 1-5 / check-in HARD/LIGHT/EASY/1/2/3). Verify code (5 ký
-  //    tự) đã xử lý phía trên. Đây KHÔNG phải reply state-aware — là lệnh thật.
+  //    (feeling review 1-5 / check-in 1/2/3 số lượt). Verify code (5 ký tự) đã
+  //    xử lý phía trên. Đây KHÔNG phải reply state-aware — là lệnh thật, và được
+  //    ưu tiên TRƯỚC nonsense filter + FAQ để "1/2/3" luôn ghi nhận check-in.
   if (profile) {
     const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
@@ -321,10 +297,11 @@ async function handleUserMessage(payload: any) {
         }
       }
 
-      // Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3). Skip cho trial_completed.
-      if (checkinType && enrollment.status !== 'trial_completed') {
-        console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
-        await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
+      // Check-in: tin nhắn CHÍNH XÁC "1"/"2"/"3" = số lượt đã tập. Skip cho
+      // trial_completed (đã hết trial, không còn ngày tập thử để ghi).
+      if (checkin.isCheckin && enrollment.status !== 'trial_completed') {
+        console.log('[webhook] CHECKIN matched, rounds:', checkin.rounds, 'enrollment:', enrollment.id);
+        await handleCheckin(zaloUserId, profile, enrollment, checkin.rounds, safeSend);
         return;
       }
     }
@@ -564,9 +541,11 @@ async function handleCheckin(
   zaloUserId: string,
   profile: any,
   enrollment: any,
-  checkinType: 'hard' | 'light' | 'easy' | 'recovery',
+  rounds: 1 | 2 | 3,
   safeSend: (uid: string, text: string) => Promise<void>,
 ) {
+  // Số lượt → mode lưu DB (daily_checkins không có cột rounds riêng).
+  const checkinMode = roundsToMode(rounds);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const program = Array.isArray((enrollment as any).programs) ? (enrollment as any).programs[0] : (enrollment as any).programs;
@@ -633,7 +612,7 @@ async function handleCheckin(
       cohort_id: enrollment.cohort_id ?? null,
       day_number: dayNumber,
       workout_date: workoutDate,
-      mode: checkinType,
+      mode: checkinMode,
       completed_at: new Date().toISOString(),
     });
 
@@ -693,10 +672,10 @@ async function handleCheckin(
     current_streak: newCurrentStreak,
     longest_streak: newLongestStreak,
     total_completed_days: prev.total_completed_days + 1,
-    total_hard_days: checkinType === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
-    total_light_days: checkinType === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
-    total_recovery_days: checkinType === 'recovery' ? prev.total_recovery_days + 1 : prev.total_recovery_days,
-    total_easy_days: checkinType === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
+    total_hard_days: checkinMode === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
+    total_light_days: checkinMode === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
+    total_recovery_days: prev.total_recovery_days,
+    total_easy_days: checkinMode === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
     total_skip_days: prev.total_skip_days,
     last_checkin_date: workoutDate,
     streak_started_at: newStreakStartedAt,
@@ -739,15 +718,14 @@ async function handleCheckin(
     return;
   }
 
-  // Phản hồi thông thường theo loại check-in
-  const CHECKIN_RESPONSES: Record<'hard' | 'light' | 'easy' | 'recovery', string> = {
-    hard: '💪 Tuyệt vời! 3 lượt – bạn thật sự nghiêm túc!',
-    light: '👏 Giỏi lắm! 2 lượt là rất tốt rồi!',
-    easy: '✅ Hoàn thành! 1 lượt cũng là chiến thắng!',
-    recovery: '🧘 Recovery xong! Cơ thể cảm ơn bạn đó.',
+  // Phản hồi xác nhận theo số lượt — completion-first: khích lệ mọi mức độ.
+  const CHECKIN_RESPONSES: Record<1 | 2 | 3, string> = {
+    3: '💪 Tuyệt vời! Bạn đã hoàn thành đủ 3 lượt hôm nay. Giữ vững nhịp này nhé!',
+    2: '👏 Làm tốt lắm! 2 lượt hôm nay là một bước tiến. Mai mình cùng cố thêm nhé!',
+    1: '✅ Hoàn thành 1 lượt vẫn hơn không tập. Quan trọng là bạn đã bước lên thảm hôm nay!',
   };
 
-  await safeSend(zaloUserId, CHECKIN_RESPONSES[checkinType]);
+  await safeSend(zaloUserId, CHECKIN_RESPONSES[rounds]);
 }
 
 function shiftDate(dateStr: string, days: number): string {

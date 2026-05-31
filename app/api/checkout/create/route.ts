@@ -22,8 +22,6 @@ interface ResolvedCode {
 }
 
 async function resolveReferralCode(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any,
   code: string,
   userId: string,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -31,7 +29,11 @@ async function resolveReferralCode(
 ): Promise<{ valid: true; info: ResolvedCode } | { valid: false }> {
   const upperCode = code.trim().toUpperCase();
 
-  const { data } = await supabase
+  // QUAN TRỌNG: lookup qua `service` (bypass RLS). RLS trên referral_codes là
+  // `auth.uid() = user_id` → nếu dùng client của buyer, code của NGƯỜI KHÁC sẽ
+  // không thấy → rơi vào legacy fallback (id=null) → enrollment.referral_code_id
+  // null → webhook KHÔNG tạo commission. Đây là root cause "/referral hiển thị 0".
+  const { data } = await service
     .from("referral_codes")
     .select(
       "id, user_id, code, code_type, referee_reward_type, referee_reward_value, is_active, max_uses, total_conversions, expires_at",
@@ -203,7 +205,6 @@ export async function POST(request: NextRequest) {
 
   if (body.referral_code?.trim()) {
     const result = await resolveReferralCode(
-      supabase,
       body.referral_code,
       user.id,
       service,

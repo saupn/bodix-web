@@ -59,8 +59,8 @@ export function BuddyChooser() {
     <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
       <h3 className="text-lg font-semibold mb-3">🤝 Chọn Buddy đồng hành</h3>
       <p className="text-sm text-gray-600 mb-4">
-        Chọn 1 người trong đợt làm buddy. Cả hai sẽ chat 1-1 trong app, động
-        viên nhau hoàn thành đợt tập.
+        Chọn 1 người trong đợt làm buddy. Cả hai sẽ động viên nhau qua tin
+        nhắn, cùng hoàn thành đợt tập.
       </p>
 
       {loading ? (

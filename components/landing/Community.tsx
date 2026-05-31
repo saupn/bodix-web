@@ -22,7 +22,7 @@ export default function Community() {
             <h3 className="font-semibold mb-2">🤝 Buddy 1-1 trong cohort</h3>
             <p className="text-gray-700">
               Mỗi đợt, BodiX ghép bạn với 1 người buddy có cùng mục tiêu. Hai
-              bạn động viên, nhắc nhở nhau qua chat trong app. KHÔNG phải PT,
+              bạn động viên, nhắc nhở nhau qua tin nhắn. KHÔNG phải PT,
               KHÔNG phải coach – chỉ là 2 người cùng cố gắng.
             </p>
           </div>

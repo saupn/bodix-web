@@ -57,7 +57,16 @@ export default async function TangSachDashboardPage() {
         📚 Tặng sách cho bạn bè
       </h1>
       <p className="mt-2 text-neutral-600">
-        Chia sẻ sách &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot; cho bạn bè – hoàn toàn miễn phí.
+        Chia sẻ sách{" "}
+        <a
+          href="/api/guides/download"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+        >
+          &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot;
+        </a>{" "}
+        cho bạn bè – hoàn toàn miễn phí.
       </p>
 
       <div className="mt-6">

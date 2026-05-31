@@ -9,6 +9,7 @@ import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeConten
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 import { BuddyChooser } from "@/components/dashboard/BuddyChooser";
 import { GiftBookCard } from "@/components/dashboard/GiftBookCard";
+import { OtherCohortsLink } from "@/components/dashboard/OtherCohortsLink";
 
 const PROGRAM_NAME: Record<string, string> = {
   "bodix-21": "BodiX 21",
@@ -381,6 +382,13 @@ export default async function AppPage() {
               tuần).
             </p>
           )}
+          {cohortStartDate && (
+            <OtherCohortsLink
+              programId={paidWaitingEnrollment.program_id}
+              currentCohortId={paidWaitingEnrollment.cohort_id}
+              currentStartDate={cohortStartDate}
+            />
+          )}
           {!trialStillActive && cohortStartDate && (
             <p className="mt-2 text-sm text-neutral-600">
               Trong thời gian chờ, BodiX sẽ nhắc bạn qua Zalo trước ngày D1.
@@ -412,8 +420,7 @@ export default async function AppPage() {
             <p className="mt-2 text-neutral-700">
               Bạn đã ghép cặp với{" "}
               <span className="font-semibold text-primary">{buddyName}</span>.
-              Khi đợt tập bắt đầu, hai bạn có thể chat 1-1 trong app để động
-              viên nhau.
+              Khi đợt tập bắt đầu, hai bạn có thể động viên nhau qua tin nhắn.
             </p>
           </div>
         )}

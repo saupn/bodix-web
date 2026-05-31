@@ -28,7 +28,7 @@ export const FAQ_DATABASE: FAQEntry[] = [
   {
     id: 'payment_method',
     keywords: ['thanh toán bằng', 'phương thức thanh toán', 'chuyển khoản', 'trả tiền'],
-    answer: 'BodiX nhận thanh toán qua chuyển khoản ngân hàng (SePay). Sau khi đăng ký, bạn sẽ nhận thông tin chuyển khoản qua app.',
+    answer: 'BodiX nhận thanh toán qua chuyển khoản ngân hàng (quét mã QR Code). Sau khi đăng ký, bạn có thể bấm vào nút “Thanh toán ngay” trên trang bodix.fit/app.',
   },
   {
     id: 'refund',

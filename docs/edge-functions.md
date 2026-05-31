@@ -15,7 +15,7 @@ npx supabase functions deploy <function-name>
 |---|---|---|---|
 | morning-reminder | `0 0 * * *` | 07:00 daily | `MORNING_REMINDER_SECRET` |
 | evening-confirmation | `0 14 * * *` | 21:00 daily | `EVENING_CONFIRMATION_SECRET` |
-| dropout-scanner | `0 15 * * *` | 22:00 daily | `DROPOUT_SCANNER_SECRET` |
+| dropout-scanner | ⛔ DEPRECATED – KHÔNG lên lịch | — | `DROPOUT_SCANNER_SECRET` (lịch sử) |
 | trial-expiration | `0 * * * *` | every hour | `TRIAL_EXPIRATION_SECRET` |
 | weekly-review-reminder | `0 1 * * 0` | 08:00 Sunday | `WEEKLY_REVIEW_REMINDER_SECRET` |
 | midprogram-trigger | `0 1 * * *` | 08:00 daily | `MIDPROGRAM_TRIGGER_SECRET` |
@@ -65,11 +65,21 @@ npx supabase functions deploy <function-name>
 
 ---
 
-## 3. dropout-scanner
+## 3. dropout-scanner — ⛔ DEPRECATED / DISABLED (2026-05)
 
-**Purpose:** Detect at-risk users, create dropout signals and rescue interventions, auto-pause abandoned enrollments.
+> **ĐÃ NGỪNG SỬ DỤNG. KHÔNG lên lịch.** Handler trả 410 và không ghi gì.
+> Thay thế bởi 2 hệ tách rời:
+> - `dropout_signals` + `risk_score` → SQL `bodix_emit_dropout_signals` /
+>   `bodix_snapshot_enrollment_daily` (migration 062), pg_cron `genome-daily`
+>   (pure SQL). **Writer duy nhất của `dropout_signals`.**
+> - rescue messaging → Vercel cron `/api/cron/rescue-check`.
+>
+> Genome v1 chưa port `downgrade_pattern` / `low_feeling_trend` (xem báo cáo).
+> Giữ function làm tham chiếu; xoá sau khi chốt port.
 
-**Cron:** `0 15 * * *` (22:00 ICT, after evening-confirmation)
+**Purpose (lịch sử):** Detect at-risk users, create dropout signals and rescue interventions, auto-pause abandoned enrollments.
+
+**Cron:** ⛔ KHÔNG lên lịch (trước đây `0 15 * * *`).
 
 **Logic:**
 1. Track previous day's nudge effectiveness (mark `led_to_checkin = true` for nudges followed by a check-in)
@@ -223,7 +233,7 @@ Set via Supabase Dashboard → Edge Functions → Secrets (or `supabase secrets 
 | `SUPABASE_SERVICE_ROLE_KEY` | All (auto-injected) |
 | `MORNING_REMINDER_SECRET` | morning-reminder |
 | `EVENING_CONFIRMATION_SECRET` | evening-confirmation |
-| `DROPOUT_SCANNER_SECRET` | dropout-scanner |
+| `DROPOUT_SCANNER_SECRET` | dropout-scanner (deprecated) |
 | `TRIAL_EXPIRATION_SECRET` | trial-expiration |
 | `WEEKLY_REVIEW_REMINDER_SECRET` | weekly-review-reminder |
 | `MIDPROGRAM_TRIGGER_SECRET` | midprogram-trigger |
@@ -233,7 +243,7 @@ Set via Supabase Dashboard → Edge Functions → Secrets (or `supabase secrets 
 | `FOUNDER_EMAIL` | weekly-report |
 | `ZALO_OA_ACCESS_TOKEN` | All (Zalo ZNS) |
 | `ZALO_ZNS_TEMPLATE_MORNING` | morning-reminder |
-| `ZALO_ZNS_TEMPLATE_RESCUE` | dropout-scanner |
+| `ZALO_ZNS_TEMPLATE_RESCUE` | dropout-scanner (deprecated) |
 
 ---
 

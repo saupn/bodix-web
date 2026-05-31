@@ -1,23 +1,22 @@
 /**
- * Edge Function: dropout-scanner
+ * Edge Function: dropout-scanner — ⛔ DEPRECATED / DISABLED (2026-05).
  *
- * Chạy mỗi tối 22:00 ICT (15:00 UTC), sau evening-confirmation.
- * Quét toàn bộ enrollments active → tính risk → tạo signals → kích hoạt rescue.
+ * ĐÃ NGỪNG SỬ DỤNG. Được thay thế bởi 2 hệ tách rời (decoupled):
+ *   1. dropout_signals + risk_score → hàm SQL `bodix_emit_dropout_signals` /
+ *      `bodix_snapshot_enrollment_daily` (migration 062_genome_v1.sql), chạy
+ *      bằng pg_cron 'genome-daily' (pure SQL, KHÔNG net.http). Đây là WRITER
+ *      DUY NHẤT của dropout_signals.
+ *   2. rescue messaging (L1/L2/L3) → Vercel cron /api/cron/rescue-check.
  *
- * Deploy:
- *   npx supabase functions deploy dropout-scanner
+ * KHÔNG lên lịch lại function này (đừng tạo cron.schedule / Edge Function
+ * Schedule). Nếu vô tình bị gọi, handler bên dưới trả 410 và KHÔNG ghi gì —
+ * tránh tái diễn race double-write dropout_signals (bài học migration 056).
  *
- * Cron setup:
- *   select cron.schedule(
- *     'dropout-scanner',
- *     '0 15 * * *',
- *     $$ select net.http_post(
- *       url     := 'https://<project-ref>.supabase.co/functions/v1/dropout-scanner',
- *       headers := '{"x-function-secret": "<DROPOUT_SCANNER_SECRET>"}'::jsonb
- *     ) $$
- *   );
+ * Giữ lại làm tham chiếu cho quyết định port `downgrade_pattern` /
+ * `low_feeling_trend` sang SQL (genome v1 chưa có 2 signal này). Xoá hẳn sau
+ * khi đã chốt port.
  *
- * Env vars: DROPOUT_SCANNER_SECRET
+ * Env vars (lịch sử): DROPOUT_SCANNER_SECRET
  */
 
 import { createAdminClient } from '../_shared/supabase-admin.ts'
@@ -668,9 +667,24 @@ async function trackNudgeEffectiveness(
 
 // ─── Main handler ─────────────────────────────────────────────────────────────
 
-Deno.serve(async (req) => {
+Deno.serve(async (_req) => {
+  // ⛔ DEPRECATED & DISABLED. Thay bằng bodix_emit_dropout_signals (genome v1,
+  // writer duy nhất của dropout_signals) + /api/cron/rescue-check (rescue).
+  // Hard-stop trước MỌI thao tác DB để không bao giờ ghi trùng dropout_signals
+  // dù bị gọi nhầm. Gỡ guard này chỉ khi cố ý hồi sinh function.
+  return new Response(
+    JSON.stringify({
+      disabled: true,
+      message:
+        'dropout-scanner đã ngừng sử dụng. dropout_signals do bodix_emit_dropout_signals ghi; rescue do /api/cron/rescue-check xử lý.',
+    }),
+    { status: 410, headers: { 'Content-Type': 'application/json' } },
+  )
+
+  // ── Dead code dưới đây giữ làm tham chiếu (xem header). Không bao giờ chạy. ──
+  // eslint-disable-next-line no-unreachable
   if (FUNCTION_SECRET) {
-    const provided = req.headers.get('x-function-secret')
+    const provided = _req.headers.get('x-function-secret')
     if (provided !== FUNCTION_SECRET) {
       return new Response(JSON.stringify({ error: 'Unauthorized.' }), {
         status: 401,

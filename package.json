@@ -8,6 +8,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
+    "test": "node --import tsx --test \"lib/**/__tests__/*.test.ts\"",
     "analyze": "ANALYZE=true next build",
     "get-zalo-token": "npx tsx scripts/get-zalo-token-simple.ts",
     "get-zalo-token:local": "npx tsx scripts/get-zalo-token.ts",

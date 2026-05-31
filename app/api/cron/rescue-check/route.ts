@@ -147,6 +147,17 @@ export async function GET(request: NextRequest) {
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SUB-TASK 1: RESCUE L1/L2/L3
+  //
+  // Trigger tính TRỰC TIẾP từ daily_checkins (last check-in → daysMissed), KHÔNG
+  // đọc dropout_signals. Đây là nơi DUY NHẤT gửi tin rescue. Genome v1
+  // (dropout_signals + risk_score, ghi bởi bodix_emit_dropout_signals) chạy độc
+  // lập, CHỈ để chẩn đoán/quan sát (trang /admin/genome) — KHÔNG tự động hành động.
+  //
+  // TODO(genome→rescue): chỉ nối genome vào rescue SAU KHI risk weights được
+  // validate qua 2-3 cohort thật. Khi nối PHẢI dedup để user không bị cả
+  // rescue-check (bỏ-N-ngày) lẫn genome (risk_score) cùng kích một lần rescue
+  // — ví dụ: 1 cooldown chung trên rescue_interventions theo enrollment + ngày,
+  // hoặc gộp 2 nguồn trước khi gửi. Hai hệ hiện DECOUPLED.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
   subTaskResults.rescue = await runSubTask('rescue_l1_l2_l3', async () => {

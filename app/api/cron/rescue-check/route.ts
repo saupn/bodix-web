@@ -23,7 +23,7 @@ function buildL1Message(name: string): string {
   return (
     `${name} ơi, mình thấy bạn chưa check-in 2 ngày rồi.\n` +
     `Chỉ cần 1 lượt (~7 phút) là chuỗi ngày tập vẫn giữ.\n` +
-    `Nhắn 1 khi xong nha!`
+    `Tập xong nhắn số lượt cho mình nha: 1, 2 hoặc 3!`
   );
 }
 
@@ -33,7 +33,7 @@ function buildL2Message(name: string, completedDays: number): string {
     `Mình hiểu có lúc bận hoặc mệt.\n` +
     `Chỉ cần 1 lượt – 7 phút – chuỗi ngày tập vẫn giữ.\n` +
     `Quan trọng là không dừng lại nha.\n` +
-    `Nhắn 1 nếu bạn muốn tiếp tục!`
+    `Tập xong nhắn số lượt cho mình nha: 1, 2 hoặc 3!`
   );
 }
 
@@ -58,7 +58,7 @@ function buildEveningMessage(name: string): string {
     `\n` +
     `Không cần hoàn hảo – chỉ cần bước lên thảm là đã thắng rồi.\n` +
     `\n` +
-    `Khi xong nhắn 1 nha, mình ghi lại cho bạn 💚`
+    `Tập xong rồi nhắn số lượt cho mình nhé: 3 nếu bạn tập đủ 3 lượt, 2 nếu 2 lượt, 1 nếu 1 lượt. Mình ghi lại cho bạn 💚`
   );
 }
 

@@ -4,12 +4,32 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { getAccessToken } from '@/lib/messaging/helpers';
 import { matchFAQ, isNonsenseMessage, FALLBACK_REPLY, NONSENSE_REPLY } from '@/lib/zalo/faq';
 import { parseCheckin, roundsToMode } from '@/lib/zalo/parse-checkin';
+import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
+import {
+  getVietnamDateString,
+  isoTimestampToVietnamYmd,
+  calendarDaysBetween,
+  formatDateVn,
+} from '@/lib/date/vietnam';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 const service = createServiceClient();
+
+// Phản hồi xác nhận check-in theo số lượt — completion-first: khích lệ mọi mức độ.
+// Dùng chung cho cả check-in active (daily_checkins) lẫn trial (trial_activities).
+const CHECKIN_RESPONSES: Record<1 | 2 | 3, string> = {
+  3: '💪 Tuyệt vời! Bạn đã hoàn thành đủ 3 lượt hôm nay. Giữ vững nhịp này nhé!',
+  2: '👏 Làm tốt lắm! 2 lượt hôm nay là một bước tiến. Mai mình cùng cố thêm nhé!',
+  1: '✅ Hoàn thành 1 lượt vẫn hơn không tập. Quan trọng là bạn đã bước lên thảm hôm nay!',
+};
+
+// Map mode (daily_checkins) → số lượt, để so sánh khi user nhập lại số khác.
+function modeToRounds(mode: string): 1 | 2 | 3 {
+  return mode === 'hard' ? 3 : mode === 'light' ? 2 : 1;
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // PARSE FEELING SCORE (1-5) cho weekly review
@@ -262,7 +282,7 @@ async function handleUserMessage(payload: any) {
 
   const { data: profile } = await supabase
     .from('profiles')
-    .select('id, full_name, phone, phone_verified, channel_user_id')
+    .select('id, full_name, phone, phone_verified, channel_user_id, trial_ends_at, bodix_start_date')
     .eq('channel_user_id', zaloUid)
     .order('created_at', { ascending: false })
     .limit(1)
@@ -273,37 +293,71 @@ async function handleUserMessage(payload: any) {
   //    xử lý phía trên. Đây KHÔNG phải reply state-aware — là lệnh thật, và được
   //    ưu tiên TRƯỚC nonsense filter + FAQ để "1/2/3" luôn ghi nhận check-in.
   if (profile) {
-    const { data: enrollment, error: enrollmentError } = await supabase
+    const { data: enrollmentRows, error: enrollmentError } = await supabase
       .from('enrollments')
-      .select('id, user_id, cohort_id, current_day, program_id, status, programs(name, duration_days)')
+      .select('id, user_id, cohort_id, current_day, program_id, status, enrolled_at, created_at, programs(name, duration_days)')
       .eq('user_id', profile.id)
-      .in('status', ['active', 'trial', 'trial_completed'])
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
+      .in('status', ['active', 'trial', 'trial_completed', 'pending_payment', 'paid_waiting_cohort', 'completed', 'dropped'])
+      .order('created_at', { ascending: false });
 
     if (enrollmentError) {
       console.error('[webhook] enrollment query error:', enrollmentError);
     }
 
-    if (enrollment) {
-      // Feeling reply (1-5) cho weekly review
-      if (feelingScore !== null) {
-        const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
-        const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore, safeSend);
-        if (handled) {
-          console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
-          return;
-        }
-      }
+    const enrollments = enrollmentRows ?? [];
 
-      // Check-in: tin nhắn CHÍNH XÁC "1"/"2"/"3" = số lượt đã tập. Skip cho
-      // trial_completed (đã hết trial, không còn ngày tập thử để ghi).
-      if (checkin.isCheckin && enrollment.status !== 'trial_completed') {
-        console.log('[webhook] CHECKIN matched, rounds:', checkin.rounds, 'enrollment:', enrollment.id);
-        await handleCheckin(zaloUserId, profile, enrollment, checkin.rounds, safeSend);
+    // ── Phân loại enrollment ──
+    // ACTIVE (trong cohort) ưu tiên cao nhất nếu user vừa trial vừa active.
+    const activeEnrollment = enrollments.find((e) => e.status === 'active') ?? null;
+
+    // TRIAL-ish: còn trong 3 ngày trải nghiệm thử (trial_ends_at còn hạn theo
+    // NGÀY lịch VN — cho phép check-in cả ngày cuối dù timestamp đã qua giờ).
+    const todayVN = getVietnamDateString();
+    const trialStillValid =
+      !!profile.trial_ends_at &&
+      isoTimestampToVietnamYmd(profile.trial_ends_at) >= todayVN;
+    const trialEnrollment = trialStillValid
+      ? enrollments.find((e) =>
+          ['trial', 'pending_payment', 'paid_waiting_cohort'].includes(e.status),
+        ) ?? null
+      : null;
+
+    // Enrollment dùng cho feeling-reply (ưu tiên active, else gần nhất).
+    const primaryEnrollment = activeEnrollment ?? enrollments[0] ?? null;
+
+    // Feeling reply (1-5) cho weekly review — chỉ xử lý khi có review chờ feeling.
+    if (primaryEnrollment && feelingScore !== null) {
+      const weekNumber = Math.ceil((primaryEnrollment.current_day || 1) / 7);
+      const handled = await handleFeelingReply(zaloUserId, profile, primaryEnrollment, weekNumber, feelingScore, safeSend);
+      if (handled) {
+        console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
         return;
       }
+    }
+
+    // Check-in "1"/"2"/"3" — phân nhánh ACTIVE (daily_checkins) vs TRIAL (trial_activities).
+    if (checkin.isCheckin) {
+      if (activeEnrollment) {
+        console.log('[webhook] CHECKIN active, rounds:', checkin.rounds, 'enrollment:', activeEnrollment.id);
+        await handleCheckin(zaloUserId, profile, activeEnrollment, checkin.rounds, safeSend);
+        return;
+      }
+      if (trialEnrollment) {
+        console.log('[webhook] CHECKIN trial, rounds:', checkin.rounds, 'enrollment:', trialEnrollment.id);
+        await handleTrialCheckin(zaloUserId, profile, trialEnrollment, checkin.rounds, safeSend);
+        return;
+      }
+      // Có enrollment nhưng không buổi nào đang mở (completed/dropped/trial_completed
+      // / trial hết hạn) → KHÔNG ghi; trả lời nhẹ nhàng, dẫn về web — tránh rơi vào
+      // nonsense filter trả lời sai cho "1/2/3".
+      if (enrollments.length > 0) {
+        await safeSend(zaloUserId,
+          'Hiện bạn chưa có buổi tập nào đang mở để ghi nhận. Ghé bodix.fit để xem chương trình của mình nhé!'
+        );
+        console.log('[webhook] checkin no-eligible-enrollment msg_id:', msgId);
+        return;
+      }
+      // Hoàn toàn chưa enroll → để rơi xuống FAQ/fallback bên dưới.
     }
   }
 
@@ -567,22 +621,27 @@ async function handleCheckin(
   const todayVN = vnNow.toISOString().split('T')[0];
   const { data: existingCheckin } = await supabase
     .from('daily_checkins')
-    .select('id')
+    .select('id, mode')
     .eq('enrollment_id', enrollment.id)
     .eq('workout_date', todayVN)
     .maybeSingle();
 
   if (existingCheckin) {
-    console.log('[webhook] CHECK-IN ALREADY EXISTS for today (VN), skipping');
-    const isTrial = enrollment.status === 'trial';
-    const currentDay = enrollment.current_day || 0;
-    if (isTrial && currentDay >= 3) {
-      await safeSend(zaloUserId,
-        '🎯 Chúc mừng! Bạn đã hoàn thành 3 ngày trải nghiệm thử!\n\nBạn có muốn đăng ký tập chính thức không? Nhắn Y nếu muốn đăng ký.'
-      );
-    } else {
-      await safeSend(zaloUserId, 'Bạn đã check-in hôm nay rồi! Nghỉ ngơi và hẹn ngày mai nhé.');
+    console.log('[webhook] CHECK-IN ALREADY EXISTS for today (VN)');
+    // Cùng số lượt → đã ghi rồi.
+    if (existingCheckin.mode === checkinMode) {
+      await safeSend(zaloUserId, 'Bạn đã ghi nhận tập hôm nay rồi. Hẹn gặp lại ngày mai nhé!');
+      return;
     }
+    // Số lượt KHÁC → latest-wins: cập nhật mode + điều chỉnh breakdown streak.
+    await service
+      .from('daily_checkins')
+      .update({ mode: checkinMode, completed_at: new Date().toISOString() })
+      .eq('id', existingCheckin.id);
+    await adjustStreakMode(enrollment.id, existingCheckin.mode, checkinMode);
+    await safeSend(zaloUserId,
+      `Đã cập nhật: hôm nay bạn tập ${rounds} lượt. Quan trọng là bạn vẫn bước lên thảm 💚`
+    );
     return;
   }
 
@@ -718,12 +777,115 @@ async function handleCheckin(
     return;
   }
 
-  // Phản hồi xác nhận theo số lượt — completion-first: khích lệ mọi mức độ.
-  const CHECKIN_RESPONSES: Record<1 | 2 | 3, string> = {
-    3: '💪 Tuyệt vời! Bạn đã hoàn thành đủ 3 lượt hôm nay. Giữ vững nhịp này nhé!',
-    2: '👏 Làm tốt lắm! 2 lượt hôm nay là một bước tiến. Mai mình cùng cố thêm nhé!',
-    1: '✅ Hoàn thành 1 lượt vẫn hơn không tập. Quan trọng là bạn đã bước lên thảm hôm nay!',
+  await safeSend(zaloUserId, CHECKIN_RESPONSES[rounds]);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ĐIỀU CHỈNH BREAKDOWN STREAK KHI ĐỔI MODE (latest-wins)
+// Tổng ngày hoàn thành không đổi (vẫn 1 ngày), chỉ dịch hard/light/easy.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+async function adjustStreakMode(enrollmentId: string, oldMode: string, newMode: string) {
+  if (oldMode === newMode) return;
+  const { data: streak } = await service
+    .from('streaks')
+    .select('total_hard_days, total_light_days, total_easy_days')
+    .eq('enrollment_id', enrollmentId)
+    .maybeSingle();
+  if (!streak) return;
+
+  const col = (mode: string) =>
+    mode === 'hard' ? 'total_hard_days' : mode === 'light' ? 'total_light_days' : 'total_easy_days';
+  const counts: Record<string, number> = {
+    total_hard_days: streak.total_hard_days ?? 0,
+    total_light_days: streak.total_light_days ?? 0,
+    total_easy_days: streak.total_easy_days ?? 0,
   };
+  counts[col(oldMode)] = Math.max(0, counts[col(oldMode)] - 1);
+  counts[col(newMode)] = counts[col(newMode)] + 1;
+
+  await service
+    .from('streaks')
+    .update({ ...counts, updated_at: new Date().toISOString() })
+    .eq('enrollment_id', enrollmentId);
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// XỬ LÝ CHECK-IN TRIAL (ghi trial_activities, KHÔNG ghi daily_checkins)
+// User trial nhắn 1/2/3 → log complete_trial_day {rounds, day_number}.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function handleTrialCheckin(
+  zaloUserId: string,
+  profile: any,
+  enrollment: any,
+  rounds: 1 | 2 | 3,
+  safeSend: (uid: string, text: string) => Promise<void>,
+) {
+  const todayVN = getVietnamDateString();
+
+  // Trial day_number = số ngày lịch từ anchor (giống tin nhắn sáng).
+  const anchor = getTrialMorningAnchorDate(
+    profile.bodix_start_date,
+    enrollment.enrolled_at ?? enrollment.created_at,
+  );
+  let dayNumber = calendarDaysBetween(anchor, todayVN) + 1;
+
+  // F1: trial chưa bắt đầu (day < 1) → báo ngày bắt đầu, không ghi.
+  if (dayNumber < 1) {
+    await safeSend(zaloUserId,
+      `Trải nghiệm thử của bạn sẽ bắt đầu vào ${formatDateVn(anchor)}. Hẹn gặp bạn khi đó nhé!`
+    );
+    return;
+  }
+  // F2: quá D3 nhưng trial_ends_at còn hạn → cap day_number = 3, vẫn cho ghi.
+  if (dayNumber > TRIAL_DAYS) dayNumber = TRIAL_DAYS;
+
+  // Dedup theo ngày VN + day_number: lấy các complete_trial_day của user, lọc trong code
+  // (metadata->>day_number và DATE(created_at AT TIME ZONE VN) = todayVN).
+  const { data: rows } = await service
+    .from('trial_activities')
+    .select('id, metadata, created_at')
+    .eq('user_id', profile.id)
+    .eq('activity_type', 'complete_trial_day')
+    .order('created_at', { ascending: false });
+
+  const existing = (rows ?? []).find(
+    (r: any) =>
+      String(r.metadata?.day_number) === String(dayNumber) &&
+      isoTimestampToVietnamYmd(r.created_at) === todayVN,
+  );
+
+  if (existing) {
+    const existingRounds = Number(existing.metadata?.rounds);
+    // Cùng số lượt → đã ghi rồi.
+    if (existingRounds === rounds) {
+      await safeSend(zaloUserId, 'Bạn đã ghi nhận tập hôm nay rồi. Hẹn gặp lại ngày mai nhé!');
+      return;
+    }
+    // Số lượt KHÁC → latest-wins: cập nhật metadata.rounds.
+    await service
+      .from('trial_activities')
+      .update({ metadata: { ...existing.metadata, rounds, day_number: dayNumber } })
+      .eq('id', existing.id);
+    await safeSend(zaloUserId,
+      `Đã cập nhật: hôm nay bạn tập ${rounds} lượt. Quan trọng là bạn vẫn bước lên thảm 💚`
+    );
+    return;
+  }
+
+  // Chưa có → INSERT.
+  const { error: insertError } = await service.from('trial_activities').insert({
+    user_id: profile.id,
+    program_id: enrollment.program_id,
+    activity_type: 'complete_trial_day',
+    metadata: { rounds, day_number: dayNumber },
+  });
+
+  if (insertError) {
+    console.error('[zalo/webhook] insert trial_activities:', insertError);
+    await safeSend(zaloUserId, 'Có lỗi xảy ra. Vui lòng thử lại sau.');
+    return;
+  }
 
   await safeSend(zaloUserId, CHECKIN_RESPONSES[rounds]);
 }

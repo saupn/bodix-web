@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createServiceClient } from '@/lib/supabase/service';
 import { getAccessToken } from '@/lib/messaging/helpers';
+import { matchFAQ, isNonsenseMessage, FALLBACK_REPLY, NONSENSE_REPLY } from '@/lib/zalo/faq';
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -278,15 +279,10 @@ async function handleUserMessage(payload: any) {
   const checkinType = parseCheckinType(messageText);
   const feelingScore = parseFeelingScore(messageText);
 
-  // 1. Tìm profile theo channel_user_id (Zalo UID)
-  // KHÔNG .single(): ném lỗi khi 0 HOẶC >1 row (profile trùng
-  // channel_user_id) → báo nhầm "chưa tìm thấy" dù tài khoản tồn tại.
-  // .order('created_at' desc) + .limit(1) + .maybeSingle():
-  //   - có duplicate → lấy profile mới nhất, không throw
-  //   - không có row → data = null (không phải error)
-  // .trim() input phòng channel_user_id lưu dính khoảng trắng
-  // (xem verify-zalo-otp/route.ts:103). KHÔNG thêm unique constraint
-  // ở DB lúc này — data duplicate đang tồn tại, dọn thủ công sau.
+  // 1. Tìm profile theo channel_user_id (Zalo UID). KHÔNG .single() — duplicate
+  //    channel_user_id tồn tại; .order(created_at desc)+limit(1)+maybeSingle để
+  //    lấy profile mới nhất, không throw. profile có thể null (chưa đăng ký) —
+  //    KHÔNG return sớm: user chưa đăng ký vẫn được trả lời FAQ.
   const zaloUid = String(zaloUserId ?? '').trim();
 
   const { data: profile } = await supabase
@@ -297,136 +293,74 @@ async function handleUserMessage(payload: any) {
     .limit(1)
     .maybeSingle();
 
-  if (!profile) {
-    console.log('[webhook] matched=no_profile msg_id:', msgId, 'uid:', zaloUid);
-    await safeSend(zaloUserId,
-      'Mình chưa tìm thấy tài khoản của bạn. Vui lòng đăng ký tại bodix.fit trước nhé!'
-    );
-    return;
-  }
-
-  // Bonus: cảnh báo nếu nhiều profile cùng Zalo UID → admin cần dọn dữ liệu
-  const { count: dupCount } = await supabase
-    .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .eq('channel_user_id', zaloUid);
-
-  if (dupCount && dupCount > 1) {
-    console.warn(`[webhook] Multiple profiles (${dupCount}) for Zalo UID ${zaloUid}, using latest`);
-  }
-
-  console.log('[webhook] profile:', profile.id, 'channel_user_id:', zaloUid, 'dup:', dupCount ?? 1);
-
-  // 2. Tìm enrollment active / trial / trial_completed
-  // Bao gồm 'trial_completed' để bắt reply "Y" (đăng ký chính thức) sau khi xong trial.
-  const { data: enrollment, error: enrollmentError } = await supabase
-    .from('enrollments')
-    .select('id, user_id, cohort_id, current_day, program_id, status, programs(name, duration_days)')
-    .eq('user_id', profile.id)
-    .in('status', ['active', 'trial', 'trial_completed'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  console.log('[webhook] enrollment:', enrollment?.status, enrollment?.id, 'error:', enrollmentError?.message);
-
-  if (enrollmentError) {
-    console.error('[webhook] enrollment query error:', enrollmentError);
-  }
-
-  if (!enrollment) {
-    // Kiểm tra các status khác để phản hồi phù hợp (chỉ 1 lần mỗi status)
-    const { data: otherEnrollment } = await supabase
+  // 2. Nếu có profile + enrollment đang chạy: xử lý LỆNH chức năng
+  //    (feeling review 1-5 / check-in HARD/LIGHT/EASY/1/2/3). Verify code (5 ký
+  //    tự) đã xử lý phía trên. Đây KHÔNG phải reply state-aware — là lệnh thật.
+  if (profile) {
+    const { data: enrollment, error: enrollmentError } = await supabase
       .from('enrollments')
-      .select('status')
+      .select('id, user_id, cohort_id, current_day, program_id, status, programs(name, duration_days)')
       .eq('user_id', profile.id)
-      .in('status', ['pending_payment', 'paid_waiting_cohort', 'completed', 'paused', 'dropped'])
+      .in('status', ['active', 'trial', 'trial_completed'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle();
 
-    const status = otherEnrollment?.status;
-    console.log('[webhook] matched=no_active_enrollment msg_id:', msgId, 'status:', status);
-
-    if (status === 'paid_waiting_cohort') {
-      await safeSend(zaloUserId,
-        'Bạn đã thanh toán thành công và đang chờ đợt tập tiếp theo bắt đầu. Chúng tôi sẽ nhắc bạn vài ngày trước ngày khai giảng. Cùng chuẩn bị tinh thần nhé!'
-      );
-    } else if (status === 'pending_payment') {
-      await safeSend(zaloUserId,
-        '⏰ 3 ngày tập thử đã kết thúc. Thanh toán tại bodix.fit/checkout'
-      );
-    } else if (status === 'completed') {
-      await safeSend(zaloUserId,
-        '🏆 Bạn đã hoàn thành chương trình rồi! Chọn chương trình tiếp theo tại bodix.fit/app để tiếp tục hành trình – có thể đăng ký bất cứ lúc nào nhé!'
-      );
-    } else if (status === 'paused') {
-      await safeSend(zaloUserId,
-        'Enrollment của bạn đang tạm dừng. Liên hệ bodix.fit để tiếp tục nhé.'
-      );
-    } else {
-      await safeSend(zaloUserId,
-        'Bạn chưa đăng ký chương trình. Vui lòng đăng ký tại bodix.fit nhé!'
-      );
+    if (enrollmentError) {
+      console.error('[webhook] enrollment query error:', enrollmentError);
     }
-    return;
-  }
 
-  // ── Reply "Y" / "YES" / "CÓ" / "ĐĂNG KÝ" — đăng ký chính thức sau trial ──
-  const upperText = messageText.toUpperCase().trim();
-  const isYesReply = ['Y', 'YES', 'CÓ', 'CO', 'ĐĂNG KÝ'].includes(upperText);
-  if (isYesReply) {
-    const trialDone =
-      enrollment.status === 'trial_completed' ||
-      (enrollment.status === 'trial' && (enrollment.current_day || 0) >= 3);
-    if (trialDone) {
-      console.log('[webhook] matched=yes_register msg_id:', msgId);
-      await safeSend(zaloUserId,
-        '✅ Tuyệt vời! Bạn có thể đăng ký khoá đầy đủ ngay tại bodix.fit/app. Sau khi thanh toán, bạn sẽ tham gia đợt tập gần nhất.'
-      );
-      return;
+    if (enrollment) {
+      // Feeling reply (1-5) cho weekly review
+      if (feelingScore !== null) {
+        const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
+        const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore, safeSend);
+        if (handled) {
+          console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
+          return;
+        }
+      }
+
+      // Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3). Skip cho trial_completed.
+      if (checkinType && enrollment.status !== 'trial_completed') {
+        console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
+        await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
+        return;
+      }
     }
   }
 
-  // ── Kiểm tra: reply feeling (1-5) cho weekly review? ──
-  if (feelingScore !== null) {
-    const weekNumber = Math.ceil((enrollment.current_day || 1) / 7);
-    const handled = await handleFeelingReply(zaloUserId, profile, enrollment, weekNumber, feelingScore, safeSend);
-    console.log('[webhook] feeling check:', feelingScore, 'handled:', handled);
-    if (handled) {
-      console.log('[webhook] matched=feeling msg_id:', msgId, 'score:', feelingScore);
-      return;
-    }
-    // Nếu không phải context review → tiếp tục xử lý check-in (1/2/3 overlap)
-  } else {
-    console.log('[webhook] feeling check: null (not a feeling reply)');
-  }
+  // 3. Tầng FAQ — THAY HOÀN TOÀN logic state-aware cũ (không còn "bạn đã thanh
+  //    toán", "bạn đã hoàn thành"...). Áp dụng cho mọi tin nhắn không phải lệnh
+  //    chức năng, bất kể user đã đăng ký hay chưa.
+  const matched = matchFAQ(messageText);
+  const nonsense = isNonsenseMessage(messageText);
 
-  // ── Check-in (HARD/LIGHT/EASY/RECOVERY hoặc 1/2/3) ──
-  // Skip cho trial_completed: đã xong trial, không nhận check-in mới.
-  console.log('[webhook] checkin type parsed:', checkinType);
-  if (checkinType && enrollment.status !== 'trial_completed') {
-    console.log('[webhook] CHECKIN matched, mode:', checkinType, 'enrollment:', enrollment.id);
-    await handleCheckin(zaloUserId, profile, enrollment, checkinType, safeSend);
+  // Log structured cho analytics sau launch: FAQ nào hỏi nhiều, tin nào miss, spam.
+  console.log(JSON.stringify({
+    event: 'zalo_user_message',
+    zalo_user_id: zaloUserId,
+    message_length: messageText.length,
+    matched_faq_id: matched?.id || null,
+    is_nonsense: nonsense,
+    timestamp: new Date().toISOString(),
+  }));
+
+  if (nonsense) {
+    await safeSend(zaloUserId, NONSENSE_REPLY);
+    console.log('[webhook] matched=nonsense msg_id:', msgId);
     return;
   }
 
-  // ── Catch-all: không match verify/Y/feeling/check-in ──
-  const trialDone =
-    enrollment.status === 'trial_completed' ||
-    (enrollment.status === 'trial' && (enrollment.current_day || 0) >= 3);
-  if (trialDone) {
-    console.log('[webhook] matched=catchall_trial_done msg_id:', msgId);
-    await safeSend(zaloUserId,
-      'Bạn đã hoàn thành trải nghiệm thử. Nhắn Y nếu muốn đăng ký tập chính thức, hoặc nhắn câu hỏi – chúng tôi sẽ phản hồi sớm nhất!'
-    );
+  if (matched) {
+    await safeSend(zaloUserId, matched.answer);
+    console.log(`[zalo-webhook] FAQ matched: ${matched.id} for user ${zaloUserId} (msg_id: ${msgId})`);
     return;
   }
 
-  console.log('[webhook] matched=catchall_active msg_id:', msgId);
-  await safeSend(zaloUserId,
-    'Mình chưa hiểu. Nhắn số nha:\n• 3 = đủ 3 lượt\n• 2 = 2 lượt\n• 1 = 1 lượt\n\nHoặc nhắn câu hỏi – chúng tôi sẽ phản hồi sớm nhất!'
-  );
+  await safeSend(zaloUserId, FALLBACK_REPLY);
+  console.log(`[zalo-webhook] No FAQ match for user ${zaloUserId} (msg_id: ${msgId}), message: "${messageText.substring(0, 100)}"`);
+  return;
   } catch (error: unknown) {
     const err = error as { message?: string; stack?: string };
     console.error(

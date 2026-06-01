@@ -14,18 +14,16 @@ export function GiftBookCard() {
         <div className="flex-1">
           <h3 className="font-semibold text-gray-900">Tặng sách cho bạn bè</h3>
           <p className="text-sm text-gray-600 mt-1">
-            {REFERRAL_COPY.giftBookSubtext}
-          </p>
-          <p className="text-sm text-gray-600 mt-2">
-            Sách:{" "}
+            {REFERRAL_COPY.giftBookSubtextBefore}
             <a
               href="/api/guides/download"
               target="_blank"
               rel="noopener noreferrer"
               className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
             >
-              &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot;
+              &quot;{REFERRAL_COPY.giftBookTitle}&quot;
             </a>
+            {REFERRAL_COPY.giftBookSubtextAfter}
           </p>
           <Link
             href="/app/tang-sach"

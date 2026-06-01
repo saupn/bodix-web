@@ -117,11 +117,12 @@ export async function ensureReferralCodeForUser(
   userId: string,
   fullName: string,
 ): Promise<{ code: string; created: boolean }> {
+  // Single-source: mỗi user chỉ 1 dòng referral_codes (UNIQUE user_id).
+  // KHÔNG lọc code_type — nếu user đã là affiliate, dòng đó vẫn là mã chung.
   const { data: existing } = await service
     .from("referral_codes")
     .select("code")
     .eq("user_id", userId)
-    .eq("code_type", "referral")
     .maybeSingle();
 
   if (existing?.code) {
@@ -148,12 +149,11 @@ export async function ensureReferralCodeForUser(
     });
 
   if (insertError) {
-    // Race condition: user khác vừa giành code trong khe hở. Re-fetch.
+    // Race condition: user khác vừa giành code / dòng vừa được tạo. Re-fetch.
     const { data: again } = await service
       .from("referral_codes")
       .select("code")
       .eq("user_id", userId)
-      .eq("code_type", "referral")
       .maybeSingle();
     if (again?.code) return { code: again.code, created: false };
     throw insertError;

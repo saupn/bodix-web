@@ -85,11 +85,11 @@ export async function POST(request: NextRequest) {
   }
 
   // 2. Upsert referral_codes (để r/[code] và checkout hoạt động)
+  // Single-source: mỗi user chỉ 1 dòng — đổi mã = UPDATE, KHÔNG lọc code_type.
   const { data: existingRefCode } = await service
     .from("referral_codes")
     .select("id, code")
     .eq("user_id", user.id)
-    .eq("code_type", "referral")
     .maybeSingle();
 
   if (existingRefCode) {

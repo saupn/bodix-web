@@ -274,16 +274,44 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ error: 'Không thể duyệt affiliate.' }, { status: 500 })
   }
 
-  // 2. Create affiliate referral code (or update existing)
+  // 2. Cấp quyền affiliate cho mã của user (single-source: 1 dòng/user).
+  // Nếu user đã có mã → UPDATE chính dòng đó (set is_affiliate=true, giữ mã chung).
+  // Nếu chưa → INSERT 1 dòng mới với mã sinh tự động.
   const generatedCode = await generateAffiliateCode(service, affiliate.user_id)
 
-  const { data: affiliateCode, error: codeError } = await service
+  const { data: existingCode } = await service
     .from('referral_codes')
-    .upsert(
-      {
+    .select('id, code')
+    .eq('user_id', affiliate.user_id)
+    .maybeSingle()
+
+  let affiliateCode: { code: string } | null = null
+  let codeError = null
+
+  if (existingCode) {
+    const res = await service
+      .from('referral_codes')
+      .update({
+        code_type: 'affiliate',
+        is_affiliate: true,
+        commission_rate: finalRate,
+        commission_type: 'percentage',
+        is_active: true,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', existingCode.id)
+      .select('code')
+      .single()
+    affiliateCode = res.data
+    codeError = res.error
+  } else {
+    const res = await service
+      .from('referral_codes')
+      .insert({
         user_id: affiliate.user_id,
         code: generatedCode,
         code_type: 'affiliate',
+        is_affiliate: true,
         reward_type: 'credit',
         reward_value: 100000,
         referee_reward_type: 'discount_percent',
@@ -291,15 +319,24 @@ export async function PUT(request: NextRequest) {
         commission_rate: finalRate,
         commission_type: 'percentage',
         is_active: true,
-      },
-      { onConflict: 'user_id,code_type', ignoreDuplicates: false }
-    )
-    .select('code')
-    .single()
+      })
+      .select('code')
+      .single()
+    affiliateCode = res.data
+    codeError = res.error
+  }
 
   if (codeError) {
     console.error('[admin/affiliate] create code:', codeError)
     // Non-fatal — profile approved, code can be created later
+  }
+
+  // Sync profiles.referral_code = mã chung
+  if (affiliateCode?.code) {
+    await service
+      .from('profiles')
+      .update({ referral_code: affiliateCode.code })
+      .eq('id', affiliate.user_id)
   }
 
   // 3. Notify the affiliate
@@ -340,12 +377,11 @@ async function generateAffiliateCode(
   service: any,
   userId: string
 ): Promise<string> {
-  // Check if user already has a code
+  // Single-source: tái dùng mã hiện có của user (bất kể code_type) nếu đã có.
   const { data: existing } = await service
     .from('referral_codes')
     .select('code')
     .eq('user_id', userId)
-    .eq('code_type', 'affiliate')
     .maybeSingle()
 
   if (existing?.code) return existing.code

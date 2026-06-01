@@ -134,7 +134,10 @@ export const REFERRAL_COPY = {
 
   // ── Profile / dashboard home labels ───────────────────────────────────────
   emptyVouchersOnProfile: `Chưa có voucher nào. Giới thiệu bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
-  giftBookSubtext: `Tặng sách "Tại sao nhịn ăn không giúp bạn gọn hơn" cho bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
+  // Tách thành 3 phần để render tên sách thành link bấm được (xem GiftBookCard).
+  giftBookTitle: "Tại sao nhịn ăn không giúp bạn gọn hơn",
+  giftBookSubtextBefore: "Tặng sách ",
+  giftBookSubtextAfter: ` cho bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
   giftBookNoCodeFallback:
     "Mã giới thiệu của bạn đang được tạo. Vui lòng tải lại trang sau vài giây.",
 } as const;

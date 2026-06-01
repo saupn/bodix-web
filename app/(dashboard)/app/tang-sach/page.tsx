@@ -21,14 +21,14 @@ export default async function TangSachDashboardPage() {
     .eq("id", user.id)
     .single();
 
-  // Fallback: nếu profile.referral_code null, kiểm tra referral_codes table
+  // Fallback: nếu profile.referral_code null, đọc dòng mã duy nhất của user.
+  // Single-source: KHÔNG lọc code_type (mã chung cho cả referral + affiliate).
   let referralCode: string | null = profile?.referral_code ?? null;
   if (!referralCode) {
     const { data: existingRef } = await service
       .from("referral_codes")
       .select("code")
       .eq("user_id", user.id)
-      .eq("code_type", "referral")
       .maybeSingle();
     if (existingRef?.code) {
       referralCode = existingRef.code;

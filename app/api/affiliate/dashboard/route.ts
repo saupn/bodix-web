@@ -48,6 +48,8 @@ export async function GET() {
   }
 
   // ── Fetch affiliate code ──────────────────────────────────────────────────
+  // Single-source: mỗi user chỉ 1 dòng referral_codes (mã chung /r/ + /af/).
+  // KHÔNG lọc code_type — đọc đúng dòng mã của user để cả 3 trang hiện cùng 1 mã.
   const { data: affiliateCode } = await supabase
     .from('referral_codes')
     .select(`
@@ -55,7 +57,6 @@ export async function GET() {
       total_clicks, total_signups, total_conversions, total_revenue_generated
     `)
     .eq('user_id', user.id)
-    .eq('code_type', 'affiliate')
     .eq('is_active', true)
     .order('created_at', { ascending: false })
     .limit(1)

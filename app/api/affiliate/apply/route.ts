@@ -81,16 +81,26 @@ export async function POST(request: NextRequest) {
     .maybeSingle()
 
   if (existingCode) {
-    // Upgrade existing referral code to affiliate
+    // Single-source: nâng cấp chính dòng mã hiện có của user (KHÔNG tạo dòng mới).
+    // is_affiliate=true đánh dấu quyền affiliate; mã giữ nguyên (mã chung /r/ + /af/).
     await service
       .from('referral_codes')
       .update({
         code_type: 'affiliate',
+        is_affiliate: true,
         commission_rate: DEFAULT_COMMISSION_RATE,
         commission_type: 'percentage',
         updated_at: now,
       })
       .eq('id', existingCode.id)
+
+    // Sync profiles.referral_code = mã chung
+    if (existingCode.code) {
+      await service
+        .from('profiles')
+        .update({ referral_code: existingCode.code })
+        .eq('id', user.id)
+    }
   } else {
     // Generate name-based code
     const { data: profile } = await service
@@ -120,6 +130,7 @@ export async function POST(request: NextRequest) {
       user_id: user.id,
       code,
       code_type: 'affiliate',
+      is_affiliate: true,
       reward_type: 'credit',
       reward_value: REFERRAL_REWARD_AMOUNT,
       referee_reward_type: 'discount_percent',

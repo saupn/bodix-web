@@ -17,11 +17,11 @@ export async function GET() {
   }
 
   // ── Referral code stats ───────────────────────────────────────────────────
+  // Single-source: 1 dòng mã/user (mã chung) — KHÔNG lọc code_type.
   const { data: code, error: codeError } = await supabase
     .from("referral_codes")
     .select("id, code, total_clicks, total_signups, total_conversions")
     .eq("user_id", user.id)
-    .eq("code_type", "referral")
     .maybeSingle();
 
   if (codeError) {

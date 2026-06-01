@@ -75,7 +75,9 @@ export async function GET() {
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
 
-  // Check existing referral code
+  // Single source of truth: mỗi user chỉ có DUY NHẤT 1 mã trong referral_codes
+  // (đảm bảo bởi UNIQUE constraint uq_referral_codes_user_id). KHÔNG lọc theo
+  // code_type — dù user là affiliate hay không, vẫn là cùng 1 mã chung.
   const { data: existing, error: fetchError } = await supabase
     .from('referral_codes')
     .select(`
@@ -85,7 +87,6 @@ export async function GET() {
       is_active, expires_at
     `)
     .eq('user_id', user.id)
-    .eq('code_type', 'referral')
     .maybeSingle()
 
   if (fetchError) {
@@ -187,31 +188,68 @@ export async function POST(request: NextRequest) {
   const { TIER_COMMISSION: TC } = await import('@/lib/affiliate/config')
   const commissionRate = TC[affiliateProfile?.affiliate_tier ?? 'basic'] ?? TC.basic
 
-  // ── Insert affiliate code ─────────────────────────────────────────────────
+  // ── Đổi mã của user sang custom code ──────────────────────────────────────
+  // Single-source: mỗi user chỉ 1 dòng referral_codes. Affiliate chọn custom
+  // code = ĐỔI TÊN mã hiện có (UPDATE), KHÔNG tạo dòng thứ 2. is_affiliate=true
+  // đánh dấu quyền affiliate trên chính dòng đó.
   const service = createServiceClient()
-  const { data: code, error: insertError } = await service
-    .from('referral_codes')
-    .insert({
-      user_id: user.id,
-      code: rawCode,
-      code_type: 'affiliate',
-      reward_type: 'credit',
-      reward_value: DEFAULT_REWARD_VALUE,
-      referee_reward_type: 'discount_percent',
-      referee_reward_value: DEFAULT_REFEREE_REWARD_VALUE,
-      commission_rate: commissionRate,
-      commission_type: 'percentage',
-    })
-    .select()
-    .single()
 
-  if (insertError) {
-    if (insertError.code === '23505') {
+  const { data: existing } = await service
+    .from('referral_codes')
+    .select('id')
+    .eq('user_id', user.id)
+    .maybeSingle()
+
+  const affiliateFields = {
+    code: rawCode,
+    is_affiliate: true,
+    commission_rate: commissionRate,
+    commission_type: 'percentage',
+    updated_at: new Date().toISOString(),
+  }
+
+  let code
+  let mutateError
+  if (existing) {
+    const res = await service
+      .from('referral_codes')
+      .update(affiliateFields)
+      .eq('id', existing.id)
+      .select()
+      .single()
+    code = res.data
+    mutateError = res.error
+  } else {
+    const res = await service
+      .from('referral_codes')
+      .insert({
+        user_id: user.id,
+        code_type: 'affiliate',
+        reward_type: 'credit',
+        reward_value: DEFAULT_REWARD_VALUE,
+        referee_reward_type: 'discount_percent',
+        referee_reward_value: DEFAULT_REFEREE_REWARD_VALUE,
+        ...affiliateFields,
+      })
+      .select()
+      .single()
+    code = res.data
+    mutateError = res.error
+  }
+
+  if (mutateError || !code) {
+    if (mutateError?.code === '23505') {
       return NextResponse.json({ error: 'Code này đã được sử dụng. Vui lòng chọn code khác.' }, { status: 409 })
     }
-    console.error('[referral/code] POST insert:', insertError)
+    console.error('[referral/code] POST set custom code:', mutateError)
     return NextResponse.json({ error: 'Không thể tạo code.' }, { status: 500 })
   }
+
+  // Sync profiles.referral_code = mã được giữ (single source of truth)
+  await service
+    .from('profiles')
+    .update({ referral_code: rawCode })
+    .eq('id', user.id)
 
   return buildCodeResponse(code, 201)
 }

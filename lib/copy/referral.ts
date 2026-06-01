@@ -140,6 +140,15 @@ export const REFERRAL_COPY = {
   giftBookSubtextAfter: ` cho bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
   giftBookNoCodeFallback:
     "Mã giới thiệu của bạn đang được tạo. Vui lòng tải lại trang sau vài giây.",
+
+  // ── Ghi chú phân biệt referral vs affiliate (trang /referral) ─────────────
+  // Affiliate (có cả link /r/ và /af/): nhắc hoa hồng /af/ nằm ở trang Đối tác.
+  affiliateSplitNote:
+    "Trang này chỉ hiển thị lượt giới thiệu qua link giới thiệu bạn bè (bodix.fit/r/...). Nếu bạn chia sẻ link Đối tác (bodix.fit/af/...), hoa hồng tiền mặt sẽ được ghi nhận tại trang Đối tác.",
+  affiliateSplitNoteLink: "Xem trang Đối tác →",
+  // Non-affiliate (chỉ có link /r/): ghi chú gọn, không nhắc đến affiliate.
+  referralOnlyNote:
+    "Trang này hiển thị lượt giới thiệu qua link giới thiệu bạn bè của bạn (bodix.fit/r/...). Voucher được ghi nhận khi bạn bè vào cohort và check-in ngày đầu.",
 } as const;
 
 export type ReferralCopy = typeof REFERRAL_COPY;

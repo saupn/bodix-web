@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
 import { QRCodeCanvas } from "qrcode.react";
-import { Copy } from "lucide-react";
+import { Copy, Info } from "lucide-react";
 import { REFERRAL_COPY } from "@/lib/copy/referral";
 
 const REFERRAL_BASE =
@@ -101,6 +102,7 @@ export default function ReferralPage() {
   const [voucherData, setVoucherData] = useState<VoucherData | null>(null);
   const [commissionSummary, setCommissionSummary] =
     useState<CommissionSummary["summary"] | null>(null);
+  const [isAffiliate, setIsAffiliate] = useState(false);
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState<"code" | "link" | null>(null);
   const qrRef = useRef<HTMLDivElement>(null);
@@ -112,15 +114,20 @@ export default function ReferralPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const [codeRes, trackRes, voucherRes, commissionRes] = await Promise.all([
+        const [codeRes, trackRes, voucherRes, commissionRes, affiliateRes] = await Promise.all([
           fetch("/api/referral/code"),
           fetch("/api/referral/tracking"),
           fetch("/api/user/vouchers"),
           fetch("/api/referral/commissions-summary"),
+          fetch("/api/affiliate/status"),
         ]);
         if (codeRes.ok) {
           const c = await codeRes.json();
           setCodeData({ code: c.code, referral_link: c.referral_link });
+        }
+        if (affiliateRes.ok) {
+          const a = await affiliateRes.json();
+          setIsAffiliate(!!a.is_approved);
         }
         if (trackRes.ok) {
           const t = await trackRes.json();
@@ -333,6 +340,28 @@ export default function ReferralPage() {
             </p>
             <p className="text-sm text-neutral-600">Tổng voucher đã nhận</p>
           </div>
+        </div>
+
+        {/* Ghi chú phân biệt referral vs affiliate */}
+        <div className="mt-4 flex items-start gap-2 rounded-lg bg-neutral-50 p-3 text-xs text-neutral-500">
+          <Info className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" aria-hidden />
+          {isAffiliate ? (
+            <p>
+              <span className="font-medium text-neutral-600">Lưu ý:</span>{" "}
+              {REFERRAL_COPY.affiliateSplitNote}{" "}
+              <Link
+                href="/app/affiliate"
+                className="font-medium text-primary underline underline-offset-2 hover:text-primary-dark"
+              >
+                {REFERRAL_COPY.affiliateSplitNoteLink}
+              </Link>
+            </p>
+          ) : (
+            <p>
+              <span className="font-medium text-neutral-600">Lưu ý:</span>{" "}
+              {REFERRAL_COPY.referralOnlyNote}
+            </p>
+          )}
         </div>
       </section>
 

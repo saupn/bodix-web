@@ -726,23 +726,23 @@ export default function AffiliatePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-left">
-                  <th className="pb-2 font-medium">Ngày mua</th>
-                  <th className="pb-2 font-medium">Người mua</th>
-                  <th className="pb-2 font-medium text-right">Doanh thu</th>
-                  <th className="pb-2 font-medium text-right">Hoa hồng</th>
-                  <th className="pb-2 font-medium">Trạng thái</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Ngày mua</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Người mua</th>
+                  <th className="px-3 pb-2 font-medium text-right first:pl-0 last:pr-0">Doanh thu</th>
+                  <th className="px-3 pb-2 font-medium text-right first:pl-0 last:pr-0">Hoa hồng</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Trạng thái</th>
                 </tr>
               </thead>
               <tbody>
                 {dashboard.commissions.map((c) => (
                   <tr key={c.id} className="border-b border-neutral-100 last:border-0 align-top">
-                    <td className="py-3">{formatDate(c.purchase_at)}</td>
-                    <td className="py-3">{c.referee_name}</td>
-                    <td className="py-3 text-right">{c.order_amount_vnd.toLocaleString("vi-VN")}đ</td>
-                    <td className="py-3 text-right font-medium text-success">
+                    <td className="px-3 py-3 first:pl-0 last:pr-0 whitespace-nowrap">{formatDate(c.purchase_at)}</td>
+                    <td className="px-3 py-3 first:pl-0 last:pr-0">{c.referee_name}</td>
+                    <td className="px-3 py-3 text-right first:pl-0 last:pr-0 whitespace-nowrap">{c.order_amount_vnd.toLocaleString("vi-VN")}đ</td>
+                    <td className="px-3 py-3 text-right font-medium text-success first:pl-0 last:pr-0 whitespace-nowrap">
                       {c.reward_amount_vnd.toLocaleString("vi-VN")}đ
                     </td>
-                    <td className="py-3">
+                    <td className="px-3 py-3 first:pl-0 last:pr-0">
                       <span className={`inline-flex rounded-full px-2 py-0.5 text-xs font-medium ${COMMISSION_STATUS_CLASS[c.status]}`}>
                         {COMMISSION_STATUS_LABEL[c.status]}
                       </span>
@@ -771,21 +771,21 @@ export default function AffiliatePage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-left">
-                  <th className="pb-2 font-medium">Ngày</th>
-                  <th className="pb-2 font-medium">Người mua</th>
-                  <th className="pb-2 font-medium">Chương trình</th>
-                  <th className="pb-2 font-medium text-right">Doanh thu</th>
-                  <th className="pb-2 font-medium text-right">Hoa hồng</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Ngày</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Người mua</th>
+                  <th className="px-3 pb-2 font-medium first:pl-0 last:pr-0">Chương trình</th>
+                  <th className="px-3 pb-2 font-medium text-right first:pl-0 last:pr-0">Doanh thu</th>
+                  <th className="px-3 pb-2 font-medium text-right first:pl-0 last:pr-0">Hoa hồng</th>
                 </tr>
               </thead>
               <tbody>
                 {dashboard.recent_conversions.map((row, i) => (
                   <tr key={i} className="border-b border-neutral-100 last:border-0">
-                    <td className="py-3">{formatDate(row.date)}</td>
-                    <td className="py-3">{row.referee_name}</td>
-                    <td className="py-3">{row.program}</td>
-                    <td className="py-3 text-right">{row.amount.toLocaleString("vi-VN")}đ</td>
-                    <td className="py-3 text-right font-medium text-success">{row.commission.toLocaleString("vi-VN")}đ</td>
+                    <td className="px-3 py-3 first:pl-0 last:pr-0 whitespace-nowrap">{formatDate(row.date)}</td>
+                    <td className="px-3 py-3 first:pl-0 last:pr-0">{row.referee_name}</td>
+                    <td className="px-3 py-3 first:pl-0 last:pr-0">{row.program}</td>
+                    <td className="px-3 py-3 text-right first:pl-0 last:pr-0 whitespace-nowrap">{row.amount.toLocaleString("vi-VN")}đ</td>
+                    <td className="px-3 py-3 text-right font-medium text-success first:pl-0 last:pr-0 whitespace-nowrap">{row.commission.toLocaleString("vi-VN")}đ</td>
                   </tr>
                 ))}
               </tbody>

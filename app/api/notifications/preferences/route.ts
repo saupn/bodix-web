@@ -43,7 +43,7 @@ export async function GET() {
     rescue_messages: true,
     community_updates: true,
     marketing_emails: false,
-    preferred_channel: 'email' as const,
+    preferred_channel: 'zalo' as const,
     morning_time: '07:00',
     evening_time: '21:00',
     timezone: 'Asia/Ho_Chi_Minh',

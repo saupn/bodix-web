@@ -5,8 +5,8 @@ import Link from "next/link";
 import { Toast } from "@/components/ui/Toast";
 
 const CHANNEL_OPTIONS = [
-  { value: "email", label: "📧 Email" },
   { value: "zalo", label: "💬 Zalo" },
+  { value: "email", label: "📧 Email" },
   { value: "both", label: "📧💬 Cả hai" },
 ] as const;
 
@@ -102,7 +102,7 @@ export default function NotificationsPage() {
       .then((r) => r.json())
       .then((data) => {
         setPrefs({
-          preferred_channel: data.preferred_channel ?? "email",
+          preferred_channel: data.preferred_channel ?? "zalo",
           morning_reminder: data.morning_reminder ?? true,
           evening_confirmation: data.evening_confirmation ?? true,
           rescue_messages: data.rescue_messages ?? true,

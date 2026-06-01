@@ -163,6 +163,7 @@ export function TrialPageContent() {
     started_at: data.enrollment?.started_at ?? data.bodix_start_date ?? null,
   });
   const program = data.program;
+  const isPaidWaitingCohort = data.enrollment?.status === "paid_waiting_cohort";
   const tryCount =
     (data.activity_summary?.try_workout ?? 0) +
     (data.activity_summary?.view_workout ?? 0);
@@ -242,7 +243,9 @@ export function TrialPageContent() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((day) => {
             const workout = workoutsByDay[day];
-            const isUnlocked = trial.hasStarted && day <= trial.currentDay;
+            // Nội dung trial là content cố định — đã tới đây nghĩa là
+            // can_access_content = true, nên mở cả 3 ngày, không khoá theo lịch.
+            const isUnlocked = !!workout;
             const isPast = trial.hasStarted && day < trial.currentDay;
 
             return (
@@ -260,44 +263,70 @@ export function TrialPageContent() {
       </div>
 
       <div className="fixed bottom-0 left-0 right-0 z-30 border-t border-neutral-200 bg-white/95 p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)] backdrop-blur sm:static sm:mt-8 sm:rounded-xl sm:border sm:border-primary/20 sm:bg-primary/5 sm:p-6 sm:shadow-none">
-        <p className="font-heading font-semibold text-primary">
-          Thích chương trình này?
-        </p>
-        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <Link
-            href={
-              program?.slug
-                ? `/app/checkout/${program.slug}`
-                : "/app/checkout/bodix-21"
-            }
-            className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
-          >
-            Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
-          </Link>
-          <div className="text-center text-sm text-neutral-700 sm:text-right">
-            {data.upcoming_cohort && (
-              <p>
-                <span className="text-neutral-500">▸ Đợt tập gần nhất:</span>{" "}
-                <span className="font-medium text-primary">
-                  {formatVnYmd(data.upcoming_cohort.start_date)}
-                </span>
-              </p>
-            )}
-            {data.completed_trial_days < 3 && (
-              <p className="mt-1 text-neutral-600">
-                ▸ Bạn vẫn tập thử đủ 3 ngày
-              </p>
-            )}
-            {data.completed_trial_days >= 3 && (
-              <p className="mt-1 text-neutral-600">
-                ▸ Sẵn sàng vào nhóm tập
-              </p>
-            )}
-            {trial.daysRemainingText && (
-              <p className="mt-1 text-neutral-500">{trial.daysRemainingText}</p>
-            )}
-          </div>
-        </div>
+        {isPaidWaitingCohort ? (
+          <>
+            <p className="font-heading font-semibold text-primary">
+              Bạn đã thanh toán ✓
+            </p>
+            <p className="mt-2 text-sm text-neutral-700">
+              {data.upcoming_cohort ? (
+                <>
+                  Đợt tập của bạn bắt đầu vào{" "}
+                  <span className="font-medium text-primary">
+                    {formatVnYmd(data.upcoming_cohort.start_date)}
+                  </span>
+                  . Hãy hoàn thành 3 ngày tập thử để sẵn sàng!
+                </>
+              ) : (
+                <>
+                  Đợt tập của bạn sẽ sớm bắt đầu. Hãy hoàn thành 3 ngày tập thử
+                  để sẵn sàng!
+                </>
+              )}
+            </p>
+          </>
+        ) : (
+          <>
+            <p className="font-heading font-semibold text-primary">
+              Thích chương trình này?
+            </p>
+            <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+              <Link
+                href={
+                  program?.slug
+                    ? `/app/checkout/${program.slug}`
+                    : "/app/checkout/bodix-21"
+                }
+                className="inline-flex items-center justify-center rounded-lg bg-primary px-4 py-2.5 text-sm font-medium text-secondary-light transition-colors hover:bg-primary-dark"
+              >
+                Đăng ký đầy đủ – {program ? formatPrice(program.price_vnd) : "Liên hệ"}
+              </Link>
+              <div className="text-center text-sm text-neutral-700 sm:text-right">
+                {data.upcoming_cohort && (
+                  <p>
+                    <span className="text-neutral-500">▸ Đợt tập gần nhất:</span>{" "}
+                    <span className="font-medium text-primary">
+                      {formatVnYmd(data.upcoming_cohort.start_date)}
+                    </span>
+                  </p>
+                )}
+                {data.completed_trial_days < 3 && (
+                  <p className="mt-1 text-neutral-600">
+                    ▸ Bạn vẫn tập thử đủ 3 ngày
+                  </p>
+                )}
+                {data.completed_trial_days >= 3 && (
+                  <p className="mt-1 text-neutral-600">
+                    ▸ Sẵn sàng vào nhóm tập
+                  </p>
+                )}
+                {trial.daysRemainingText && (
+                  <p className="mt-1 text-neutral-500">{trial.daysRemainingText}</p>
+                )}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

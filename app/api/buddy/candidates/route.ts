@@ -17,8 +17,11 @@ function calcAge(dob: string | null): number | null {
 
 /**
  * Returns top N buddy candidates in current user's cohort, ranked by:
- *   1. same gender (matches first), and
- *   2. closest age proximity (smallest |Δage|).
+ *   1. closest age proximity (smallest |Δage|) — ưu tiên chênh ≤ 3 tuổi,
+ *      nới rộng dần nếu không có ai gần,
+ *   2. same gender (tiebreaker khi cùng mức chênh tuổi).
+ *
+ * Thiếu date_of_birth → KHÔNG loại trừ, chỉ xếp xuống cuối (ageDiff = 999).
  *
  * Excludes:
  *   - users already in a buddy_pairs row for this cohort (active)
@@ -124,10 +127,12 @@ export async function GET() {
     };
   });
 
-  // Sort: same-gender first, then smallest age diff. Unknown age sinks last.
+  // Sort: smallest age diff first (ưu tiên chênh tuổi ít nhất), same gender
+  // chỉ là tiebreaker khi cùng mức chênh tuổi. Unknown age (999) sinks last.
   ranked.sort((a, b) => {
+    if (a.ageDiff !== b.ageDiff) return a.ageDiff - b.ageDiff;
     if (a.sameGender !== b.sameGender) return a.sameGender ? -1 : 1;
-    return a.ageDiff - b.ageDiff;
+    return 0;
   });
 
   const top = ranked.slice(0, TOP_N).map((r) => ({

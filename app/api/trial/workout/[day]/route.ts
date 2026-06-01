@@ -5,7 +5,6 @@ import {
   isWithinTrialContentLimit,
   TRIAL_ACCESSIBLE_STATUSES,
 } from "@/lib/trial/utils";
-import { getTrialExperienceDay } from "@/lib/trial/calendar";
 
 export async function GET(
   _request: Request,
@@ -29,7 +28,7 @@ export async function GET(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("trial_ends_at, bodix_start_date")
+    .select("trial_ends_at")
     .eq("id", user.id)
     .single();
 
@@ -62,20 +61,10 @@ export async function GET(
     );
   }
 
-  const trialExpDay = getTrialExperienceDay(profile?.bodix_start_date ?? null);
-  if (trialExpDay === 0) {
-    return NextResponse.json(
-      { error: "Chương trình tập thử chưa bắt đầu. Vui lòng quay lại vào ngày bắt đầu." },
-      { status: 403 }
-    );
-  }
-  if (day > trialExpDay) {
-    return NextResponse.json(
-      { error: "Ngày này chưa mở khóa." },
-      { status: 403 }
-    );
-  }
-
+  // Nội dung trial (D1/D2/D3) là content cố định — KHÔNG khoá theo lịch
+  // (bodix_start_date) hay current_day. Chừng nào enrollment còn quyền truy cập
+  // trial (canAccessTrialContent ở trên) thì xem được cả 3 ngày, kể cả khi đã
+  // thanh toán (paid_waiting_cohort) hoặc chưa tới ngày bắt đầu.
   const { data: workout, error } = await supabase
     .from("workout_templates")
     .select(

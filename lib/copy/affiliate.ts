@@ -69,7 +69,7 @@ export const AFFILIATE_COPY = {
     `Bạn có thể giúp người được giới thiệu bắt đầu sớm để hoa hồng sớm được kích hoạt. Nếu họ chưa kịp tham gia đợt tập trong ${AFFILIATE_PENDING_TIMEOUT_DAYS} ngày, hành trình này tạm khép lại.`,
     `Tối thiểu ${formatVnd(AFFILIATE_MIN_WITHDRAW_VND)} cho mỗi lần rút – tích luỹ qua nhiều lần đồng hành thành công.`,
     "Mã Đối tác chỉ dành cho người khác. Muốn tự nhận ưu đãi, hãy dùng link Giới thiệu bạn bè (referral).",
-    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
+    "Hoa hồng của bạn đang được tích lũy an toàn. Tính năng rút tiền đang được hoàn thiện và sẽ sớm ra mắt – chúng tôi sẽ thông báo khi bạn có thể rút.",
   ],
 
   // ── Cancel reasons (tinh thần partner, không transaction) ──────────────────
@@ -106,13 +106,13 @@ export const AFFILIATE_COPY = {
   payableBelowMinHint: (remaining: number) =>
     `Cần ≥ ${formatVnd(AFFILIATE_MIN_WITHDRAW_VND)} để rút (còn thiếu ${formatVnd(remaining)})`,
   payableAboveMinHint:
-    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
+    "Hoa hồng của bạn đang được tích lũy an toàn. Tính năng rút tiền đang được hoàn thiện và sẽ sớm ra mắt – chúng tôi sẽ thông báo khi bạn có thể rút.",
 
   // ── Withdraw section ──────────────────────────────────────────────────────
   withdrawDisabledMessage:
-    "Tính năng rút tiền sẽ được mở trong thời gian tới. Trong khi chờ, hoa hồng của bạn vẫn được tích luỹ và lưu trữ an toàn.",
+    "Hoa hồng của bạn đang được tích lũy an toàn. Tính năng rút tiền đang được hoàn thiện và sẽ sớm ra mắt – chúng tôi sẽ thông báo khi bạn có thể rút.",
   withdrawDisabledTooltip:
-    "Tính năng rút tiền sẽ được mở trong thời gian tới. Hoa hồng đang được tích luỹ và lưu trữ an toàn.",
+    "Hoa hồng của bạn đang được tích lũy an toàn. Tính năng rút tiền đang được hoàn thiện và sẽ sớm ra mắt.",
 
   // ── FAQ ───────────────────────────────────────────────────────────────────
   faq: [

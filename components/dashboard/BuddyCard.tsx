@@ -85,12 +85,6 @@ export function BuddyCard() {
     }
   };
 
-  const handleRandomMatch = async () => {
-    if (!results.length) return;
-    const random = results[Math.floor(Math.random() * results.length)];
-    await handleChoose(random.id);
-  };
-
   const handleNudge = async () => {
     setNudging(true);
     try {
@@ -212,18 +206,10 @@ export function BuddyCard() {
       )}
 
       {!searching && results.length === 0 && !loading && (
-        <p className="mt-2 text-xs text-neutral-600">Không tìm thấy ai phù hợp.</p>
-      )}
-
-      {results.length > 0 && (
-        <button
-          type="button"
-          onClick={handleRandomMatch}
-          disabled={!!choosing}
-          className="mt-3 w-full rounded-lg border-2 border-dashed border-primary/30 py-2.5 text-sm font-medium text-primary transition-colors hover:border-primary/50 hover:bg-primary/5 disabled:opacity-50"
-        >
-          Ghép ngẫu nhiên
-        </button>
+        <p className="mt-2 text-xs text-neutral-600">
+          Chưa có người đồng hành phù hợp. Bạn vẫn có thể tập một mình bình
+          thường — chúng tôi sẽ gợi ý khi có thêm thành viên cùng đợt.
+        </p>
       )}
     </div>
   );

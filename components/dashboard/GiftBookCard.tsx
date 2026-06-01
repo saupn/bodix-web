@@ -16,6 +16,17 @@ export function GiftBookCard() {
           <p className="text-sm text-gray-600 mt-1">
             {REFERRAL_COPY.giftBookSubtext}
           </p>
+          <p className="text-sm text-gray-600 mt-2">
+            Sách:{" "}
+            <a
+              href="/api/guides/download"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+            >
+              &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot;
+            </a>
+          </p>
           <Link
             href="/app/tang-sach"
             className="text-sm text-primary font-medium mt-2 inline-block hover:underline"

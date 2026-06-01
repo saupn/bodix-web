@@ -5,11 +5,6 @@ import { redirect } from "next/navigation";
 import { REFERRAL_COPY } from "@/lib/copy/referral";
 import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 
-function maskPhone(phone: string): string {
-  if (phone.length < 6) return phone;
-  return phone.slice(0, 4) + "***" + phone.slice(-3);
-}
-
 function formatDate(dateStr: string): string {
   return new Date(dateStr).toLocaleDateString("vi-VN", {
     day: "numeric",
@@ -76,8 +71,11 @@ export default async function ProfilePage() {
 
   const [{ data: profile }, { data: vouchers }, { data: affiliateProfile }] = await Promise.all([
     supabase
+      // NOTE: `profiles` không có cột `email` (email nằm ở auth.users → dùng
+      // user.email). Đưa `email` vào select sẽ làm cả query lỗi → toàn bộ
+      // phone/dob/gender/goal về null. Chỉ select cột tồn tại.
       .from("profiles")
-      .select("full_name, email, phone, phone_verified, date_of_birth, gender, fitness_goal")
+      .select("full_name, phone, phone_verified, date_of_birth, gender, fitness_goal")
       .eq("id", user.id)
       .single(),
     service
@@ -128,7 +126,7 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-600">Số điện thoại</dt>
             <dd className="mt-1 flex items-center gap-2 text-neutral-800">
-              {profile?.phone ? maskPhone(profile.phone) : "–"}
+              {profile?.phone ? profile.phone : "Chưa cập nhật"}
               {profile?.phone_verified && (
                 <span className="inline-flex items-center rounded-full bg-success/15 px-2 py-0.5 text-xs font-medium text-success">
                   ✓ Đã xác minh
@@ -139,13 +137,13 @@ export default async function ProfilePage() {
           <div>
             <dt className="text-sm font-medium text-neutral-600">Ngày sinh</dt>
             <dd className="mt-1 text-neutral-800">
-              {profile?.date_of_birth ? formatDate(profile.date_of_birth) : "–"}
+              {profile?.date_of_birth ? formatDate(profile.date_of_birth) : "Chưa cập nhật"}
             </dd>
           </div>
           <div>
             <dt className="text-sm font-medium text-neutral-600">Giới tính</dt>
             <dd className="mt-1 text-neutral-800">
-              {profile?.gender ? (GENDER_LABEL[profile.gender] ?? profile.gender) : "–"}
+              {profile?.gender ? (GENDER_LABEL[profile.gender] ?? profile.gender) : "Chưa cập nhật"}
             </dd>
           </div>
           <div>
@@ -153,7 +151,7 @@ export default async function ProfilePage() {
             <dd className="mt-1 text-neutral-800">
               {(() => {
                 const goals = parseFitnessGoals(profile?.fitness_goal);
-                return goals.length > 0 ? goals.join(", ") : "–";
+                return goals.length > 0 ? goals.join(", ") : "Chưa cập nhật";
               })()}
             </dd>
           </div>

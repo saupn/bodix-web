@@ -94,10 +94,10 @@ export function BuddyChooser() {
         </div>
       ) : (
         <div className="text-center py-6 bg-gray-50 rounded-lg">
-          <p className="text-gray-700 mb-2">⏳ Đang chờ ghép cặp</p>
+          <p className="text-gray-700 mb-2">⏳ Chưa ghép cặp</p>
           <p className="text-sm text-gray-500">
-            Chưa có người phù hợp. BodiX sẽ tự động ghép buddy cho bạn khi đợt
-            tập bắt đầu.
+            Chúng tôi sẽ ghép bạn với một người đồng hành phù hợp khi có thêm
+            thành viên. Bạn vẫn có thể tập một mình bình thường.
           </p>
         </div>
       )}

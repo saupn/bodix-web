@@ -85,10 +85,15 @@ export default function TrialWorkoutPage() {
     }
 
     fetch(`/api/trial/workout/${day}`)
-      .then((r) => {
+      .then(async (r) => {
         if (!r.ok) {
-          if (r.status === 403) router.replace("/app/programs");
-          else if (r.status === 404) return null;
+          if (r.status === 403) {
+            // Ngày chưa mở (sequential gating) → quay lại danh sách trial.
+            const body = await r.json().catch(() => null);
+            router.replace(body?.locked ? "/app/trial" : "/app/programs");
+            return null;
+          }
+          if (r.status === 404) return null;
           throw new Error("Failed to load");
         }
         return r.json();

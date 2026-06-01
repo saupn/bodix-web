@@ -102,3 +102,36 @@ export function getTrialDisplayStatus(input: {
     progressPercent: Math.round((currentDay / TRIAL_DAYS) * 100),
   };
 }
+
+/**
+ * Resolve ngày bắt đầu trial từ các nguồn, ưu tiên theo độ chính xác.
+ * `bodix_start_date` (YYYY-MM-DD) là nguồn chuẩn cho lịch trial — ưu tiên nhất.
+ * KHÔNG dùng `current_day` (có thể = 0 dù trial đã chạy).
+ */
+export function resolveTrialStartDate(input: {
+  bodix_start_date?: string | null;
+  started_at?: string | null;
+  trial_started_at?: string | null;
+  enrolled_at?: string | null;
+}): string | null {
+  return (
+    input.bodix_start_date ||
+    input.started_at ||
+    input.trial_started_at ||
+    input.enrolled_at ||
+    null
+  );
+}
+
+/**
+ * Ngày trial hiện tại theo lịch VN:
+ *  0  → chưa bắt đầu (start date là tương lai / chưa có)
+ *  1-3 → đang trong trial
+ *  >3 → trial đã kết thúc (tất cả các ngày đều mở để xem lại)
+ *
+ * Dùng cho sequential gating: ô Ngày N mở khi N <= currentTrialDay.
+ */
+export function getCurrentTrialDay(startDate: string | null | undefined): number {
+  const status = getTrialDisplayStatus({ started_at: startDate ?? null });
+  return status.hasStarted ? status.currentDay : 0;
+}

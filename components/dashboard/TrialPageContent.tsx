@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { getTrialDisplayStatus } from "@/lib/trial/status";
+import { getTrialDisplayStatus, resolveTrialStartDate } from "@/lib/trial/status";
 
 interface Workout {
   id: string;
@@ -30,6 +30,7 @@ interface TrialData {
   is_trial: boolean;
   is_expired: boolean;
   trial_ends_at: string | null;
+  trial_started_at?: string | null;
   bodix_start_date?: string | null;
   bodix_current_day?: number | null;
   days_remaining: number;
@@ -159,9 +160,16 @@ export function TrialPageContent() {
     );
   }
 
-  const trial = getTrialDisplayStatus({
-    started_at: data.enrollment?.started_at ?? data.bodix_start_date ?? null,
+  // Ngày bắt đầu trial — ưu tiên bodix_start_date (lịch chuẩn), KHÔNG dùng current_day.
+  const trialStartDate = resolveTrialStartDate({
+    bodix_start_date: data.bodix_start_date ?? null,
+    started_at: data.enrollment?.started_at ?? null,
+    trial_started_at: data.trial_started_at ?? null,
+    enrolled_at: data.enrollment?.enrolled_at ?? null,
   });
+  const trial = getTrialDisplayStatus({ started_at: trialStartDate });
+  // Ngày trial hôm nay: 0 = chưa bắt đầu, 1-3 đang trial, >3 đã hết (mở hết để xem lại).
+  const trialDayToday = trial.hasStarted ? trial.currentDay : 0;
   const program = data.program;
   const isPaidWaitingCohort = data.enrollment?.status === "paid_waiting_cohort";
   const tryCount =
@@ -243,10 +251,18 @@ export function TrialPageContent() {
         <div className="grid gap-4 sm:grid-cols-3">
           {[1, 2, 3].map((day) => {
             const workout = workoutsByDay[day];
-            // Nội dung trial là content cố định — đã tới đây nghĩa là
-            // can_access_content = true, nên mở cả 3 ngày, không khoá theo lịch.
-            const isUnlocked = !!workout;
-            const isPast = trial.hasStarted && day < trial.currentDay;
+            // Sequential gating: ô Ngày N chỉ mở khi N <= ngày trial hôm nay.
+            // Ngày tương lai (N > trialDayToday) bị khoá — kể cả khi đã có workout.
+            const isFuture = day > trialDayToday;
+            const isPast = trialDayToday > 0 && day < trialDayToday;
+            const isUnlocked = !!workout && !isFuture;
+
+            // Nhãn khoá cho ngày tương lai: "Mở khóa vào ngày mai" / "Còn X ngày nữa".
+            let lockLabel = "Mở khóa theo từng ngày";
+            if (isFuture) {
+              const diff = day - trialDayToday;
+              lockLabel = diff === 1 ? "Mở khóa vào ngày mai" : `Còn ${diff} ngày nữa`;
+            }
 
             return (
               <WorkoutCard
@@ -255,6 +271,7 @@ export function TrialPageContent() {
                 workout={workout}
                 isUnlocked={isUnlocked}
                 isPast={isPast}
+                lockLabel={lockLabel}
                 programId={data.enrollment?.program_id}
               />
             );
@@ -337,12 +354,14 @@ function WorkoutCard({
   workout,
   isUnlocked,
   isPast,
+  lockLabel,
   programId,
 }: {
   day: number;
   workout: Workout | undefined;
   isUnlocked: boolean;
   isPast: boolean;
+  lockLabel: string;
   programId: string | undefined;
 }) {
   const router = useRouter();
@@ -405,7 +424,10 @@ function WorkoutCard({
           {loading ? "Đang chuyển..." : isPast ? "Xem lại" : "Bắt đầu tập"}
         </p>
       ) : (
-        <p className="mt-4 text-sm text-neutral-600">Mở khóa theo từng ngày</p>
+        <p className="mt-4 flex items-center gap-1 text-sm text-neutral-500">
+          <span aria-hidden>🔒</span>
+          {lockLabel}
+        </p>
       )}
     </div>
   );

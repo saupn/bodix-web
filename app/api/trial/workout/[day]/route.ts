@@ -5,6 +5,7 @@ import {
   isWithinTrialContentLimit,
   TRIAL_ACCESSIBLE_STATUSES,
 } from "@/lib/trial/utils";
+import { getCurrentTrialDay, resolveTrialStartDate } from "@/lib/trial/status";
 
 export async function GET(
   _request: Request,
@@ -28,13 +29,13 @@ export async function GET(
 
   const { data: profile } = await supabase
     .from("profiles")
-    .select("trial_ends_at")
+    .select("trial_ends_at, bodix_start_date, trial_started_at")
     .eq("id", user.id)
     .single();
 
   const { data: enrollment } = await supabase
     .from("enrollments")
-    .select("id, program_id, status")
+    .select("id, program_id, status, started_at, enrolled_at")
     .eq("user_id", user.id)
     .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
     .order("enrolled_at", { ascending: false })
@@ -61,10 +62,28 @@ export async function GET(
     );
   }
 
-  // Nội dung trial (D1/D2/D3) là content cố định — KHÔNG khoá theo lịch
-  // (bodix_start_date) hay current_day. Chừng nào enrollment còn quyền truy cập
-  // trial (canAccessTrialContent ở trên) thì xem được cả 3 ngày, kể cả khi đã
-  // thanh toán (paid_waiting_cohort) hoặc chưa tới ngày bắt đầu.
+  // Sequential gating: chặn truy cập trực tiếp workout của ngày CHƯA tới.
+  // trialDayToday tính từ bodix_start_date theo lịch VN (KHÔNG dùng current_day).
+  // 0 = chưa bắt đầu → khoá tất cả; >3 = đã hết trial → mở hết để xem lại.
+  const trialStartDate = resolveTrialStartDate({
+    bodix_start_date: profile?.bodix_start_date ?? null,
+    started_at: enrollment.started_at,
+    trial_started_at: profile?.trial_started_at ?? null,
+    enrolled_at: enrollment.enrolled_at,
+  });
+  const trialDayToday = getCurrentTrialDay(trialStartDate);
+  if (day > trialDayToday) {
+    return NextResponse.json(
+      {
+        error: "Phiên tập này chưa mở. Quay lại vào đúng ngày nhé!",
+        locked: true,
+      },
+      { status: 403 }
+    );
+  }
+
+  // Nội dung trial là content cố định (độc lập cohort/current_day) — đã qua các
+  // gate ở trên (quyền truy cập + ngày đã mở) thì load bài tập của ngày đó.
   const { data: workout, error } = await supabase
     .from("workout_templates")
     .select(

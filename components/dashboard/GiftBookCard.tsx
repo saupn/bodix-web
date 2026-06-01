@@ -19,7 +19,7 @@ export function GiftBookCard() {
               href="/api/guides/download"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+              className="font-medium text-primary underline-offset-2 hover:underline"
             >
               &quot;{REFERRAL_COPY.giftBookTitle}&quot;
             </a>

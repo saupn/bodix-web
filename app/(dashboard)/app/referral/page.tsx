@@ -351,7 +351,7 @@ export default function ReferralPage() {
               {REFERRAL_COPY.affiliateSplitNote}{" "}
               <Link
                 href="/app/affiliate"
-                className="font-medium text-primary underline underline-offset-2 hover:text-primary-dark"
+                className="font-medium text-primary underline-offset-2 hover:underline hover:text-primary-dark"
               >
                 {REFERRAL_COPY.affiliateSplitNoteLink}
               </Link>

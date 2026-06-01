@@ -183,7 +183,7 @@ export default function NotificationsPage() {
           <p className="mt-3 text-sm text-amber-600">
             <Link
               href="/onboarding"
-              className="font-medium underline hover:no-underline"
+              className="font-semibold text-amber-700 hover:underline"
             >
               Xác minh số điện thoại trước
             </Link>{" "}

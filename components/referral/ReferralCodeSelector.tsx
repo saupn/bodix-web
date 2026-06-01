@@ -216,7 +216,7 @@ export function ReferralCodeSelector({
                       href="https://bodix.fit/affiliate"
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-primary underline"
+                      className="font-medium text-primary hover:underline"
                     >
                       bodix.fit/affiliate
                     </a>

@@ -62,7 +62,7 @@ export default async function TangSachDashboardPage() {
           href="/api/guides/download"
           target="_blank"
           rel="noopener noreferrer"
-          className="font-medium text-primary underline decoration-primary/40 underline-offset-2 hover:decoration-primary"
+          className="font-medium text-primary underline-offset-2 hover:underline"
         >
           &quot;Tại sao nhịn ăn không giúp bạn gọn hơn&quot;
         </a>{" "}

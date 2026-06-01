@@ -337,7 +337,7 @@ function QuestionsTab({ cohortId, week }: { cohortId: string; week: string }) {
                         href={q.media_url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-primary underline"
+                        className="text-primary hover:underline"
                       >
                         Xem
                       </a>
@@ -752,7 +752,7 @@ function DirectReplyTab({ cohortId, week }: { cohortId: string; week: string }) 
                   href={q.media_url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="text-sm text-primary underline"
+                  className="text-sm text-primary hover:underline"
                 >
                   Xem media
                 </a>
@@ -1122,7 +1122,7 @@ function VideoExportTab({
                                   href={q.media_url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="ml-1 text-primary underline"
+                                  className="ml-1 text-primary hover:underline"
                                 >
                                   ({MESSAGE_TYPE_ICONS[q.message_type] || "📎"} media)
                                 </a>

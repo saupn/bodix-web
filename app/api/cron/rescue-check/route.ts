@@ -573,7 +573,7 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // Skip nếu đã check-in hôm nay
+      // Skip nếu đã check-in hôm nay (program check-in → daily_checkins).
       const { data: todayCheckin } = await supabase
         .from('daily_checkins')
         .select('id')
@@ -584,6 +584,26 @@ export async function GET(request: NextRequest) {
       if (todayCheckin) {
         stats.evening_skipped_already_checked_in++;
         continue;
+      }
+
+      // Trial-bucket: check-in được ghi vào trial_activities (KHÔNG daily_checkins).
+      // Nếu chỉ xét daily_checkins, user trial đã tập sáng vẫn nhận tin tối → spam.
+      // Mọi complete_trial_day tạo trong ngày VN hôm nay (created_at >= đầu ngày VN
+      // theo UTC) tính là đã check-in → skip evening.
+      if (en.status === 'trial') {
+        const { data: trialCheckinToday } = await supabase
+          .from('trial_activities')
+          .select('id')
+          .eq('user_id', en.user_id)
+          .eq('activity_type', 'complete_trial_day')
+          .gte('created_at', todayVNStartUtc)
+          .limit(1)
+          .maybeSingle();
+
+        if (trialCheckinToday) {
+          stats.evening_skipped_already_checked_in++;
+          continue;
+        }
       }
 
       // Dedup: đã gửi evening_confirmation hôm nay chưa (key: enrollment + ngày VN)

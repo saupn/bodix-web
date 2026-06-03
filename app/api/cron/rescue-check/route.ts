@@ -104,6 +104,19 @@ export async function GET(request: NextRequest) {
   const todayVN = getVietnamDateString();
   const todayVNStartUtc = new Date(`${todayVN}T00:00:00+07:00`).toISOString();
 
+  // Housekeeping: dọn magic-link token đã hết hạn (giữ thêm 1 ngày để debug).
+  // Token ephemeral (24h) → không cần backup. Lỗi cleanup không chặn rescue.
+  {
+    const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { error: cleanupError } = await supabase
+      .from('workout_access_tokens')
+      .delete()
+      .lt('expires_at', cutoff);
+    if (cleanupError) {
+      console.error('[rescue-check] workout_access_tokens cleanup failed:', cleanupError.message);
+    }
+  }
+
   const stats = {
     l1: 0,
     l2: 0,

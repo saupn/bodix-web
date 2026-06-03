@@ -1,10 +1,16 @@
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
+import { cookies, headers } from "next/headers";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
 import { getUserStatus, canAccessDashboard, getRedirectPath, type StatusEnrollment } from "@/lib/user/status";
 import { getMyStats } from "@/lib/completion/fetch-stats";
 import { getRescueStatus } from "@/lib/rescue/fetch-status";
+import {
+  decodeWorkoutCookie,
+  isWorkoutTokenPath,
+  WORKOUT_COOKIE_NAME,
+} from "@/lib/workout-token";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -21,6 +27,24 @@ export default async function DashboardLayout({
   } = await supabase.auth.getUser();
 
   if (!user) {
+    // Magic-link phiên tập: cookie workout-token CHỈ mở đúng 2 route workout.
+    // Mọi route dashboard khác (trang chủ, hồ sơ, thanh toán…) vẫn đòi session
+    // đầy đủ → token-only KHÔNG bao giờ được hiểu là "đã đăng nhập đầy đủ".
+    const pathname = (await headers()).get("x-pathname") ?? "";
+    if (isWorkoutTokenPath(pathname)) {
+      const cookieStore = await cookies();
+      const access = decodeWorkoutCookie(
+        cookieStore.get(WORKOUT_COOKIE_NAME)?.value
+      );
+      if (access) {
+        // Shell tối giản — KHÔNG có nav tới hồ sơ/thanh toán/cộng đồng.
+        return (
+          <div className="min-h-screen bg-neutral-50">
+            <main className="mx-auto max-w-2xl px-4 py-6 pb-24">{children}</main>
+          </div>
+        );
+      }
+    }
     redirect("/login");
   }
 

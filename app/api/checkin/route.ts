@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { getWorkoutRequestUser } from '@/lib/workout-token'
 import { revalidateAnalytics } from '@/lib/cache'
 import { checkinRateLimit, rateLimitExceeded } from '@/lib/middleware/rate-limit'
 import { checkinSchema, safeParseBody } from '@/lib/validation/schemas'
@@ -18,15 +18,14 @@ function todayUTC(): string {
 }
 
 export async function POST(request: NextRequest) {
-  // ─── 1. Auth ────────────────────────────────────────────────────────────────
-  const supabase = await createClient()
-  const { data: { user }, error: authError } = await supabase.auth.getUser()
-  if (authError || !user) {
+  // ─── 1. Auth: session đầy đủ HOẶC cookie workout-token (magic link) ──────────
+  const auth = await getWorkoutRequestUser(request)
+  if (!auth) {
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
 
   // ─── 1b. Rate limit — per user ───────────────────────────────────────────────
-  const rl = checkinRateLimit(user.id)
+  const rl = checkinRateLimit(auth.userId)
   if (!rl.ok) return rateLimitExceeded(rl.resetIn)
 
   // ─── Parse & validate body ───────────────────────────────────────────────────
@@ -44,12 +43,12 @@ export async function POST(request: NextRequest) {
 
   const service = createServiceClient()
 
-  // ─── 2. Verify enrollment ────────────────────────────────────────────────────
-  const { data: enrollment, error: enrollmentError } = await supabase
+  // ─── 2. Verify enrollment (service + filter user_id — token-only không có RLS) ─
+  const { data: enrollment, error: enrollmentError } = await service
     .from('enrollments')
     .select('id, user_id, cohort_id, status, started_at, current_day, program_id, programs(duration_days)')
     .eq('id', enrollment_id)
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .eq('status', 'active')
     .single()
 
@@ -92,7 +91,7 @@ export async function POST(request: NextRequest) {
     .from('daily_checkins')
     .insert({
       enrollment_id,
-      user_id: user.id,
+      user_id: auth.userId,
       cohort_id: enrollment.cohort_id ?? null,
       day_number,
       workout_date: workoutDate,
@@ -170,7 +169,7 @@ export async function POST(request: NextRequest) {
 
   const streakUpsert = {
     enrollment_id,
-    user_id: user.id,
+    user_id: auth.userId,
     current_streak: newCurrentStreak,
     longest_streak: newLongestStreak,
     total_completed_days: mode !== 'skip' ? prev.total_completed_days + 1 : prev.total_completed_days,
@@ -219,19 +218,19 @@ export async function POST(request: NextRequest) {
   if (mode !== 'skip') {
     // first_checkin
     if (totalCompleted === 1) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'first_checkin', metadata: {} })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'first_checkin', metadata: {} })
     }
 
     // streak milestones
     for (const target of [3, 7, 14, 21]) {
       if (newCurrentStreak === target) {
-        milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: `streak_${target}`, metadata: { streak: target } })
+        milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: `streak_${target}`, metadata: { streak: target } })
       }
     }
 
     // comeback
     if (isComeback) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'comeback', metadata: {} })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'comeback', metadata: {} })
     }
 
     // all_hard: 7 most recent check-ins are all 'hard' (including this one)
@@ -244,7 +243,7 @@ export async function POST(request: NextRequest) {
         .limit(7)
 
       if (recentCheckins?.length === 7 && recentCheckins.every(c => c.mode === 'hard')) {
-        milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'all_hard', metadata: {} })
+        milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'all_hard', metadata: {} })
       }
     }
 
@@ -260,23 +259,23 @@ export async function POST(request: NextRequest) {
       .lte('day_number', weekEndDay)
 
     if (weekCheckinCount === 7) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'week_complete', metadata: { week: weekNumber } })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'week_complete', metadata: { week: weekNumber } })
     }
 
     // halfway
     const halfwayDay = Math.ceil(programDays / 2)
     if (day_number === halfwayDay) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'halfway', metadata: { program_days: programDays } })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'halfway', metadata: { program_days: programDays } })
     }
 
     // final_week: entering last 7 days
     if (day_number > programDays - 7) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'final_week', metadata: {} })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'final_week', metadata: {} })
     }
 
     // program_complete
     if (day_number === programDays) {
-      milestonesToInsert.push({ enrollment_id, user_id: user.id, milestone_type: 'program_complete', metadata: {} })
+      milestonesToInsert.push({ enrollment_id, user_id: auth.userId, milestone_type: 'program_complete', metadata: {} })
     }
   }
 

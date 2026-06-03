@@ -1,8 +1,9 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getWorkoutRequestUser } from "@/lib/workout-token";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ day: string }> }
 ) {
   const { day: dayParam } = await context.params;
@@ -12,19 +13,18 @@ export async function GET(
     return NextResponse.json({ error: "Ngày không hợp lệ." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  // Chấp nhận session đầy đủ HOẶC cookie workout-token (magic link).
+  const auth = await getWorkoutRequestUser(request);
+  if (!auth) {
     return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
   }
+  // Service client (filter user_id thủ công) — token-only không có RLS session.
+  const supabase = createServiceClient();
 
   const { data: enrollment } = await supabase
     .from("enrollments")
     .select("id, program_id, status, started_at")
-    .eq("user_id", user.id)
+    .eq("user_id", auth.userId)
     .eq("status", "active")
     .limit(1)
     .maybeSingle();

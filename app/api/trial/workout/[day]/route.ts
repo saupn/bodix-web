@@ -1,5 +1,6 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@/lib/supabase/server";
+import { NextResponse, type NextRequest } from "next/server";
+import { createServiceClient } from "@/lib/supabase/service";
+import { getWorkoutRequestUser } from "@/lib/workout-token";
 import {
   canAccessTrialContent,
   isWithinTrialContentLimit,
@@ -8,7 +9,7 @@ import {
 import { getCurrentTrialDay, resolveTrialStartDate } from "@/lib/trial/status";
 
 export async function GET(
-  _request: Request,
+  request: NextRequest,
   context: { params: Promise<{ day: string }> }
 ) {
   const { day: dayParam } = await context.params;
@@ -18,25 +19,23 @@ export async function GET(
     return NextResponse.json({ error: "Ngày không hợp lệ." }, { status: 400 });
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  // Chấp nhận session đầy đủ HOẶC cookie workout-token (magic link).
+  const auth = await getWorkoutRequestUser(request);
+  if (!auth) {
     return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
   }
+  const supabase = createServiceClient();
 
   const { data: profile } = await supabase
     .from("profiles")
     .select("trial_ends_at, bodix_start_date, trial_started_at")
-    .eq("id", user.id)
+    .eq("id", auth.userId)
     .single();
 
   const { data: enrollment } = await supabase
     .from("enrollments")
     .select("id, program_id, status, started_at, enrolled_at")
-    .eq("user_id", user.id)
+    .eq("user_id", auth.userId)
     .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
     .order("enrolled_at", { ascending: false })
     .limit(1)
@@ -103,7 +102,7 @@ export async function GET(
   const { data: completedActivities } = await supabase
     .from("trial_activities")
     .select("id, metadata")
-    .eq("user_id", user.id)
+    .eq("user_id", auth.userId)
     .eq("program_id", enrollment.program_id)
     .eq("activity_type", "complete_trial_day")
     .limit(20);

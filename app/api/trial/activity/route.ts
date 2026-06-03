@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
+import { createServiceClient } from '@/lib/supabase/service'
+import { getWorkoutRequestUser } from '@/lib/workout-token'
 import {
   VALID_ACTIVITY_TYPES,
   type ActivityType,
@@ -9,15 +10,12 @@ import {
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
 export async function POST(request: NextRequest) {
-  // --- Auth ---
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
-
-  if (!user) {
+  // --- Auth: session đầy đủ HOẶC cookie workout-token (magic link) ---
+  const auth = await getWorkoutRequestUser(request)
+  if (!auth) {
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
+  const supabase = createServiceClient()
 
   // --- Parse body ---
   let body: { program_id?: unknown; activity_type?: unknown; metadata?: unknown }
@@ -56,7 +54,7 @@ export async function POST(request: NextRequest) {
   const { data: enrollment } = await supabase
     .from('enrollments')
     .select('id, status')
-    .eq('user_id', user.id)
+    .eq('user_id', auth.userId)
     .eq('program_id', programId)
     .in('status', Array.from(TRIAL_ACCESSIBLE_STATUSES))
     .order('enrolled_at', { ascending: false })
@@ -74,7 +72,7 @@ export async function POST(request: NextRequest) {
   const { data: activity, error: insertError } = await supabase
     .from('trial_activities')
     .insert({
-      user_id: user.id,
+      user_id: auth.userId,
       program_id: programId,
       activity_type: activityType,
       metadata,

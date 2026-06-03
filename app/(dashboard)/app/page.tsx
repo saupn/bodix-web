@@ -525,24 +525,39 @@ export default async function AppPage() {
           )}
         </div>
 
-        <Link
-          href="/app/trial"
-          className="block rounded-xl border border-neutral-200 bg-white p-6 transition hover:border-primary hover:shadow-sm"
-        >
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="font-heading text-base font-semibold text-neutral-900">
-                Bài tập trải nghiệm thử
-              </h3>
-              <p className="mt-1 text-sm text-neutral-600">
-                {trial.hasStarted
-                  ? `Ngày ${trial.currentDay}/${trial.totalDays} – xem bài tập hôm nay`
-                  : "Bắt đầu từ ngày mai. Xem trước bài tập đầu tiên?"}
-              </p>
-            </div>
-            <span className="shrink-0 text-lg text-primary">→</span>
-          </div>
-        </Link>
+        {trial.hasStarted ? (
+          // Phiên tập HÔM NAY — card lớn, nút "Bắt đầu tập" to, dẫn THẲNG vào bài.
+          <Link
+            href={`/app/trial/workout/${trial.currentDay}`}
+            className="block rounded-2xl border-2 border-primary bg-primary/5 p-6 shadow-sm transition hover:bg-primary/10 hover:shadow-md"
+          >
+            <p className="text-sm font-medium text-primary">Phiên tập hôm nay</p>
+            <h3 className="mt-1 font-heading text-xl font-bold text-primary sm:text-2xl">
+              Ngày {trial.currentDay}/{trial.totalDays} – Tập thử
+            </h3>
+            <p className="mt-1 text-sm text-neutral-700">
+              Chỉ ~7–21 phút. Bấm để xem bài và bắt đầu ngay.
+            </p>
+            <span className="mt-4 inline-flex w-full items-center justify-center rounded-xl bg-primary px-6 py-4 text-base font-semibold text-secondary-light transition-colors hover:bg-primary-dark sm:w-auto sm:px-10">
+              Bắt đầu tập →
+            </span>
+          </Link>
+        ) : (
+          <Link
+            href="/app/trial"
+            className="block rounded-2xl border-2 border-primary/30 bg-white p-6 transition hover:border-primary hover:shadow-sm"
+          >
+            <h3 className="font-heading text-lg font-semibold text-neutral-900">
+              Bài tập trải nghiệm thử
+            </h3>
+            <p className="mt-1 text-sm text-neutral-600">
+              Bắt đầu từ ngày mai. Xem trước bài tập đầu tiên?
+            </p>
+            <span className="mt-3 inline-block font-medium text-primary">
+              Xem trước →
+            </span>
+          </Link>
+        )}
 
         <Link
           href="/app/checkout/bodix-21"

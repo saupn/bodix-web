@@ -18,6 +18,28 @@ import {
   translateExerciseName,
   type ExerciseTranslationMap,
 } from '@/lib/exercises/translate';
+import { generateWorkoutToken } from '@/lib/workout-token';
+
+const APP_URL = 'https://bodix.fit';
+
+/**
+ * Magic link phiên tập: sinh token gắn user → bodix.fit/w/[token] → bấm vào
+ * tự nhận diện, vào thẳng phiên tập hôm nay (KHÔNG cần đăng nhập).
+ * Nếu sinh token lỗi → fallback link trần (vẫn mở được nhưng phải login).
+ */
+async function buildWorkoutLink(
+  userId: string,
+  enrollmentId: string | null | undefined,
+  fallbackPath: string,
+): Promise<string> {
+  try {
+    const token = await generateWorkoutToken(userId, enrollmentId ?? null);
+    return `${APP_URL}/w/${token}`;
+  } catch (err) {
+    console.error('[morning-messages] token gen failed, fallback link:', userId, err);
+    return `${APP_URL}${fallbackPath}`;
+  }
+}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // Session metadata (source: lib/workout/video-config.ts)
@@ -93,6 +115,7 @@ function buildMainMessage(
   sessionTitle: string,
   isWeekStart: boolean,
   translationMap: ExerciseTranslationMap,
+  workoutUrl: string,
 ): string {
   const exerciseList = session.exercises
     .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
@@ -105,7 +128,7 @@ function buildMainMessage(
     `Hi ${name}! 🌸 Ngày ${dayNumber}/${totalDays} – hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
-    `▶️ Xem video: https://bodix.fit/app/program/workout/${dayNumber}\n` +
+    `▶️ Xem video: ${workoutUrl}\n` +
     `\n` +
     `Tập xong nhắn qua đây:\n` +
     `  3 → đủ 3 lượt (~21 phút)\n` +
@@ -122,6 +145,7 @@ function buildRecoveryMessage(
   dayNumber: number,
   totalDays: number,
   isWeekStart: boolean,
+  workoutUrl: string,
 ): string {
   const weekStartTip = isWeekStart
     ? '\n\n💡 Tuần này có thắc mắc gì – nhắn mình bất cứ lúc nào nha!'
@@ -132,7 +156,7 @@ function buildRecoveryMessage(
     `\n` +
     `Recovery giúp cơ thể phục hồi. 1 lượt (~7 phút).\n` +
     `\n` +
-    `▶️ Xem video: https://bodix.fit/app/program/workout/${dayNumber}\n` +
+    `▶️ Xem video: ${workoutUrl}\n` +
     `\n` +
     `Xong rồi nhắn 1 nha!` +
     weekStartTip
@@ -150,6 +174,7 @@ function buildTrialMainMessage(
   sessionTitle: string,
   isWeekStart: boolean,
   translationMap: ExerciseTranslationMap,
+  workoutUrl: string,
 ): string {
   const exerciseList = session.exercises
     .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
@@ -162,7 +187,7 @@ function buildTrialMainMessage(
     `Chào ${name} ơi! 🌿 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – hôm nay mình cùng nhau tập ${sessionTitle}. Các bài tập gồm:\n` +
     `${exerciseList}\n` +
     `\n` +
-    `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
+    `▶️ Xem bài: ${workoutUrl}\n` +
     `\n` +
     `Tập xong nhắn qua đây:\n` +
     `  3 → đủ 3 lượt (~21 phút)\n` +
@@ -178,6 +203,7 @@ function buildTrialRecoveryMessage(
   name: string,
   trialDay: number,
   isWeekStart: boolean,
+  workoutUrl: string,
 ): string {
   const weekTip = isWeekStart
     ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha!'
@@ -188,7 +214,7 @@ function buildTrialRecoveryMessage(
     `\n` +
     `Recovery ~7 phút một lượt.\n` +
     `\n` +
-    `▶️ Xem bài: https://bodix.fit/app/trial/workout/${trialDay}\n` +
+    `▶️ Xem bài: ${workoutUrl}\n` +
     `\n` +
     `Xong nhắn 1 là được!` +
     weekTip
@@ -375,9 +401,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       }
     }
 
+    const workoutUrl = await buildWorkoutLink(
+      userId,
+      en.enrollment_id,
+      `/app/trial/workout/${trialDay}`,
+    );
     const zaloMessage = isRecovery
-      ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart)
-      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart, translationMap);
+      ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart, workoutUrl)
+      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart, translationMap, workoutUrl);
 
     const logVars = {
       day_number: trialDay,
@@ -565,9 +596,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       }
     }
 
+    const workoutUrl = await buildWorkoutLink(
+      userId,
+      en.enrollment_id,
+      `/app/program/workout/${dayNumber}`,
+    );
     const zaloMessage = isRecovery
-      ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart)
-      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart, translationMap);
+      ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart, workoutUrl)
+      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart, translationMap, workoutUrl);
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 

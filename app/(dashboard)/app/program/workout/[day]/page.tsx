@@ -9,16 +9,19 @@ import { CelebrationOverlay } from "@/components/completion/CelebrationOverlay";
 import { Toast } from "@/components/ui/Toast";
 import { VimeoPlayer } from "@/components/workout/VimeoPlayer";
 
-type Exercise = {
+type ExerciseItem = {
   name: string;
-  sets?: number;
-  reps?: number;
-  duration_seconds?: number;
 };
 
-type VersionData = {
+type Rounds = { hard: number; light: number; recovery: number };
+
+type ExercisesData = {
   video_url?: string | null;
-  exercises?: Exercise[];
+  duration_minutes?: number;
+  work_seconds?: number;
+  rest_seconds?: number;
+  rounds?: Rounds;
+  items?: ExerciseItem[];
 };
 
 interface Workout {
@@ -29,9 +32,7 @@ interface Workout {
   description: string | null;
   duration_minutes: number;
   workout_type: string;
-  hard_version: VersionData | null;
-  light_version: VersionData | null;
-  recovery_version: VersionData | null;
+  exercises: ExercisesData | null;
 }
 
 const WORKOUT_TYPE_LABEL: Record<string, string> = {
@@ -57,24 +58,20 @@ const FEELING_OPTIONS = [
 
 type TabMode = "hard" | "light" | "recovery";
 
-function getExercises(workout: Workout, mode: TabMode): Exercise[] {
-  const v =
-    mode === "hard"
-      ? workout.hard_version
-      : mode === "light"
-      ? workout.light_version
-      : workout.recovery_version;
-  return v?.exercises ?? [];
+const DEFAULT_ROUNDS: Rounds = { hard: 3, light: 2, recovery: 1 };
+const WORK_SECONDS = 60;
+const REST_SECONDS = 30;
+
+function getItems(workout: Workout): ExerciseItem[] {
+  return workout.exercises?.items ?? [];
 }
 
-function hasVersion(workout: Workout, mode: TabMode): boolean {
-  const v =
-    mode === "hard"
-      ? workout.hard_version
-      : mode === "light"
-      ? workout.light_version
-      : workout.recovery_version;
-  return !!v?.exercises?.length;
+function hasExercises(workout: Workout): boolean {
+  return !!workout.exercises?.items?.length;
+}
+
+function roundsFor(workout: Workout, mode: TabMode): number {
+  return workout.exercises?.rounds?.[mode] ?? DEFAULT_ROUNDS[mode];
 }
 
 export default function ProgramWorkoutPage() {
@@ -128,14 +125,14 @@ export default function ProgramWorkoutPage() {
             setMode(data.checkin.mode);
           } else if (data.workout) {
             const urlMode = searchParams.get("mode") as TabMode | null;
-            if (urlMode && ["hard", "light", "recovery"].includes(urlMode) && hasVersion(data.workout, urlMode)) {
+            if (
+              urlMode &&
+              ["hard", "light", "recovery"].includes(urlMode) &&
+              hasExercises(data.workout)
+            ) {
               setMode(urlMode);
-            } else if (hasVersion(data.workout, "hard")) {
+            } else {
               setMode("hard");
-            } else if (hasVersion(data.workout, "light")) {
-              setMode("light");
-            } else if (hasVersion(data.workout, "recovery")) {
-              setMode("recovery");
             }
           }
         }
@@ -226,13 +223,17 @@ export default function ProgramWorkoutPage() {
   const typeLabel =
     WORKOUT_TYPE_LABEL[workout.workout_type] ?? workout.workout_type;
   const weekNum = workout.week_number ?? Math.ceil(day / 7);
-  const exercises = getExercises(workout, mode);
+  const items = getItems(workout);
+  const workSeconds = workout.exercises?.work_seconds ?? WORK_SECONDS;
+  const restSeconds = workout.exercises?.rest_seconds ?? REST_SECONDS;
   const modeOptions: { key: TabMode; label: string }[] = [];
-  if (hasVersion(workout, "hard")) modeOptions.push({ key: "hard", label: "HARD" });
-  if (hasVersion(workout, "light")) modeOptions.push({ key: "light", label: "LIGHT" });
-  if (hasVersion(workout, "recovery"))
+  if (hasExercises(workout)) {
+    modeOptions.push({ key: "hard", label: "HARD" });
+    modeOptions.push({ key: "light", label: "LIGHT" });
     modeOptions.push({ key: "recovery", label: "RECOVERY" });
-  if (modeOptions.length === 0) modeOptions.push({ key: "hard", label: "HARD" });
+  } else {
+    modeOptions.push({ key: "hard", label: "HARD" });
+  }
 
   const feelingLabel = (n: number) =>
     FEELING_OPTIONS.find((f) => f.value === n)?.label ?? "";
@@ -283,11 +284,13 @@ export default function ProgramWorkoutPage() {
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row">
           {modeOptions.map((opt) => {
-            const rounds = opt.key === "hard" ? 3 : opt.key === "light" ? 2 : 1;
-            const perRound = workout.duration_minutes > 0
-              ? Math.round(workout.duration_minutes / 3)
-              : 7;
-            const dur = rounds * perRound;
+            const rounds = roundsFor(workout, opt.key);
+            const hardRounds = roundsFor(workout, "hard") || 3;
+            const perRound =
+              workout.duration_minutes > 0
+                ? workout.duration_minutes / hardRounds
+                : 7;
+            const dur = Math.round(rounds * perRound);
             const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "🧘";
             return (
               <button
@@ -317,8 +320,7 @@ export default function ProgramWorkoutPage() {
 
       {/* Video area */}
       {(() => {
-        const version = mode === "hard" ? workout.hard_version : mode === "light" ? workout.light_version : workout.recovery_version;
-        const videoUrl = version?.video_url ?? workout.hard_version?.video_url;
+        const videoUrl = workout.exercises?.video_url;
         if (videoUrl && videoUrl.includes("vimeo.com")) {
           return <VimeoPlayer videoUrl={videoUrl} title={workout.title} />;
         }
@@ -339,9 +341,13 @@ export default function ProgramWorkoutPage() {
         <h2 className="font-heading text-lg font-semibold text-primary">
           Danh sách bài tập
         </h2>
+        <p className="mt-1 text-sm text-neutral-600">
+          {roundsFor(workout, mode)} lượt · mỗi động tác {workSeconds}s tập, nghỉ{" "}
+          {restSeconds}s
+        </p>
         <ul className="mt-3 space-y-3">
-          {exercises.length > 0 ? (
-            exercises.map((ex, i) => (
+          {items.length > 0 ? (
+            items.map((ex, i) => (
               <li
                 key={i}
                 className="flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-4"
@@ -352,13 +358,7 @@ export default function ProgramWorkoutPage() {
                 <div className="min-w-0 flex-1">
                   <span className="font-medium text-neutral-800">{ex.name}</span>
                   <p className="mt-0.5 text-sm text-neutral-600">
-                    {ex.reps != null
-                      ? `${ex.sets ?? 1} × ${ex.reps} reps`
-                      : ex.duration_seconds != null
-                      ? `${ex.sets ?? 1} × ${ex.duration_seconds}s`
-                      : ex.sets != null
-                      ? `${ex.sets} sets`
-                      : "–"}
+                    {workSeconds}s tập · nghỉ {restSeconds}s
                   </p>
                 </div>
               </li>

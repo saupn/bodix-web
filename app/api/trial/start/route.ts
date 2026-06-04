@@ -1,9 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
-import { TRIAL_DAYS, hasMinDaysBeforeCohortForTrial } from '@/lib/trial/utils'
+import { TRIAL_DAYS } from '@/lib/trial/utils'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
-import { getVietnamTomorrowDateString } from '@/lib/date/vietnam'
+import { getVietnamDateString, getVietnamTomorrowDateString } from '@/lib/date/vietnam'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -60,25 +60,22 @@ export async function POST(request: NextRequest) {
   }
 
   const service = createServiceClient()
+
+  // BD-FLEXIBLE-ENROLLMENT: KHÔNG còn ràng buộc "≥3 ngày tới cohort". User đăng ký
+  // tập thử bất cứ lúc nào và được gán luôn vào cohort upcoming gần nhất (start_date
+  // ≥ hôm nay). Nếu chưa có cohort upcoming → cohort_id = null, đợt mở sau sẽ quét
+  // (xem api/admin/cohorts/[id]/start auto-assign). Trial sát ngày cohort sẽ bị cắt
+  // ngắn khi cohort mở (Cách B2) — vẫn cho đăng ký.
+  const todayStr = getVietnamDateString()
   const { data: nextCohort } = await service
     .from('cohorts')
-    .select('start_date')
+    .select('id, start_date')
     .eq('program_id', programId)
     .eq('status', 'upcoming')
+    .gte('start_date', todayStr)
     .order('start_date', { ascending: true })
     .limit(1)
     .maybeSingle()
-
-  if (nextCohort?.start_date && !hasMinDaysBeforeCohortForTrial(nextCohort.start_date)) {
-    return NextResponse.json(
-      {
-        error:
-          'Đợt tập sắp tới quá gần – không đủ 3 ngày cho tập thử. Vui lòng chờ đợt cohort tiếp theo.',
-        code: 'cohort_too_soon',
-      },
-      { status: 409 }
-    )
-  }
 
   const startDate = getVietnamTomorrowDateString()
   const startedAt = `${startDate}T00:00:00+07:00`
@@ -92,6 +89,7 @@ export async function POST(request: NextRequest) {
       status: 'trial',
       current_day: 0,
       started_at: startedAt,
+      cohort_id: nextCohort?.id ?? null,
     })
     .select('id, user_id, program_id, status, enrolled_at')
     .single()

@@ -75,7 +75,7 @@ export async function GET() {
 
   const { data: workouts } = await supabase
     .from("workout_templates")
-    .select("id, day_number, title, duration_minutes, workout_type, hard_version, light_version, recovery_version")
+    .select("id, day_number, title, duration_minutes, workout_type, exercises")
     .eq("program_id", program.id)
     .order("day_number", { ascending: true });
 

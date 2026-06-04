@@ -20,7 +20,7 @@ export async function POST(
 
   const { data: cohort } = await service
     .from("cohorts")
-    .select("id, status, start_date")
+    .select("id, status, start_date, program_id")
     .eq("id", cohortId)
     .maybeSingle();
 
@@ -40,12 +40,24 @@ export async function POST(
     .update({ status: "active" })
     .eq("id", cohortId);
 
-  // Lấy enrollments thuộc cohort (paid_waiting_cohort hoặc đã active sẵn)
+  // BD-FLEXIBLE-ENROLLMENT (Cách B2): gom mọi enrollment trial/paid CHƯA gán cohort
+  // của cùng program vào cohort đang mở (đây là đợt gần nhất). Trial dang dở sẽ vào
+  // ngày 1 cohort thật — trial_activities giữ nguyên, không đụng daily_checkins.
+  if (cohort.program_id) {
+    await service
+      .from("enrollments")
+      .update({ cohort_id: cohortId })
+      .eq("program_id", cohort.program_id)
+      .is("cohort_id", null)
+      .in("status", ["trial", "paid_waiting_cohort"]);
+  }
+
+  // Lấy enrollments thuộc cohort: trial (cắt ngắn → active), paid_waiting_cohort, active.
   const { data: enrollments } = await service
     .from("enrollments")
     .select("id, user_id, status")
     .eq("cohort_id", cohortId)
-    .in("status", ["paid_waiting_cohort", "active"]);
+    .in("status", ["trial", "paid_waiting_cohort", "active"]);
 
   if (!enrollments || enrollments.length === 0) {
     return NextResponse.json({

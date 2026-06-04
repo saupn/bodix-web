@@ -125,10 +125,13 @@ Get detailed workout for trial day (1, 2, or 3 only).
 {
   "workout": {
     "id": "uuid", "day_number": 1, "title": "...", "description": "...",
-    "duration_minutes": 30, "workout_type": "main",
-    "hard_version": { "video_url": "...", "exercises": [] },
-    "light_version": { "video_url": "...", "exercises": [] },
-    "recovery_version": { "video_url": "...", "exercises": [] }
+    "duration_minutes": 21, "workout_type": "main",
+    "exercises": {
+      "video_url": "...", "duration_minutes": 21,
+      "work_seconds": 60, "rest_seconds": 30,
+      "rounds": { "hard": 3, "light": 2, "recovery": 1 },
+      "items": [ { "name": "Squats" } ]
+    }
   },
   "program_id": "uuid",
   "is_completed": false
@@ -188,8 +191,8 @@ Get specific workout day details for active enrollment.
 {
   "workout": {
     "id": "uuid", "day_number": 5, "week_number": 1,
-    "title": "...", "description": "...", "duration_minutes": 30, "workout_type": "main",
-    "hard_version": {}, "light_version": {}, "recovery_version": {}
+    "title": "...", "description": "...", "duration_minutes": 21, "workout_type": "main",
+    "exercises": { "video_url": "...", "duration_minutes": 21, "work_seconds": 60, "rest_seconds": 30, "rounds": { "hard": 3, "light": 2, "recovery": 1 }, "items": [ { "name": "Squats" } ] }
   },
   "program_id": "uuid",
   "enrollment_id": "uuid",

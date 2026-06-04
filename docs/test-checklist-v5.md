@@ -263,7 +263,7 @@
 - [ ] **Video Vimeo embed hiện đúng (CC-03 seed data)**
   - Làm: Vào trang workout của ngày hiện tại
   - Đúng: Video Vimeo render đúng trong iframe, không lỗi
-  - DB: `SELECT hard_version, light_version FROM workout_templates WHERE program_id = '<program_id>' AND day_number = <day>` → JSON có `video_url` Vimeo
+  - DB: `SELECT exercises FROM workout_templates WHERE program_id = '<program_id>' AND day_number = <day>` → JSON có `video_url` Vimeo
 
 ---
 

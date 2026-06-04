@@ -219,7 +219,7 @@ final milestones = await supabase
 ```dart
 final workout = await supabase
     .from('workout_templates')
-    .select('id, day_number, week_number, title, description, duration_minutes, workout_type, hard_version, light_version, recovery_version')
+    .select('id, day_number, week_number, title, description, duration_minutes, workout_type, exercises')
     .eq('program_id', programId)
     .eq('day_number', dayNumber)
     .single();

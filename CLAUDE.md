@@ -123,7 +123,7 @@ trial → trial_completed → pending_payment → paid_waiting_cohort → active
 | `programs` | 3 chương trình — slug, name, duration_days, price_vnd, features (jsonb) |
 | `cohorts` | Đợt chạy — program_id, start_date, end_date, max_members, status (upcoming/active/completed) |
 | `enrollments` | User tham gia — user_id, program_id, cohort_id, status (trial/pending_payment/active/paused/completed/dropped), current_day, amount_paid, referral_code_id, referral_discount_amount |
-| `workout_templates` | Bài tập theo ngày — program_id, day_number, week_number, workout_type (main/recovery/review/flexible), hard_version (jsonb), light_version (jsonb) |
+| `workout_templates` | Bài tập theo ngày — program_id, day_number, week_number, workout_type (main/recovery/review/flexible), `exercises` (jsonb: `{video_url, duration_minutes, work_seconds:60, rest_seconds:30, rounds:{hard:3,light:2,recovery:1}, items:[{name}]}`; null cho review day). Mọi động tác 60s tập / 30s nghỉ; số lượt theo mode lấy ở `rounds[mode]` |
 | `review_content` | Coach review videos & notes per week — program_id, week_number, review_video_url, coach_note, next_week_focus |
 | `trial_activities` | Hoạt động trong 3 ngày trial — activity_type (view_program/view_workout/try_workout/complete_trial_day) |
 

@@ -76,8 +76,12 @@ export default function GuidePage() {
           </li>
         </ul>
         <p className="text-gray-700 leading-relaxed">
-          Sau onboarding, bạn vào dashboard với 3 ngày trải nghiệm miễn phí
-          được kích hoạt sẵn.
+          Sau onboarding, bạn vào dashboard với 3 ngày trải nghiệm miễn phí. Bạn
+          có thể tập thử trước rồi quyết định, hoặc thanh toán ngay để giữ chỗ
+          trong đợt tập (cohort) sắp mở. Bạn đăng ký bất cứ lúc nào cũng được –
+          hệ thống sẽ xếp bạn vào đợt tập gần nhất. Nếu đăng ký sát ngày khai
+          giảng, thời gian trải nghiệm có thể ngắn hơn, và bạn sẽ vào đợt tập
+          ngay khi nó bắt đầu.
         </p>
       </section>
 
@@ -87,7 +91,7 @@ export default function GuidePage() {
         </h2>
         <p className="text-gray-700 leading-relaxed mb-4">
           Trial cho phép bạn dùng đầy đủ tính năng trước khi quyết định mua.
-          Trong 3 ngày bạn có thể:
+          Trong thời gian trải nghiệm bạn có thể:
         </p>
         <ul className="list-disc pl-6 space-y-2 text-gray-700 leading-relaxed mb-4">
           <li>Xem 3 buổi tập đầu tiên của BodiX 21.</li>
@@ -96,9 +100,12 @@ export default function GuidePage() {
           <li>Nhận tin nhắc qua Zalo như người đã mua chính thức.</li>
         </ul>
         <p className="text-gray-700 leading-relaxed">
-          Trial không tính phí, không cần thẻ tín dụng. Khi trial sắp hết
-          (24 giờ và 6 giờ trước khi kết thúc), BodiX sẽ nhắc qua Zalo để bạn
-          quyết định chọn chương trình.
+          Trial không tính phí, không cần thẻ tín dụng. Bạn không phải chờ tập
+          thử xong mới được thanh toán – có thể thanh toán bất cứ lúc nào (trước,
+          trong, hoặc sau trial) để giữ chỗ trong đợt tập. Khi trial sắp hết
+          (24 giờ và 6 giờ trước khi kết thúc), BodiX nhắc qua Zalo để bạn đăng
+          ký khoá đầy đủ. Nếu đợt tập mở trong khi bạn vẫn đang trải nghiệm, bạn
+          vào thẳng ngày 1 của đợt – phần trải nghiệm dang dở không ảnh hưởng gì.
         </p>
       </section>
 
@@ -131,10 +138,13 @@ export default function GuidePage() {
           vào chương trình quá sức.
         </p>
         <p className="text-gray-700 leading-relaxed">
-          Thanh toán qua VNPay (thẻ ATM nội địa, Visa/Mastercard, QR ngân
-          hàng). Sau khi thanh toán thành công, enrollment chuyển sang trạng
-          thái <span className="font-medium">active</span> và bạn được ghép
-          vào đợt (cohort) gần nhất.
+          Bạn có thể thanh toán bất cứ lúc nào – ngay khi đăng ký, giữa lúc tập
+          thử, hay sau khi trial kết thúc. Sau khi thanh toán thành công, bạn
+          được giữ chỗ trong đợt (cohort) gần nhất và enrollment chuyển sang
+          trạng thái <span className="font-medium">đã thanh toán, chờ đợt mở</span>.
+          Khi đợt tập bắt đầu, bạn vào ngày 1 và enrollment chuyển sang{" "}
+          <span className="font-medium">active</span>. Nếu chưa có đợt nào được
+          lên lịch, chúng tôi sẽ xếp bạn vào đợt gần nhất ngay khi mở.
         </p>
       </section>
 

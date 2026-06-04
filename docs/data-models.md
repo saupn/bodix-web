@@ -166,9 +166,7 @@ Daily workout plans for each program.
 | title | text | e.g. "Ngày 1: Lower Body Basics" |
 | description | text | |
 | duration_minutes | integer | |
-| hard_version | jsonb | `{ video_url, exercises: [] }` |
-| light_version | jsonb | |
-| recovery_version | jsonb | |
+| exercises | jsonb | `{ video_url, duration_minutes, work_seconds:60, rest_seconds:30, rounds:{hard:3,light:2,recovery:1}, items:[{name}] }` — null cho review day |
 | sort_order | integer | |
 
 ```dart
@@ -182,9 +180,10 @@ class WorkoutTemplate {
   final String title;
   final String? description;
   final int durationMinutes;
-  final Map<String, dynamic>? hardVersion;
-  final Map<String, dynamic>? lightVersion;
-  final Map<String, dynamic>? recoveryVersion;
+  // exercises: { video_url, duration_minutes, work_seconds:60, rest_seconds:30,
+  //   rounds:{hard:3,light:2,recovery:1}, items:[{name}] }. Số lượt theo mode lấy
+  //   ở rounds[mode]; mọi động tác 60s tập / 30s nghỉ. null cho review day.
+  final Map<String, dynamic>? exercises;
 }
 ```
 

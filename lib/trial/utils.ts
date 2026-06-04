@@ -21,7 +21,12 @@ export function getTrialMorningAnchorDate(
   return addCalendarDays(enrollYmd, 1);
 }
 
-/** Từ ngày mai (D1 trial) đến ngày cohort còn ít nhất 3 ngày lịch */
+/**
+ * @deprecated BD-FLEXIBLE-ENROLLMENT: bỏ ràng buộc "≥3 ngày tới cohort". User đăng
+ * ký tập thử bất cứ lúc nào; trial sát ngày cohort bị cắt ngắn (Cách B2). Không còn
+ * gọi ở runtime — giữ lại để tránh phá import lịch sử / test.
+ * Từ ngày mai (D1 trial) đến ngày cohort còn ít nhất 3 ngày lịch.
+ */
 export function hasMinDaysBeforeCohortForTrial(cohortStartYmd: string): boolean {
   const tomorrow = getVietnamTomorrowDateString();
   return calendarDaysBetween(tomorrow, cohortStartYmd) >= 3;

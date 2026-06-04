@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Check } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
-import { hasMinDaysBeforeCohortForTrial } from "@/lib/trial/utils";
 import { getTrialDisplayStatus } from "@/lib/trial/status";
 import { formatDateVn } from "@/lib/date/vietnam";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
@@ -642,17 +641,10 @@ export default async function AppPage() {
         .maybeSingle()
     : { data: null };
 
-  // Từ ngày mai (D1 trial) đến cohort cần ≥ 3 ngày lịch — xem hasMinDaysBeforeCohortForTrial
-  let canTrial = false;
-  let nextCohortDate: string | null = null;
-
-  if (nextCohort) {
-    nextCohortDate = nextCohort.start_date;
-    canTrial = hasMinDaysBeforeCohortForTrial(nextCohort.start_date) && !hasEverTrialed;
-  } else {
-    // No upcoming cohort — allow trial (admin will create cohort later)
-    canTrial = !hasEverTrialed;
-  }
+  // BD-FLEXIBLE-ENROLLMENT: cho đăng ký tập thử bất cứ lúc nào (bỏ ràng buộc 3 ngày).
+  // Chỉ cần chưa từng trial. nextCohortDate dùng để hiển thị đợt gần nhất (không chặn).
+  const canTrial = !hasEverTrialed;
+  const nextCohortDate: string | null = nextCohort?.start_date ?? null;
 
   return (
     <div className="space-y-8">

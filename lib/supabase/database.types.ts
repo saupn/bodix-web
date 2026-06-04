@@ -1503,11 +1503,9 @@ export type Database = {
           day_of_week: number
           description: string | null
           duration_minutes: number
-          hard_version: Json | null
+          exercises: Json | null
           id: string
-          light_version: Json | null
           program_id: string
-          recovery_version: Json | null
           sort_order: number
           title: string
           week_number: number
@@ -1519,11 +1517,9 @@ export type Database = {
           day_of_week: number
           description?: string | null
           duration_minutes: number
-          hard_version?: Json | null
+          exercises?: Json | null
           id?: string
-          light_version?: Json | null
           program_id: string
-          recovery_version?: Json | null
           sort_order?: number
           title: string
           week_number: number
@@ -1535,11 +1531,9 @@ export type Database = {
           day_of_week?: number
           description?: string | null
           duration_minutes?: number
-          hard_version?: Json | null
+          exercises?: Json | null
           id?: string
-          light_version?: Json | null
           program_id?: string
-          recovery_version?: Json | null
           sort_order?: number
           title?: string
           week_number?: number

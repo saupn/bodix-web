@@ -113,7 +113,7 @@ function TangSachContent() {
                   Muốn thay đổi cơ thể trong 21 ngày?
                 </p>
                 <p className="mt-2 text-sm text-neutral-600">
-                  Tập thử 3 ngày miễn phí. Sau đó chúng tôi sẽ chỉ chọn một số được tham gia.
+                  Tập thử 3 ngày miễn phí. Thanh toán bất cứ lúc nào để giữ chỗ trong đợt tập gần nhất.
                 </p>
                 <Link
                   href={signupHref}

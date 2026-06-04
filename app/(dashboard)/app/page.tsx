@@ -6,6 +6,7 @@ import { getTrialDisplayStatus } from "@/lib/trial/status";
 import { formatDateVn } from "@/lib/date/vietnam";
 import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
+import { TrialPreviewCard } from "@/components/dashboard/TrialPreviewCard";
 import { BuddyChooser } from "@/components/dashboard/BuddyChooser";
 import { GiftBookCard } from "@/components/dashboard/GiftBookCard";
 import { OtherCohortsLink } from "@/components/dashboard/OtherCohortsLink";
@@ -509,6 +510,30 @@ export default async function AppPage() {
       );
     }
 
+    // Pre-trial (chưa tới ngày tập): cho XEM TRƯỚC bài Ngày 1 — bài thật sẽ tập.
+    // Fetch video ở server, truyền xuống modal. KHÔNG check-in, KHÔNG ghi
+    // trial_activities, KHÔNG đụng day-gating (xem ≠ tập).
+    let previewVideoUrl: string | null = null;
+    let previewWorkoutTitle = "";
+    let trialStartLabel: string | null = null;
+    if (!trial.hasStarted) {
+      trialStartLabel =
+        formatDateVn((trialEnrollment.started_at as string | null) ?? null) ||
+        null;
+      if (trialEnrollment.program_id) {
+        const { data: previewWorkout } = await service
+          .from("workout_templates")
+          .select("title, exercises")
+          .eq("program_id", trialEnrollment.program_id)
+          .eq("day_number", 1)
+          .maybeSingle();
+        previewWorkoutTitle = (previewWorkout?.title as string | null) ?? "";
+        previewVideoUrl =
+          (previewWorkout?.exercises as { video_url?: string | null } | null)
+            ?.video_url ?? null;
+      }
+    }
+
     return (
       <div className="space-y-8">
         {pendingBanner}
@@ -542,20 +567,11 @@ export default async function AppPage() {
             </span>
           </Link>
         ) : (
-          <Link
-            href="/app/trial"
-            className="block rounded-2xl border-2 border-primary/30 bg-white p-6 transition hover:border-primary hover:shadow-sm"
-          >
-            <h3 className="font-heading text-lg font-semibold text-neutral-900">
-              Bài tập trải nghiệm thử
-            </h3>
-            <p className="mt-1 text-sm text-neutral-600">
-              Bắt đầu từ ngày mai. Xem trước bài tập đầu tiên?
-            </p>
-            <span className="mt-3 inline-block font-medium text-primary">
-              Xem trước →
-            </span>
-          </Link>
+          <TrialPreviewCard
+            startDateLabel={trialStartLabel}
+            videoUrl={previewVideoUrl}
+            workoutTitle={previewWorkoutTitle}
+          />
         )}
 
         <Link

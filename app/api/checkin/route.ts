@@ -141,6 +141,7 @@ export async function POST(request: NextRequest) {
     total_completed_days: 0,
     total_hard_days: 0,
     total_light_days: 0,
+    total_easy_days: 0,
     total_recovery_days: 0,
     total_skip_days: 0,
     last_checkin_date: null,
@@ -175,6 +176,8 @@ export async function POST(request: NextRequest) {
     total_completed_days: mode !== 'skip' ? prev.total_completed_days + 1 : prev.total_completed_days,
     total_hard_days: mode === 'hard' ? prev.total_hard_days + 1 : prev.total_hard_days,
     total_light_days: mode === 'light' ? prev.total_light_days + 1 : prev.total_light_days,
+    // 'easy' = mức 1 lượt (web + Zalo); 'recovery' = buổi Recovery thứ 7.
+    total_easy_days: mode === 'easy' ? (prev.total_easy_days ?? 0) + 1 : (prev.total_easy_days ?? 0),
     total_recovery_days: mode === 'recovery' ? prev.total_recovery_days + 1 : prev.total_recovery_days,
     total_skip_days: mode === 'skip' ? prev.total_skip_days + 1 : prev.total_skip_days,
     last_checkin_date: mode !== 'skip' ? workoutDate : prev.last_checkin_date,

@@ -31,3 +31,20 @@ export function translateExerciseName(
   const key = nameEn.toLowerCase().trim();
   return translationMap.get(key) ?? nameEn;
 }
+
+/**
+ * Dịch tại chỗ tên bài trong workout_templates.exercises.items sang
+ * "Tiếng Việt (English)". Mutate object để API trả thẳng tên đã dịch — trang
+ * phiên tập chỉ render `item.name`. Bài chưa có name_vi → giữ tiếng Anh.
+ */
+export async function translateWorkoutItems(
+  supabase: SupabaseClient,
+  exercises: { items?: Array<{ name: string }> } | null | undefined,
+): Promise<void> {
+  if (!exercises?.items?.length) return;
+  const map = await loadExerciseTranslations(supabase);
+  exercises.items = exercises.items.map((it) => ({
+    ...it,
+    name: translateExerciseName(it.name, map),
+  }));
+}

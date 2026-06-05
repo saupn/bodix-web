@@ -78,7 +78,7 @@ export function RescueBanner({
                   Quay lại bất cứ lúc nào
                 </p>
                 <p className="mt-1 text-sm text-orange-800/90">
-                  Một bài Recovery {recoveryDuration} phút sẽ giúp bạn lấy lại nhịp
+                  Một buổi Easy {recoveryDuration} phút sẽ giúp bạn lấy lại nhịp
                 </p>
               </div>
             </div>
@@ -87,7 +87,7 @@ export function RescueBanner({
                 href={workoutHref("recovery")}
                 className="rounded-lg bg-orange-600 px-4 py-2.5 font-medium text-white transition-colors hover:bg-orange-700"
               >
-                Tập Recovery
+                Tập Easy
               </Link>
               <button
                 type="button"

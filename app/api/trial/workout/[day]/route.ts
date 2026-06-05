@@ -7,6 +7,7 @@ import {
   TRIAL_ACCESSIBLE_STATUSES,
 } from "@/lib/trial/utils";
 import { getCurrentTrialDay, resolveTrialStartDate } from "@/lib/trial/status";
+import { translateWorkoutItems } from "@/lib/exercises/translate";
 
 export async function GET(
   request: NextRequest,
@@ -98,6 +99,11 @@ export async function GET(
       { status: 404 }
     );
   }
+
+  await translateWorkoutItems(
+    supabase,
+    workout.exercises as { items?: Array<{ name: string }> } | null,
+  );
 
   const { data: completedActivities } = await supabase
     .from("trial_activities")

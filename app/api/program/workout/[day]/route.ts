@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getWorkoutRequestUser } from "@/lib/workout-token";
+import { translateWorkoutItems } from "@/lib/exercises/translate";
 
 export async function GET(
   request: NextRequest,
@@ -64,6 +65,11 @@ export async function GET(
       { status: 404 }
     );
   }
+
+  await translateWorkoutItems(
+    supabase,
+    workout.exercises as { items?: Array<{ name: string }> } | null,
+  );
 
   const { data: checkin } = await supabase
     .from("daily_checkins")

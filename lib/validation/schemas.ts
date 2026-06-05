@@ -36,7 +36,9 @@ function sanitized(maxLength: number) {
 export const checkinSchema = z.object({
   enrollment_id:    z.string().uuid('enrollment_id phải là UUID hợp lệ.'),
   day_number:       z.number().int().min(1).max(84),
-  mode:             z.enum(['hard', 'light', 'recovery', 'skip']),
+  // 'easy' = mức cường độ 1 lượt; 'recovery' = buổi Recovery thứ 7 (giữ cả 2,
+  // khớp CHECK constraint daily_checkins.mode).
+  mode:             z.enum(['hard', 'light', 'easy', 'recovery', 'skip']),
   feeling:          z.number().int().min(1).max(5).optional(),
   feeling_note:     sanitized(500).optional(),
   duration_minutes: z.number().int().min(1).max(300).optional(),

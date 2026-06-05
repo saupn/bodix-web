@@ -42,14 +42,23 @@ const WORKOUT_TYPE_LABEL: Record<string, string> = {
 const MODE_DESCRIPTIONS: Record<string, string> = {
   hard: "Đầy đủ cường độ – cho ngày bạn tràn đầy năng lượng",
   light: "Giảm cường độ – cho ngày bạn cần nhẹ nhàng hơn",
-  recovery: "Phục hồi – stretching và thư giãn",
+  easy: "Nhẹ nhàng nhất – 1 lượt, cho ngày bạn chỉ cần giữ nhịp",
 };
 
-type TabMode = "hard" | "light" | "recovery";
+// Nhãn cường độ (UI). Mức 1 lượt = "easy" (trước hiển thị "Recovery"). KHÁC với
+// buổi tập Recovery thứ 7 (workout_type='recovery').
+type TabMode = "hard" | "light" | "easy";
 
 const DEFAULT_ROUNDS: Rounds = { hard: 3, light: 2, recovery: 1 };
 const WORK_SECONDS = 60;
 const REST_SECONDS = 30;
+
+// Tab cường độ "easy" đọc số lượt từ DB key 'recovery' — GIỮ NGUYÊN key DB.
+const ROUNDS_KEY: Record<TabMode, keyof Rounds> = {
+  hard: "hard",
+  light: "light",
+  easy: "recovery",
+};
 
 function getItems(workout: Workout): ExerciseItem[] {
   return workout.exercises?.items ?? [];
@@ -60,7 +69,8 @@ function hasExercises(workout: Workout): boolean {
 }
 
 function roundsFor(workout: Workout, mode: TabMode): number {
-  return workout.exercises?.rounds?.[mode] ?? DEFAULT_ROUNDS[mode];
+  const key = ROUNDS_KEY[mode];
+  return workout.exercises?.rounds?.[key] ?? DEFAULT_ROUNDS[key];
 }
 
 export default function TrialWorkoutPage() {
@@ -179,7 +189,7 @@ export default function TrialWorkoutPage() {
   if (hasExercises(workout)) {
     modeOptions.push({ key: "hard", label: "HARD" });
     modeOptions.push({ key: "light", label: "LIGHT" });
-    modeOptions.push({ key: "recovery", label: "RECOVERY" });
+    modeOptions.push({ key: "easy", label: "EASY" });
   } else {
     modeOptions.push({ key: "hard", label: "HARD" });
   }
@@ -230,7 +240,7 @@ export default function TrialWorkoutPage() {
                 ? workout.duration_minutes / hardRounds
                 : 7;
             const dur = Math.round(rounds * perRound);
-            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "🧘";
+            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "☀️";
             return (
               <button
                 key={opt.key}

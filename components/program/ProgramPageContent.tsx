@@ -102,10 +102,10 @@ export function ProgramPageContent() {
     equipment: false,
   });
   const [weekExpanded, setWeekExpanded] = useState(true);
-  const [selectedMode, setSelectedMode] = useState<"hard" | "light" | "recovery">("hard");
+  const [selectedMode, setSelectedMode] = useState<"hard" | "light" | "easy">("hard");
   const [rescue, setRescue] = useState<{
     is_in_rescue: boolean;
-    suggested_mode: "hard" | "light" | "recovery";
+    suggested_mode: "hard" | "light" | "easy";
   } | null>(null);
   const [progressTrend, setProgressTrend] = useState<
     { week: string; value: number }[]
@@ -141,8 +141,10 @@ export function ProgramPageContent() {
         if (rescueRes.ok) {
           const r = await rescueRes.json();
           if (r.is_in_rescue && r.suggested_mode) {
-            setRescue({ is_in_rescue: true, suggested_mode: r.suggested_mode });
-            setSelectedMode(r.suggested_mode);
+            // rescue API trả 'recovery' (legacy) → map sang nhãn cường độ 'easy'.
+            const sm = r.suggested_mode === "recovery" ? "easy" : r.suggested_mode;
+            setRescue({ is_in_rescue: true, suggested_mode: sm });
+            setSelectedMode(sm);
           }
         }
 
@@ -332,7 +334,7 @@ export function ProgramPageContent() {
                         key={m}
                         type="button"
                         onClick={() =>
-                          setSelectedMode(m as "hard" | "light" | "recovery")
+                          setSelectedMode(m as "hard" | "light" | "easy")
                         }
                         className={`rounded-lg px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
                           selectedMode === m

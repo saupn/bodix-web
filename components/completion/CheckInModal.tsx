@@ -11,7 +11,7 @@ export const FEELING_OPTIONS = [
   { value: 5, label: "Tuyệt vời", emoji: "🔥" },
 ] as const;
 
-type TabMode = "hard" | "light" | "recovery";
+type TabMode = "hard" | "light" | "easy";
 
 interface CheckInModalProps {
   open: boolean;

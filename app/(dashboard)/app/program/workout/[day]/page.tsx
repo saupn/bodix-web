@@ -45,7 +45,7 @@ const WORKOUT_TYPE_LABEL: Record<string, string> = {
 const MODE_DESCRIPTIONS: Record<string, string> = {
   hard: "Đầy đủ cường độ – cho ngày bạn tràn đầy năng lượng",
   light: "Giảm cường độ – cho ngày bạn cần nhẹ nhàng hơn",
-  recovery: "Phục hồi – stretching và thư giãn",
+  easy: "Nhẹ nhàng nhất – 1 lượt, cho ngày bạn chỉ cần giữ nhịp",
 };
 
 const FEELING_OPTIONS = [
@@ -56,11 +56,21 @@ const FEELING_OPTIONS = [
   { value: 5, label: "Tuyệt vời", emoji: "🔥" },
 ];
 
-type TabMode = "hard" | "light" | "recovery";
+// Nhãn cường độ (UI/check-in mode). Mức 1 lượt = "easy" (trước đây hiển thị
+// "Recovery"). KHÁC với buổi tập Recovery thứ 7 (workout_type='recovery').
+type TabMode = "hard" | "light" | "easy";
 
 const DEFAULT_ROUNDS: Rounds = { hard: 3, light: 2, recovery: 1 };
 const WORK_SECONDS = 60;
 const REST_SECONDS = 30;
+
+// Tab cường độ "easy" đọc số lượt từ DB key 'recovery' — GIỮ NGUYÊN key DB,
+// chỉ đổi nhãn hiển thị + mode lưu (mode='easy').
+const ROUNDS_KEY: Record<TabMode, keyof Rounds> = {
+  hard: "hard",
+  light: "light",
+  easy: "recovery",
+};
 
 function getItems(workout: Workout): ExerciseItem[] {
   return workout.exercises?.items ?? [];
@@ -71,7 +81,8 @@ function hasExercises(workout: Workout): boolean {
 }
 
 function roundsFor(workout: Workout, mode: TabMode): number {
-  return workout.exercises?.rounds?.[mode] ?? DEFAULT_ROUNDS[mode];
+  const key = ROUNDS_KEY[mode];
+  return workout.exercises?.rounds?.[key] ?? DEFAULT_ROUNDS[key];
 }
 
 export default function ProgramWorkoutPage() {
@@ -124,10 +135,14 @@ export default function ProgramWorkoutPage() {
             });
             setMode(data.checkin.mode);
           } else if (data.workout) {
-            const urlMode = searchParams.get("mode") as TabMode | null;
+            // Chấp nhận ?mode=easy; map legacy ?mode=recovery (link rescue cũ) → easy.
+            const rawMode = searchParams.get("mode");
+            const urlMode = (
+              rawMode === "recovery" ? "easy" : rawMode
+            ) as TabMode | null;
             if (
               urlMode &&
-              ["hard", "light", "recovery"].includes(urlMode) &&
+              ["hard", "light", "easy"].includes(urlMode) &&
               hasExercises(data.workout)
             ) {
               setMode(urlMode);
@@ -230,7 +245,7 @@ export default function ProgramWorkoutPage() {
   if (hasExercises(workout)) {
     modeOptions.push({ key: "hard", label: "HARD" });
     modeOptions.push({ key: "light", label: "LIGHT" });
-    modeOptions.push({ key: "recovery", label: "RECOVERY" });
+    modeOptions.push({ key: "easy", label: "EASY" });
   } else {
     modeOptions.push({ key: "hard", label: "HARD" });
   }
@@ -273,8 +288,8 @@ export default function ProgramWorkoutPage() {
         </div>
       </div>
 
-      {/* Rescue mode message — when in rescue and doing light/recovery */}
-      {isInRescue && (mode === "light" || mode === "recovery") && !isCompleted && (
+      {/* Rescue mode message — when in rescue and doing light/easy */}
+      {isInRescue && (mode === "light" || mode === "easy") && !isCompleted && (
         <p className="rounded-lg bg-primary/5 px-4 py-2.5 text-sm text-primary">
           Bạn đang ở chế độ nhẹ nhàng. Mỗi phút đều đáng giá! 💪
         </p>
@@ -291,7 +306,7 @@ export default function ProgramWorkoutPage() {
                 ? workout.duration_minutes / hardRounds
                 : 7;
             const dur = Math.round(rounds * perRound);
-            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "🧘";
+            const emoji = opt.key === "hard" ? "💪" : opt.key === "light" ? "🌿" : "☀️";
             return (
               <button
                 key={opt.key}

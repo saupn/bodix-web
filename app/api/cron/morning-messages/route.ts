@@ -42,59 +42,24 @@ async function buildWorkoutLink(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// Session metadata (source: lib/workout/video-config.ts)
+// Exercises — SOURCE OF TRUTH: workout_templates.exercises.items[].name
+// (KHÔNG hardcode tên bài. Tin nhắn đọc đúng cùng nguồn với trang phiên tập.)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-type SessionCode = 'A' | 'B' | 'C' | 'D' | 'E' | 'F';
-
-interface SessionMeta {
-  code: SessionCode;
-  focus: string;
-  exercises: string[];
+interface ExerciseItem {
+  name: string;
 }
 
-const SESSIONS: Record<SessionCode, SessionMeta> = {
-  A: {
-    code: 'A',
-    focus: 'Mông, đùi, bắp chân',
-    exercises: ['Squat', 'Lunge', 'Glute Bridge', 'Calf Raise', 'Wall Sit'],
-  },
-  B: {
-    code: 'B',
-    focus: 'Vai, tay, ngực',
-    exercises: ['Push-up', 'Shoulder Press', 'Tricep Dip', 'Arm Circle', 'Plank Shoulder Tap'],
-  },
-  C: {
-    code: 'C',
-    focus: 'Tim mạch, sức bền',
-    exercises: ['March in Place', 'Step Touch', 'Low Jack', 'Knee Lift', 'Side Step'],
-  },
-  D: {
-    code: 'D',
-    focus: 'Bụng, lưng, cơ sâu',
-    exercises: ['Plank', 'Dead Bug', 'Bird Dog', 'Crunch', 'Side Plank'],
-  },
-  E: {
-    code: 'E',
-    focus: 'Toàn thân liên tục',
-    exercises: ['Light Burpee', 'Mountain Climber', 'Squat to Press', 'Lunge Twist', 'Inchworm'],
-  },
-  F: {
-    code: 'F',
-    focus: 'Giãn cơ, thư giãn',
-    exercises: ['Cat-Cow', 'Child\'s Pose', 'Hip Opener', 'Hamstring Stretch', 'Shoulder Stretch'],
-  },
-};
+interface WorkoutExercises {
+  items?: ExerciseItem[];
+}
 
-// Title in workout_templates → session code
-const TITLE_TO_SESSION: Record<string, SessionCode> = {
-  'Nền tảng thân dưới': 'A',
-  'Thân trên & Tư thế': 'B',
-  'Cardio nhẹ nhàng': 'C',
-  'Cơ trung tâm & Cân bằng': 'D',
-  'Toàn thân linh hoạt': 'E',
-  'Phục hồi & Linh hoạt': 'F',
-};
+// Lấy danh sách tên bài từ exercises.items của workout_templates.
+function getExerciseNames(exercises: WorkoutExercises | null): string[] {
+  return (exercises?.items ?? [])
+    .map((it) => it?.name)
+    .filter((n): n is string => !!n);
+}
 
 // Program config — extensible for 6W/12W
 const PROGRAM_CONFIG: Record<string, { slug: string; totalDays: number }> = {
@@ -111,13 +76,13 @@ function buildMainMessage(
   name: string,
   dayNumber: number,
   totalDays: number,
-  session: SessionMeta,
+  exerciseNames: string[],
   sessionTitle: string,
   isWeekStart: boolean,
   translationMap: ExerciseTranslationMap,
   workoutUrl: string,
 ): string {
-  const exerciseList = session.exercises
+  const exerciseList = exerciseNames
     .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
     .join('\n');
   const weekStartTip = isWeekStart
@@ -170,13 +135,13 @@ function buildRecoveryMessage(
 function buildTrialMainMessage(
   name: string,
   trialDay: number,
-  session: SessionMeta,
+  exerciseNames: string[],
   sessionTitle: string,
   isWeekStart: boolean,
   translationMap: ExerciseTranslationMap,
   workoutUrl: string,
 ): string {
-  const exerciseList = session.exercises
+  const exerciseList = exerciseNames
     .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
     .join('\n');
   const weekTip = isWeekStart
@@ -372,7 +337,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const { data: workout } = await supabase
       .from('workout_templates')
-      .select('day_number, title, workout_type')
+      .select('day_number, title, workout_type, exercises')
       .eq('program_id', en.program_id)
       .eq('day_number', trialDay)
       .maybeSingle();
@@ -391,14 +356,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const isRecovery = workout.workout_type === 'recovery';
     const contentTemplate = isRecovery ? 'morning_recovery_trial' : 'morning_main_trial';
 
-    let session: SessionMeta | null = null;
-    if (!isRecovery) {
-      const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-      session = sessionCode ? SESSIONS[sessionCode] : null;
-      if (!session) {
-        fail(userId, `trial: unknown session title "${workout.title}"`);
-        continue;
-      }
+    // Source of truth: workout_templates.exercises.items[].name (KHÔNG hardcode).
+    const exerciseNames = getExerciseNames(workout.exercises as WorkoutExercises | null);
+    if (!isRecovery && exerciseNames.length === 0) {
+      fail(userId, `trial: no exercises.items for day ${trialDay} (title "${workout.title}")`);
+      continue;
     }
 
     const workoutUrl = await buildWorkoutLink(
@@ -408,7 +370,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     );
     const zaloMessage = isRecovery
       ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart, workoutUrl)
-      : buildTrialMainMessage(displayName, trialDay, session!, workout.title, isWeekStart, translationMap, workoutUrl);
+      : buildTrialMainMessage(displayName, trialDay, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl);
 
     const logVars = {
       day_number: trialDay,
@@ -564,7 +526,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     const { data: workout } = await supabase
       .from('workout_templates')
-      .select('day_number, title, workout_type')
+      .select('day_number, title, workout_type, exercises')
       .eq('program_id', en.program_id)
       .eq('day_number', dayNumber)
       .maybeSingle();
@@ -586,14 +548,11 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const isRecovery = workoutType === 'recovery';
     const contentTemplate = isRecovery ? 'morning_recovery' : 'morning_main';
 
-    let session: SessionMeta | null = null;
-    if (!isRecovery) {
-      const sessionCode = TITLE_TO_SESSION[workout.title] ?? null;
-      session = sessionCode ? SESSIONS[sessionCode] : null;
-      if (!session) {
-        fail(userId, `active: unknown session title "${workout.title}" for day ${dayNumber}`);
-        continue;
-      }
+    // Source of truth: workout_templates.exercises.items[].name (KHÔNG hardcode).
+    const exerciseNames = getExerciseNames(workout.exercises as WorkoutExercises | null);
+    if (!isRecovery && exerciseNames.length === 0) {
+      fail(userId, `active: no exercises.items for day ${dayNumber} (title "${workout.title}")`);
+      continue;
     }
 
     const workoutUrl = await buildWorkoutLink(
@@ -603,7 +562,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     );
     const zaloMessage = isRecovery
       ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart, workoutUrl)
-      : buildMainMessage(displayName, dayNumber, config.totalDays, session!, workout.title, isWeekStart, translationMap, workoutUrl);
+      : buildMainMessage(displayName, dayNumber, config.totalDays, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl);
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 

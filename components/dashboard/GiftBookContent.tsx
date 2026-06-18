@@ -8,6 +8,7 @@ interface GiftBookContentProps {
   referralCode: string | null;
   remaining: number;
   total: number;
+  isAffiliate?: boolean;
   baseUrl: string;
 }
 
@@ -15,6 +16,7 @@ export function GiftBookContent({
   referralCode,
   remaining,
   total,
+  isAffiliate = false,
   baseUrl,
 }: GiftBookContentProps) {
   const { success: toastSuccess } = useToast();
@@ -22,9 +24,10 @@ export function GiftBookContent({
   // Mọi user đều có sẵn referralCode (auto-create lúc onboarding). Nếu
   // referralCode null ở đây là edge case race condition → hiển thị
   // fallback hướng dẫn reload, không cần form tạo code.
+  // Affiliate tặng không giới hạn → không bao giờ rơi vào trạng thái "exhausted".
   const kind: "missing_code" | "exhausted" | "active" = !referralCode
     ? "missing_code"
-    : remaining <= 0
+    : !isAffiliate && remaining <= 0
       ? "exhausted"
       : "active";
 
@@ -69,19 +72,31 @@ export function GiftBookContent({
 
       {kind === "active" && referralCode && giftLink && (
         <div className="mt-6 space-y-4">
-          <p className="text-neutral-800">
-            Còn lại:{" "}
-            <span className="text-2xl font-bold text-[#2D4A3E]">
-              {remaining}/{total}
-            </span>{" "}
-            suất
-          </p>
-          <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
-            <div
-              className="h-full rounded-full bg-[#2D4A3E]/40 transition-all"
-              style={{ width: `${pct}%` }}
-            />
-          </div>
+          {isAffiliate ? (
+            <p className="text-neutral-800">
+              Bạn có thể tặng sách cho{" "}
+              <span className="font-bold text-[#2D4A3E]">
+                không giới hạn
+              </span>{" "}
+              bạn bè.
+            </p>
+          ) : (
+            <>
+              <p className="text-neutral-800">
+                Còn lại:{" "}
+                <span className="text-2xl font-bold text-[#2D4A3E]">
+                  {remaining}/{total}
+                </span>{" "}
+                suất
+              </p>
+              <div className="h-1.5 w-full overflow-hidden rounded-full bg-neutral-100">
+                <div
+                  className="h-full rounded-full bg-[#2D4A3E]/40 transition-all"
+                  style={{ width: `${pct}%` }}
+                />
+              </div>
+            </>
+          )}
           <div className="rounded-lg border border-neutral-200 bg-white p-4">
             <p className="text-xs font-medium text-neutral-600">Mã của bạn</p>
             <p className="mt-1 font-mono text-lg font-bold tracking-wider text-[#2D4A3E]">

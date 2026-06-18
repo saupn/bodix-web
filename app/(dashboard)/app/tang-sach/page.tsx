@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { GiftBookContent } from "@/components/dashboard/GiftBookContent";
+import { isAffiliate } from "@/lib/affiliate/is-affiliate";
 
 export const dynamic = "force-dynamic";
 
@@ -42,6 +43,8 @@ export default async function TangSachDashboardPage() {
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://bodix.fit";
   const total = profile?.gift_total ?? 10;
   const remaining = profile?.gift_remaining ?? 10;
+  // Affiliate tặng sách không giới hạn → ẩn số đếm quota.
+  const affiliate = await isAffiliate(service, user.id);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -75,6 +78,7 @@ export default async function TangSachDashboardPage() {
           referralCode={referralCode}
           remaining={remaining}
           total={total}
+          isAffiliate={affiliate}
           baseUrl={baseUrl}
         />
       </div>

@@ -135,9 +135,15 @@ export const REFERRAL_COPY = {
   // ── Profile / dashboard home labels ───────────────────────────────────────
   emptyVouchersOnProfile: `Chưa có voucher nào. Giới thiệu bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
   // Tách thành 3 phần để render tên sách thành link bấm được (xem GiftBookCard).
+  // LƯU Ý: copy tặng sách (lead magnet phễu đầu) KHÔNG hứa voucher — voucher là
+  // cơ chế referral riêng (thưởng khi người được giới thiệu mua + check-in).
   giftBookTitle: "Tại sao nhịn ăn không giúp bạn gọn hơn",
-  giftBookSubtextBefore: "Tặng sách ",
-  giftBookSubtextAfter: ` cho bạn bè – nhận voucher ${VOUCHER_VALUE_DISPLAY} khi họ vào cohort và check-in ngày đầu.`,
+  giftBookSubtextBefore: "Tặng cuốn ",
+  giftBookSubtextAfter:
+    " cho bạn bè – một món quà mở đầu hành trình thay đổi của họ.",
+  // Nhắc nhẹ về chương trình giới thiệu, tách bạch khỏi hành động tặng sách.
+  giftBookReferralHint: "Muốn nhận thưởng giới thiệu? Xem trang ",
+  giftBookReferralHintLink: "Giới thiệu bạn bè",
   giftBookNoCodeFallback:
     "Mã giới thiệu của bạn đang được tạo. Vui lòng tải lại trang sau vài giây.",
 

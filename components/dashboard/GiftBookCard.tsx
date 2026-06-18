@@ -19,11 +19,18 @@ export function GiftBookCard() {
               href="/api/guides/download"
               target="_blank"
               rel="noopener noreferrer"
-              className="font-medium text-primary underline-offset-2 hover:underline"
+              className="font-medium text-primary no-underline"
             >
               &quot;{REFERRAL_COPY.giftBookTitle}&quot;
             </a>
             {REFERRAL_COPY.giftBookSubtextAfter}
+          </p>
+          <p className="text-xs text-gray-500 mt-2">
+            {REFERRAL_COPY.giftBookReferralHint}
+            <Link href="/app/referral" className="text-primary font-medium">
+              {REFERRAL_COPY.giftBookReferralHintLink}
+            </Link>
+            .
           </p>
           <Link
             href="/app/tang-sach"

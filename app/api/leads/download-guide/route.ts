@@ -94,7 +94,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Không thể lưu thông tin. Vui lòng thử lại." }, { status: 500 });
   }
 
-  if (remaining > 0) {
+  // Affiliate tặng sách KHÔNG giới hạn → bỏ qua việc trừ quota gift_remaining.
+  // Xác định affiliate qua referral_codes.is_affiliate của người tặng (profile.id).
+  const gifterIsAffiliate = await isAffiliate(service, profile.id);
+  if (!gifterIsAffiliate && remaining > 0) {
     const { error: updateError } = await service
       .from("profiles")
       .update({ gift_remaining: remaining - 1 })

@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { downloadGuideLeadSchema, safeParseBody } from "@/lib/validation/schemas";
+import { isAffiliate } from "@/lib/affiliate/is-affiliate";
+import {
+  bookDownloadRateLimit,
+  getClientIp,
+  rateLimitExceeded,
+} from "@/lib/middleware/rate-limit";
 
 const STORAGE_BUCKET = "guides";
 const STORAGE_PATH = "bodix-fuel-guide.pdf";
@@ -15,18 +21,28 @@ function stripHtml(s: string): string {
     .trim();
 }
 
-function isValidVnPhone10(digits: string): boolean {
-  return digits.length === 10 && digits.startsWith("0");
-}
-
-/** 0909123456 → 84909123456 */
+/**
+ * Chuẩn hoá SĐT VN về dạng lưu trữ 84XXXXXXXXX.
+ * Chấp nhận: 0XXXXXXXXX (10 số, đầu 0) hoặc 84XXXXXXXXX / +84XXXXXXXXX.
+ */
 function formatPhoneStorage(raw: string): string | null {
   const digits = raw.replace(/\D/g, "");
-  if (!isValidVnPhone10(digits)) return null;
-  return `84${digits.slice(1)}`;
+  // 0 + 9 số → thay 0 bằng 84
+  if (digits.length === 10 && digits.startsWith("0")) {
+    return `84${digits.slice(1)}`;
+  }
+  // 84 + 9 số (đã là dạng lưu trữ, có/không có dấu +)
+  if (digits.length === 11 && digits.startsWith("84")) {
+    return digits;
+  }
+  return null;
 }
 
 export async function POST(request: NextRequest) {
+  // Chống bot spam form public (không login).
+  const rl = bookDownloadRateLimit(getClientIp(request));
+  if (!rl.ok) return rateLimitExceeded(rl.resetIn);
+
   let json: unknown;
   try {
     json = await request.json();

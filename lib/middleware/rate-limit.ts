@@ -69,6 +69,11 @@ export function generalRateLimit(ip: string) {
   return check(`general:${ip}`, 60, 60_000)
 }
 
+/** Public book-download (lead magnet) form: 15 req/min per IP — chặn bot spam form. */
+export function bookDownloadRateLimit(ip: string) {
+  return check(`book:${ip}`, 15, 60_000)
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 /**

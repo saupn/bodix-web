@@ -5,7 +5,7 @@ const cards = [
     emoji: "📋",
     title: "Có lộ trình rõ ràng",
     description:
-      "Không phải \"tập khi có hứng\". Mỗi ngày bạn biết chính xác tập gì, bao lâu, ở cường độ nào.",
+      "Không phải \"chỉ tập khi có động lực\". Mỗi ngày bạn biết chính xác tập gì, bao lâu, ở cường độ nào.",
   },
   {
     emoji: "👥",

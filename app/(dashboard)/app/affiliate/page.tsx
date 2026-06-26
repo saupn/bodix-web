@@ -110,7 +110,7 @@ function formatDate(dateStr: string): string {
 const TIPS = [
   "Chia sẻ câu chuyện thật của bạn – người thật, kết quả thật luôn thu hút hơn quảng cáo.",
   "Nhắm tới phụ nữ 25–42 tuổi, từng tập rồi bỏ – đối tượng dễ đồng cảm với BodiX nhất.",
-  "Tặng sách miễn phí qua link tang-sach làm mồi để khởi đầu cuộc trò chuyện.",
+  "Tặng sách miễn phí qua link tang-sach để khơi gợi thảo luận, dẫn dắt cuộc trò chuyện.",
   "Đăng 2–3 bài/tuần, đều đặn quan trọng hơn viral.",
   "Tận dụng Zalo – nhắn riêng cho từng bạn bè phù hợp, hiệu quả hơn đăng đại trà.",
   "Nhấn mạnh \"Thử miễn phí 3 ngày, không mất gì\" – rào cản thấp = nhiều click hơn.",

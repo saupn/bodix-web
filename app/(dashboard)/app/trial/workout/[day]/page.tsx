@@ -229,6 +229,15 @@ export default function TrialWorkoutPage() {
         </div>
       </div>
 
+      {/* Lưu ý ăn uống trước buổi tập — nguyên tắc chung, không số liệu */}
+      {!isCompleted && (
+        <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+          Lưu ý nhỏ: hãy ăn uống đầy đủ và nghỉ ngơi hợp lý trước khi tập. Đừng
+          nhịn ăn trước buổi tập – cơ thể cần năng lượng để tập an toàn và hiệu
+          quả. Lắng nghe cơ thể mình, nếu thấy mệt hãy chọn mức nhẹ hơn.
+        </p>
+      )}
+
       {/* Mode buttons */}
       <div className="space-y-2">
         <div className="flex flex-col gap-2 sm:flex-row">

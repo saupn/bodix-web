@@ -530,18 +530,30 @@ async function handleFeelingReply(
   score: number,
   safeSend: (uid: string, text: string) => Promise<void>,
 ): Promise<boolean> {
-  // Kiểm tra có weekly_review chưa reply feeling không
+  // Kiểm tra có weekly_review chưa reply feeling không.
+  // KHÔNG yêu cầu review_video_id: tin Review CN tự động có thể không kèm video.
   const { data: review } = await service
     .from('weekly_reviews')
-    .select('id, week_number')
+    .select('id, week_number, created_at')
     .eq('enrollment_id', enrollment.id)
     .is('feeling_score', null)
-    .not('review_video_id', 'is', null)
     .order('week_number', { ascending: false })
     .limit(1)
     .single();
 
   if (!review) return false; // Không có review chờ feeling → không phải context review
+
+  // Chống nuốt nhầm check-in: số 1–3 vừa là feeling vừa là số lượt tập.
+  // Chỉ nhận 1–3 làm feeling khi review được tạo HÔM NAY (VN) — tức đúng ngày CN
+  // vừa gửi tin Review. Số 4–5 không phải số lượt hợp lệ nên nhận bất cứ lúc nào.
+  // Nhờ vậy một review CN cũ chưa trả lời sẽ KHÔNG cướp "1/2/3" check-in ngày thường.
+  if (score <= 3) {
+    const todayVN = getVietnamDateString();
+    const reviewYmd = review.created_at
+      ? isoTimestampToVietnamYmd(review.created_at)
+      : null;
+    if (reviewYmd !== todayVN) return false;
+  }
 
   // Update feeling
   await service

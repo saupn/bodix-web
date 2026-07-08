@@ -59,6 +59,27 @@ export function formatDateVn(input: string | null | undefined): string {
   return `${day}/${month}/${year}`;
 }
 
+/**
+ * Thứ trong tuần theo lịch VN: 0=Chủ nhật, 1=Thứ 2, ..., 6=Thứ 7.
+ * Nhận YYYY-MM-DD (mặc định hôm nay theo giờ VN). Trả -1 nếu parse lỗi.
+ * Dùng getUTCDay trên UTC-midnight của chính chuỗi ngày → không lệch timezone.
+ */
+export function getVietnamWeekday(ymd: string = getVietnamDateString()): number {
+  const p = parseYmd(ymd);
+  if (!p) return -1;
+  return new Date(Date.UTC(p.y, p.m - 1, p.d)).getUTCDay();
+}
+
+/**
+ * Thứ 2 (đầu tuần) của tuần chứa ymd, theo lịch VN. Trả YYYY-MM-DD.
+ * CN (dow=0) thuộc tuần bắt đầu từ thứ 2 trước đó 6 ngày.
+ */
+export function getMondayOfWeek(ymd: string = getVietnamDateString()): string {
+  const dow = getVietnamWeekday(ymd); // 0=CN..6=T7
+  const offset = dow === 0 ? -6 : 1 - dow;
+  return addCalendarDays(ymd, offset);
+}
+
 export function addCalendarDays(ymd: string, delta: number): string {
   const p = parseYmd(ymd);
   if (!p) return ymd;

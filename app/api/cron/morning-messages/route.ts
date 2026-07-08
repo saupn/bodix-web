@@ -4,8 +4,10 @@ import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
 import { sendFcmMessage } from '@/lib/messaging/adapters/push';
 import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
 import {
+  addCalendarDays,
   calendarDaysBetween,
   getVietnamDateString,
+  getVietnamWeekday,
   isoTimestampToVietnamYmd,
 } from '@/lib/date/vietnam';
 import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
@@ -19,6 +21,13 @@ import {
   type ExerciseTranslationMap,
 } from '@/lib/exercises/translate';
 import { generateWorkoutToken } from '@/lib/workout-token';
+import {
+  countMissedWorkoutDays,
+  rescueLevel,
+  buildRescueMessage,
+  WELCOME_BACK_LINE,
+  type RescueLevel,
+} from '@/lib/rescue/escalation';
 
 const APP_URL = 'https://bodix.fit';
 
@@ -129,6 +138,55 @@ function buildRecoveryMessage(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// BUILD MESSAGE — Chủ nhật: tin Review (active, KHÔNG tập)
+// Không số đo cơ thể, không so sánh cá nhân, giọng ghi nhận.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+// Dòng ghi nhận theo số buổi X/6 (không phán xét).
+function reviewRecognitionLine(x: number): string {
+  if (x >= 6) return 'Một tuần trọn vẹn – bạn đã giữ đúng cam kết với chính mình!';
+  if (x >= 4) return 'Một tuần rất đều – hoàn thành quan trọng hơn hoàn hảo, và bạn đang làm đúng điều đó.';
+  if (x >= 1) return 'Tuần này có vài buổi lỡ nhịp, không sao cả. Điều quan trọng là bạn vẫn ở đây. Tuần mới mình đi tiếp nhé.';
+  return 'Tuần này bận rộn phải không? Không sao – thứ 2 là một khởi đầu mới. Chỉ cần 1 buổi Easy để quay lại nhịp.';
+}
+
+function buildReviewMessage(
+  name: string,
+  cohortName: string,
+  personalCount: number,
+  cohortCount: number,
+  qaContent: string | null,
+  videoUrl: string | null,
+): string {
+  const qaBlock = qaContent ? `\n💡 Giải đáp tuần này: ${qaContent}\n` : '';
+  const videoBlock = videoUrl ? `\n🎬 Xem video Nhìn lại tuần: ${videoUrl}\n` : '';
+
+  return (
+    `🪞 Chủ nhật – ngày Nhìn lại của BodiX\n` +
+    `\n` +
+    `Chào ${name}! Hôm nay không có buổi tập. Mình cùng nhìn lại tuần vừa qua nhé.\n` +
+    `\n` +
+    `📊 Tuần của bạn:\n` +
+    `Bạn đã hoàn thành ${personalCount}/6 buổi.\n` +
+    `${reviewRecognitionLine(personalCount)}\n` +
+    `\n` +
+    `👥 Cả ${cohortName}:\n` +
+    `Tuần này cả đợt hoàn thành ${cohortCount} buổi tập. Bạn không đi một mình!\n` +
+    qaBlock +
+    videoBlock +
+    `\n` +
+    `Tuần này bạn thấy cơ thể thế nào? Trả lời bằng 1 con số:\n` +
+    `  1 → rất mệt\n` +
+    `  2 → hơi mệt\n` +
+    `  3 → bình thường\n` +
+    `  4 → khá khỏe\n` +
+    `  5 → rất khỏe\n` +
+    `\n` +
+    `Thứ 2 mình bắt đầu tuần mới. Hôm nay nghỉ ngơi thật tốt nhé! 🌿`
+  );
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // BUILD MESSAGES — trial (D1–D3, thân mật)
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
@@ -211,10 +269,13 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   }
 
   const todayVN = getVietnamDateString();
+  const yesterdayVN = addCalendarDays(todayVN, -1);
   const todayVNStartUtc = new Date(`${todayVN}T00:00:00+07:00`).toISOString();
   let sentCount = 0;
   let skippedCount = 0;
   let errorCount = 0;
+  // Rescue counters (adaptive morning message)
+  const rescueStats = { l1: 0, l2: 0, l3: 0, dormant: 0, welcome_back: 0 };
   const skipReasons: string[] = [];
   const errorReasons: string[] = [];
   // In-memory dedup: mỗi user chỉ nhận đúng 1 tin trong 1 lần chạy cron,
@@ -244,6 +305,83 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       .limit(1)
       .maybeSingle();
     return !!data;
+  }
+
+  // Dedup riêng cho tin Review CN (nudge_type='week_review').
+  async function alreadySentReviewToday(userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('nudge_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('nudge_type', 'week_review')
+      .gte('created_at', todayVNStartUtc)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
+  }
+
+  // Dedup cho tin Rescue (nudge_type rescue_soft/urgent/critical) trong hôm nay.
+  async function alreadySentRescueToday(userId: string): Promise<boolean> {
+    const { data } = await supabase
+      .from('nudge_logs')
+      .select('id')
+      .eq('user_id', userId)
+      .in('nudge_type', ['rescue_soft', 'rescue_urgent', 'rescue_critical'])
+      .gte('created_at', todayVNStartUtc)
+      .limit(1)
+      .maybeSingle();
+    return !!data;
+  }
+
+  // ── Chủ nhật (theo lịch VN) → active user nhận tin Review thay tin tập. ──
+  // Cohort luôn khai giảng thứ 2 nên CN thực trùng day 7/14/21 (review), nhưng
+  // ta xác định CN theo NGÀY LỊCH, không dựa workout_type.
+  const isSundayVN = getVietnamWeekday(todayVN) === 0;
+  const weekMonVN = addCalendarDays(todayVN, -6); // Thứ 2 tuần vừa qua
+  const weekSatVN = addCalendarDays(todayVN, -1); // Thứ 7 tuần vừa qua
+
+  // Cache số buổi cả đợt trong tuần theo cohort_id (tính 1 lần / cohort).
+  const cohortWeekCount = new Map<string, number>();
+  // Cache Q&A + video theo cohort_id (week_start_date = weekMonVN cố định trong 1 lần chạy).
+  const reviewContentCache = new Map<
+    string,
+    { qa: string | null; video: string | null }
+  >();
+
+  async function getCohortWeekCount(cohortId: string): Promise<number> {
+    if (cohortWeekCount.has(cohortId)) return cohortWeekCount.get(cohortId)!;
+    const { count } = await supabase
+      .from('daily_checkins')
+      .select('id', { count: 'exact', head: true })
+      .eq('cohort_id', cohortId)
+      .gte('workout_date', weekMonVN)
+      .lte('workout_date', weekSatVN);
+    const n = count ?? 0;
+    cohortWeekCount.set(cohortId, n);
+    return n;
+  }
+
+  // Q&A + video admin nhập ở weekly_review_content (cohort_id + week_start_date=thứ 2 tuần vừa qua).
+  // Không có row / bảng chưa tạo → trả null → tin Review vẫn hoàn chỉnh (bỏ 2 khối optional).
+  async function getReviewContent(
+    cohortId: string | null,
+  ): Promise<{ qa: string | null; video: string | null }> {
+    if (!cohortId) return { qa: null, video: null };
+    if (reviewContentCache.has(cohortId)) return reviewContentCache.get(cohortId)!;
+    let content = { qa: null as string | null, video: null as string | null };
+    const { data, error } = await supabase
+      .from('weekly_review_content')
+      .select('qa_content, video_url')
+      .eq('cohort_id', cohortId)
+      .eq('week_start_date', weekMonVN)
+      .maybeSingle();
+    if (error) {
+      console.warn('[morning-messages] weekly_review_content lookup failed:', error.message);
+    } else {
+      content = { qa: data?.qa_content ?? null, video: data?.video_url ?? null };
+    }
+    reviewContentCache.set(cohortId, content);
+    return content;
   }
 
   // Load translation map MỘT lần đầu cron (~29 rows) — tránh N+1 query
@@ -524,6 +662,332 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // CHỦ NHẬT — tin Review thay tin tập (chỉ user active)
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    if (isSundayVN) {
+      if (await alreadySentReviewToday(userId)) {
+        sentUserIds.add(userId);
+        skip(userId, 'active: already sent week_review today');
+        continue;
+      }
+
+      // weekNumber = tuần vừa kết thúc (CN day 7/14/21 → 1/2/3). Clamp phòng lệch.
+      const weekNumber = Math.min(3, Math.max(1, Math.ceil(dayNumber / 7)));
+      const displayName =
+        profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
+
+      // Số buổi cá nhân + breakdown mode trong tuần T2–T7 (theo workout_date VN).
+      const { data: weekCheckins } = await supabase
+        .from('daily_checkins')
+        .select('mode')
+        .eq('enrollment_id', en.enrollment_id)
+        .gte('workout_date', weekMonVN)
+        .lte('workout_date', weekSatVN);
+      const rowsW = weekCheckins ?? [];
+      const personalCount = rowsW.length;
+      const hardCount = rowsW.filter((c) => c.mode === 'hard').length;
+      const lightCount = rowsW.filter((c) => c.mode === 'light').length;
+      const easyCount = rowsW.filter((c) => c.mode === 'easy').length;
+      const recoveryCount = rowsW.filter((c) => c.mode === 'recovery').length;
+
+      // Số buổi cả đợt + tên cohort.
+      let cohortCount = 0;
+      let cohortName = 'cả lớp mình';
+      if (en.cohort_id) {
+        cohortCount = await getCohortWeekCount(en.cohort_id);
+        const { data: cohortRow } = await supabase
+          .from('cohorts')
+          .select('name')
+          .eq('id', en.cohort_id)
+          .maybeSingle();
+        if (cohortRow?.name) cohortName = cohortRow.name;
+      }
+
+      const { qa, video } = await getReviewContent(en.cohort_id);
+      const reviewMessage = buildReviewMessage(
+        displayName,
+        cohortName,
+        personalCount,
+        cohortCount,
+        qa,
+        video,
+      );
+
+      // Tạo row weekly_reviews 'pending' (feeling_score=null) để webhook nhận 1–5.
+      // Chỉ insert khi CHƯA có (tránh reset feeling_score nếu đã trả lời/đã publish).
+      const { data: existingReview } = await supabase
+        .from('weekly_reviews')
+        .select('id')
+        .eq('enrollment_id', en.enrollment_id)
+        .eq('week_number', weekNumber)
+        .maybeSingle();
+      if (!existingReview) {
+        const { error: wrError } = await supabase.from('weekly_reviews').insert({
+          enrollment_id: en.enrollment_id,
+          user_id: userId,
+          week_number: weekNumber,
+          week_completion_rate: personalCount / 6,
+          week_hard_count: hardCount,
+          week_light_count: lightCount,
+          week_easy_count: easyCount,
+          week_recovery_count: recoveryCount,
+        });
+        // 23505 = row vừa được tạo bởi run song song; bỏ qua, vẫn gửi tin.
+        if (wrError && wrError.code !== '23505') {
+          console.error('[morning-messages] weekly_reviews insert failed:', userId, wrError.message);
+        }
+      }
+
+      const logVars = {
+        week_number: weekNumber,
+        personal_count: personalCount,
+        cohort_count: cohortCount,
+      };
+      const chatContent =
+        `🪞 Chủ nhật – Nhìn lại tuần ${weekNumber}\n` +
+        `Bạn hoàn thành ${personalCount}/6 buổi. Trả lời 1 đến 5 để cho biết cảm nhận cơ thể nhé!`;
+
+      let zaloDone = false;
+      let zaloErrorDetail: string | null = null;
+      if (channelUserId) {
+        try {
+          const result = await sendViaZalo(channelUserId, reviewMessage);
+          if (result.success) {
+            zaloDone = true;
+            sentCount++;
+            sentUserIds.add(userId);
+            await supabase.from('nudge_logs').insert({
+              user_id: userId,
+              enrollment_id: en.enrollment_id,
+              nudge_type: 'week_review',
+              channel: 'zalo',
+              content_template: 'sunday_review',
+              content_variables: logVars,
+              delivered: true,
+            });
+            await insertSupportSystemMessage(supabase, userId, chatContent);
+          } else {
+            zaloErrorDetail = result.error ?? 'unknown';
+            console.error('[morning-messages] review Zalo failed:', userId, zaloErrorDetail);
+          }
+        } catch (zaloErr) {
+          zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
+          console.error('[morning-messages] review Zalo threw:', userId, zaloErrorDetail);
+        }
+      }
+
+      if (zaloDone) {
+        await new Promise((r) => setTimeout(r, 100));
+        continue;
+      }
+
+      if (fcmToken) {
+        try {
+          const result = await sendFcmMessage(
+            fcmToken,
+            {
+              type: 'weekReview',
+              title: `🪞 Chủ nhật – Nhìn lại tuần ${weekNumber}`,
+              body: `Bạn hoàn thành ${personalCount}/6 buổi. Trả lời 1 đến 5 để cho biết cảm nhận nhé!`,
+              data: { week_number: String(weekNumber) },
+            },
+            userId,
+          );
+          if (result.success) {
+            sentCount++;
+            sentUserIds.add(userId);
+            await supabase.from('nudge_logs').insert({
+              user_id: userId,
+              enrollment_id: en.enrollment_id,
+              nudge_type: 'week_review',
+              channel: 'push',
+              content_template: 'sunday_review',
+              content_variables: logVars,
+              delivered: true,
+            });
+            await insertSupportSystemMessage(supabase, userId, chatContent);
+          } else {
+            fail(userId, `active review: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+          }
+        } catch (fcmErr) {
+          const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+          fail(userId, `active review: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+        }
+      } else {
+        fail(userId, `active review: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
+      }
+
+      await new Promise((r) => setTimeout(r, 100));
+      continue;
+    }
+
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    // RESCUE PROTOCOL — tin sáng THÍCH ỨNG theo số ngày lỡ nhịp (chỉ active)
+    // missedDays = số ngày TẬP (T2–T7, bỏ CN) lỡ liên tiếp gần nhất, đến hôm qua.
+    // Rescue THAY tin tập (không gửi cả 2). >7 ngày → dừng tin sáng (chỉ giữ tin CN).
+    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+    const { data: lastCheckin } = await supabase
+      .from('daily_checkins')
+      .select('workout_date')
+      .eq('enrollment_id', en.enrollment_id)
+      .order('workout_date', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const missedDays = countMissedWorkoutDays(
+      lastCheckin?.workout_date ?? null,
+      startAnchor,
+      todayVN,
+    );
+    const level: RescueLevel = rescueLevel(missedDays);
+
+    const rescueDisplayName =
+      profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
+
+    // >7 ngày lỡ → dormant: dừng tin sáng hằng ngày (tránh spam gây unfollow).
+    // Chỉ còn tin Review CN hàng tuần. Quay lại check-in → missedDays reset → tự hồi phục.
+    if (level === 'dormant') {
+      rescueStats.dormant++;
+      sentUserIds.add(userId);
+      skip(userId, `active: dormant (missed=${missedDays} > 7) → dừng tin sáng, chỉ giữ tin CN`);
+      continue;
+    }
+
+    if (level === 'l1' || level === 'l2' || level === 'l3') {
+      if (await alreadySentRescueToday(userId)) {
+        sentUserIds.add(userId);
+        skip(userId, `active: already sent rescue (${level}) today`);
+        continue;
+      }
+
+      const rescueText = buildRescueMessage(level, rescueDisplayName)!;
+      const nudgeType =
+        level === 'l1' ? 'rescue_soft' : level === 'l2' ? 'rescue_urgent' : 'rescue_critical';
+      const triggerReason = level === 'l1' ? 'missed_2_days' : 'missed_3_plus_days';
+      const contentTemplate = `rescue_${level}`;
+      const logVars = { missed_days: missedDays, level };
+      const pushTitle =
+        level === 'l1'
+          ? `${rescueDisplayName} ơi, mình chưa thấy bạn 💚`
+          : `${rescueDisplayName} ơi, mình nhớ bạn 💚`;
+      const pushBody = 'Chỉ 1 lượt Easy (~7 phút) là quay lại nhịp. Mở app nhé!';
+
+      let zaloDone = false;
+      let zaloErrorDetail: string | null = null;
+      if (channelUserId) {
+        try {
+          const result = await sendViaZalo(channelUserId, rescueText);
+          if (result.success) {
+            zaloDone = true;
+            sentCount++;
+            rescueStats[level]++;
+            sentUserIds.add(userId);
+            await supabase.from('rescue_interventions').insert({
+              enrollment_id: en.enrollment_id,
+              user_id: userId,
+              trigger_reason: triggerReason,
+              action_taken: 'send_rescue_message',
+              message_sent: rescueText,
+              outcome: 'pending',
+            });
+            await supabase.from('nudge_logs').insert({
+              user_id: userId,
+              enrollment_id: en.enrollment_id,
+              nudge_type: nudgeType,
+              channel: 'zalo',
+              content_template: contentTemplate,
+              content_variables: logVars,
+              delivered: true,
+            });
+            await insertSupportSystemMessage(supabase, userId, rescueText);
+          } else {
+            zaloErrorDetail = result.error ?? 'unknown';
+            console.error('[morning-messages] rescue Zalo failed:', userId, zaloErrorDetail);
+          }
+        } catch (zaloErr) {
+          zaloErrorDetail = zaloErr instanceof Error ? zaloErr.message : String(zaloErr);
+          console.error('[morning-messages] rescue Zalo threw:', userId, zaloErrorDetail);
+        }
+      }
+
+      if (zaloDone) {
+        await new Promise((r) => setTimeout(r, 100));
+        continue;
+      }
+
+      if (fcmToken) {
+        try {
+          const result = await sendFcmMessage(
+            fcmToken,
+            {
+              type: 'rescue',
+              title: pushTitle,
+              body: pushBody,
+              data: { missed_days: String(missedDays), level },
+            },
+            userId,
+          );
+          if (result.success) {
+            sentCount++;
+            rescueStats[level]++;
+            sentUserIds.add(userId);
+            await supabase.from('rescue_interventions').insert({
+              enrollment_id: en.enrollment_id,
+              user_id: userId,
+              trigger_reason: triggerReason,
+              action_taken: 'send_rescue_message',
+              message_sent: `push:rescue_${level}`,
+              outcome: 'pending',
+            });
+            await supabase.from('nudge_logs').insert({
+              user_id: userId,
+              enrollment_id: en.enrollment_id,
+              nudge_type: nudgeType,
+              channel: 'push',
+              content_template: contentTemplate,
+              content_variables: logVars,
+              delivered: true,
+            });
+            await insertSupportSystemMessage(supabase, userId, rescueText);
+          } else {
+            fail(userId, `active rescue: FCM failed (${result.error ?? 'unknown'})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+          }
+        } catch (fcmErr) {
+          const msg = fcmErr instanceof Error ? fcmErr.message : String(fcmErr);
+          fail(userId, `active rescue: FCM threw (${msg})` + (zaloErrorDetail ? `, zalo earlier: ${zaloErrorDetail}` : ''));
+        }
+      } else {
+        fail(userId, `active rescue: Zalo failed (${zaloErrorDetail ?? 'no channelUserId'}) and no fcm_token fallback`);
+      }
+
+      await new Promise((r) => setTimeout(r, 100));
+      continue;
+    }
+
+    // ── level 'normal' (0–1 ngày lỡ) → tin sáng bình thường bên dưới. ──
+    // Nếu user vừa quay lại HÔM QUA sau khi có rescue đang 'pending' → thêm câu chào mừng
+    // và đánh dấu rescue đã dẫn tới quay lại (outcome='user_returned').
+    let welcomePrefix = '';
+    if (lastCheckin?.workout_date === yesterdayVN) {
+      const { data: pendingRescue } = await supabase
+        .from('rescue_interventions')
+        .select('id')
+        .eq('enrollment_id', en.enrollment_id)
+        .eq('outcome', 'pending')
+        .limit(1)
+        .maybeSingle();
+      if (pendingRescue) {
+        welcomePrefix = `${WELCOME_BACK_LINE}\n\n`;
+        rescueStats.welcome_back++;
+        await supabase
+          .from('rescue_interventions')
+          .update({ outcome: 'user_returned', outcome_at: new Date().toISOString() })
+          .eq('enrollment_id', en.enrollment_id)
+          .eq('outcome', 'pending');
+      }
+    }
+
     const { data: workout } = await supabase
       .from('workout_templates')
       .select('day_number, title, workout_type, exercises')
@@ -560,9 +1024,9 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       en.enrollment_id,
       `/app/program/workout/${dayNumber}`,
     );
-    const zaloMessage = isRecovery
+    const zaloMessage = welcomePrefix + (isRecovery
       ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart, workoutUrl)
-      : buildMainMessage(displayName, dayNumber, config.totalDays, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl);
+      : buildMainMessage(displayName, dayNumber, config.totalDays, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl));
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 
@@ -665,6 +1129,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     sent: sentCount,
     skipped: skippedCount,
     errors: errorCount,
+    rescue: rescueStats,
     trial_expired_filtered: breakdown.trial_expired_filtered,
     active_total: activeEnrollments.length,
     trial_total: trialEnrollments.length,

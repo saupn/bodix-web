@@ -337,6 +337,18 @@ Deno.serve(async (req) => {
   const supabase = createAdminClient()
   const today = new Date().toISOString().slice(0, 10)
 
+  // Chủ nhật (lịch VN) = ngày Review, KHÔNG có buổi tập → KHÔNG hỏi "đã tập chưa".
+  // Evening chỉ gửi cho user active; feeling reply (1–5) của tin Review sáng CN là
+  // tương tác của ngày rồi. vnNow = giờ VN; getUTCDay()===0 → Chủ nhật.
+  const vnNow = new Date(Date.now() + 7 * 3600000)
+  if (vnNow.getUTCDay() === 0) {
+    console.log('[evening-confirmation] Chủ nhật (VN) → skip active users')
+    return new Response(
+      JSON.stringify({ success: true, skipped: 'sunday_vn', date: today }),
+      { headers: { 'Content-Type': 'application/json' } },
+    )
+  }
+
   let totalSent = 0
   let totalErrors = 0
   let offset = 0

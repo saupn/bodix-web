@@ -2,48 +2,19 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createServiceClient } from '@/lib/supabase/service';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
 import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
+import { sendFcmMessage } from '@/lib/messaging/adapters/push';
 import {
-  sendFcmMessage,
-  pickMessagingChannel,
-} from '@/lib/messaging/adapters/push';
-import type { MessageResult } from '@/lib/messaging/types';
-import { getVietnamDateString, isoTimestampToVietnamYmd } from '@/lib/date/vietnam';
+  getVietnamDateString,
+  getVietnamWeekday,
+  isoTimestampToVietnamYmd,
+} from '@/lib/date/vietnam';
+import { countMissedWorkoutDays } from '@/lib/rescue/escalation';
 import { getEligibleForNudge } from '@/lib/notifications/eligible-enrollments';
 import { transitionAffiliateCommissions } from '@/lib/affiliate/commission';
 import {
   transitionReferralCommissions,
   expireOldVouchers,
 } from '@/lib/referral/commission';
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// RESCUE MESSAGES (Protocol Levels)
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-function buildL1Message(name: string): string {
-  return (
-    `${name} ơi, mình thấy bạn chưa check-in 2 ngày rồi.\n` +
-    `Chỉ cần 1 lượt (~7 phút) là chuỗi ngày tập vẫn giữ.\n` +
-    `Tập xong nhắn số lượt cho mình nha: 1, 2 hoặc 3!`
-  );
-}
-
-function buildL2Message(name: string, completedDays: number): string {
-  return (
-    `${name} ơi, bạn đã đi được ${completedDays} ngày rồi.\n` +
-    `Mình hiểu có lúc bận hoặc mệt.\n` +
-    `Chỉ cần 1 lượt – 7 phút – chuỗi ngày tập vẫn giữ.\n` +
-    `Quan trọng là không dừng lại nha.\n` +
-    `Tập xong nhắn số lượt cho mình nha: 1, 2 hoặc 3!`
-  );
-}
-
-function buildL3BuddyMessage(buddyName: string, userName: string, daysMissed: number): string {
-  return (
-    `${buddyName} ơi, buddy ${userName} đã nghỉ ${daysMissed} ngày rồi.\n` +
-    `Bạn có thể nhắn hoặc gọi cho ${userName} để động viên không?\n` +
-    `Đôi khi chỉ cần 1 tin nhắn từ bạn là đủ để quay lại! 🙏`
-  );
-}
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // EVENING REMINDER (20:00 VN) — Rescue Protocol Level 1 tone
@@ -118,11 +89,6 @@ export async function GET(request: NextRequest) {
   }
 
   const stats = {
-    l1: 0,
-    l2: 0,
-    l3_buddy: 0,
-    l3_no_buddy: 0,
-    skipped: 0,
     errors: 0,
     trial_expired: 0,
     evening_eligible: 0,
@@ -131,6 +97,7 @@ export async function GET(request: NextRequest) {
     evening_sent: 0,
     evening_skipped_dedup: 0,
     evening_skipped_already_checked_in: 0,
+    evening_skipped_rescue: 0,
     evening_skipped_no_channel: 0,
     evening_skipped_not_started: 0,
     evening_errors: 0,
@@ -159,296 +126,15 @@ export async function GET(request: NextRequest) {
   const subTaskResults: Record<string, SubTaskResult> = {};
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-  // SUB-TASK 1: RESCUE L1/L2/L3
+  // RESCUE L1/L2/L3 — ĐÃ CHUYỂN sang cron sáng (morning-messages).
   //
-  // Trigger tính TRỰC TIẾP từ daily_checkins (last check-in → daysMissed), KHÔNG
-  // đọc dropout_signals. Đây là nơi DUY NHẤT gửi tin rescue. Genome v1
-  // (dropout_signals + risk_score, ghi bởi bodix_emit_dropout_signals) chạy độc
-  // lập, CHỈ để chẩn đoán/quan sát (trang /admin/genome) — KHÔNG tự động hành động.
+  // Tin rescue giờ THAY tin sáng (adaptive) theo missedDays (bỏ CN), bands
+  // L1(2)/L2(3–4)/L3(5–7)/dormant(>7) — xem lib/rescue/escalation.ts. Bỏ sub-task
+  // rescue buổi tối ở đây để KHÔNG gửi 2 lần/ngày. Buổi tối chỉ còn:
+  // evening confirmation (skip nếu user đã nhận rescue sáng / dormant).
   //
-  // TODO(genome→rescue): chỉ nối genome vào rescue SAU KHI risk weights được
-  // validate qua 2-3 cohort thật. Khi nối PHẢI dedup để user không bị cả
-  // rescue-check (bỏ-N-ngày) lẫn genome (risk_score) cùng kích một lần rescue
-  // — ví dụ: 1 cooldown chung trên rescue_interventions theo enrollment + ngày,
-  // hoặc gộp 2 nguồn trước khi gửi. Hai hệ hiện DECOUPLED.
+  // Genome v1 (dropout_signals + risk_score) vẫn DECOUPLED, chỉ để quan sát.
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-  subTaskResults.rescue = await runSubTask('rescue_l1_l2_l3', async () => {
-    const { data: enrollments, error: enrollError } = await supabase
-      .from('enrollments')
-      .select(`
-        id,
-        current_day,
-        user_id,
-        program_id,
-        cohort_id,
-        started_at,
-        profiles!inner (
-          id,
-          full_name,
-          channel_user_id,
-          fcm_token,
-          notification_via
-        )
-      `)
-      .eq('status', 'active')
-      .lte('started_at', new Date().toISOString());
-
-    if (enrollError) {
-      console.error('[rescue-check] enrollments query error:', enrollError);
-      return;
-    }
-
-    const today = todayVN;
-
-    for (const row of enrollments ?? []) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const enrollment = row as any;
-      const profile = Array.isArray(enrollment.profiles) ? enrollment.profiles[0] : enrollment.profiles;
-      const channelUserId: string | null = profile?.channel_user_id;
-      const fcmToken: string | null = profile?.fcm_token;
-
-      const userChannel = pickMessagingChannel({
-        fcm_token: fcmToken,
-        channel_user_id: channelUserId,
-        notification_via: profile?.notification_via ?? null,
-      });
-      if (userChannel === 'none') {
-        stats.skipped++;
-        continue;
-      }
-
-      const { data: lastCheckin } = await supabase
-        .from('daily_checkins')
-        .select('day_number, workout_date')
-        .eq('enrollment_id', enrollment.id)
-        .order('workout_date', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      if (!lastCheckin) {
-        stats.skipped++;
-        continue;
-      }
-
-      const lastCheckinDate = new Date(lastCheckin.workout_date + 'T00:00:00Z');
-      const todayDate = new Date(today + 'T00:00:00Z');
-      const daysMissed = Math.floor(
-        (todayDate.getTime() - lastCheckinDate.getTime()) / (1000 * 60 * 60 * 24),
-      );
-
-      if (daysMissed < 2) continue;
-
-      let level: 1 | 2 | 3;
-      if (daysMissed === 2) level = 1;
-      else if (daysMissed === 3) level = 2;
-      else level = 3;
-
-      const cooldownDate = level === 1
-        ? new Date(todayDate.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
-        : new Date(todayDate.getTime()).toISOString();
-
-      const { data: recentRescue } = await supabase
-        .from('rescue_interventions')
-        .select('id')
-        .eq('enrollment_id', enrollment.id)
-        .gte('created_at', cooldownDate)
-        .limit(1);
-
-      if (recentRescue && recentRescue.length > 0) continue;
-
-      const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'Bạn';
-      const completedDays = lastCheckin.day_number;
-
-      try {
-        if (level === 1) {
-          const zaloMessage = buildL1Message(displayName);
-          let result: MessageResult;
-          if (userChannel === 'push') {
-            result = await sendFcmMessage(
-              fcmToken!,
-              {
-                type: 'rescueDay2',
-                title: 'Mình thấy bạn chưa tập 2 ngày rồi',
-                body: 'Chỉ cần 1 lượt (~7 phút). Mở app tập ngay!',
-                data: { days_missed: String(daysMissed) },
-              },
-              profile.id,
-            );
-          } else {
-            result = await sendViaZalo(channelUserId!, zaloMessage);
-          }
-
-          await supabase.from('rescue_interventions').insert({
-            enrollment_id: enrollment.id,
-            user_id: enrollment.user_id,
-            trigger_reason: 'missed_2_days',
-            action_taken: 'send_rescue_message',
-            message_sent: userChannel === 'push' ? 'push:rescueDay2' : zaloMessage,
-            outcome: 'pending',
-          });
-
-          await supabase.from('nudge_logs').insert({
-            user_id: profile.id,
-            enrollment_id: enrollment.id,
-            nudge_type: 'rescue_soft',
-            channel: userChannel,
-            content_template: 'rescue_l1',
-            content_variables: { days_missed: daysMissed },
-            delivered: result.success,
-          });
-
-          if (result.success) {
-            stats.l1++;
-            await insertSupportSystemMessage(
-              supabase,
-              profile.id,
-              `Mình thấy bạn chưa tập 2 ngày rồi 💚\nChỉ cần 1 lượt (~7 phút). Mở app tập ngay!`,
-            );
-          } else {
-            stats.errors++;
-          }
-        } else if (level === 2) {
-          const zaloMessage = buildL2Message(displayName, completedDays);
-          let result: MessageResult;
-          if (userChannel === 'push') {
-            result = await sendFcmMessage(
-              fcmToken!,
-              {
-                type: 'rescueDay3',
-                title: `${displayName} ơi, mình nhớ bạn 💚`,
-                body: `Bạn đã đi được ${completedDays} ngày – chỉ 1 lượt là quay lại ngay!`,
-                data: {
-                  days_missed: String(daysMissed),
-                  completed_days: String(completedDays),
-                },
-              },
-              profile.id,
-            );
-          } else {
-            result = await sendViaZalo(channelUserId!, zaloMessage);
-          }
-
-          await supabase.from('rescue_interventions').insert({
-            enrollment_id: enrollment.id,
-            user_id: enrollment.user_id,
-            trigger_reason: 'missed_3_plus_days',
-            action_taken: 'send_rescue_message',
-            message_sent: userChannel === 'push' ? 'push:rescueDay3' : zaloMessage,
-            outcome: 'pending',
-          });
-
-          await supabase.from('nudge_logs').insert({
-            user_id: profile.id,
-            enrollment_id: enrollment.id,
-            nudge_type: 'rescue_urgent',
-            channel: userChannel,
-            content_template: 'rescue_l2',
-            content_variables: { days_missed: daysMissed, completed_days: completedDays },
-            delivered: result.success,
-          });
-
-          if (result.success) {
-            stats.l2++;
-            await insertSupportSystemMessage(
-              supabase,
-              profile.id,
-              `${displayName} ơi, mình nhớ bạn 💚\nBạn đã đi được ${completedDays} ngày – chỉ 1 lượt là quay lại ngay!`,
-            );
-          } else {
-            stats.errors++;
-          }
-        } else {
-          const buddy = await findBuddy(supabase, enrollment.user_id, enrollment.cohort_id);
-
-          const buddyChannel = buddy
-            ? pickMessagingChannel({
-                fcm_token: buddy.fcm_token,
-                channel_user_id: buddy.channel_user_id,
-                notification_via: buddy.notification_via,
-              })
-            : 'none';
-
-          if (buddy && buddyChannel !== 'none') {
-            const buddyDisplayName = buddy.full_name?.split(' ').pop() || buddy.full_name || 'Bạn';
-            const userFullName = profile.full_name || 'buddy của bạn';
-            const zaloMessage = buildL3BuddyMessage(buddyDisplayName, userFullName, daysMissed);
-
-            let result: MessageResult;
-            if (buddyChannel === 'push') {
-              result = await sendFcmMessage(
-                buddy.fcm_token!,
-                {
-                  type: 'system',
-                  title: `Buddy ${userFullName} cần bạn động viên`,
-                  body: `${userFullName} đã nghỉ ${daysMissed} ngày – nhắn hoặc gọi cho bạn ấy nha 🙏`,
-                  data: {
-                    days_missed: String(daysMissed),
-                    buddy_id: buddy.id,
-                  },
-                },
-                buddy.id,
-              );
-            } else {
-              result = await sendViaZalo(buddy.channel_user_id!, zaloMessage);
-            }
-
-            await supabase.from('rescue_interventions').insert({
-              enrollment_id: enrollment.id,
-              user_id: enrollment.user_id,
-              trigger_reason: 'missed_3_plus_days',
-              action_taken: 'send_rescue_message',
-              message_sent: buddyChannel === 'push' ? 'push:buddy_l3' : zaloMessage,
-              outcome: 'pending',
-            });
-
-            await supabase.from('nudge_logs').insert({
-              user_id: profile.id,
-              enrollment_id: enrollment.id,
-              nudge_type: 'rescue_critical',
-              channel: buddyChannel,
-              content_template: 'rescue_l3_buddy',
-              content_variables: {
-                days_missed: daysMissed,
-                buddy_id: buddy.id,
-                buddy_name: buddy.full_name,
-              },
-              delivered: result.success,
-            });
-
-            if (result.success) stats.l3_buddy++;
-            else stats.errors++;
-          } else {
-            await supabase.from('rescue_interventions').insert({
-              enrollment_id: enrollment.id,
-              user_id: enrollment.user_id,
-              trigger_reason: 'missed_3_plus_days',
-              action_taken: 'coach_intervention',
-              message_sent: null,
-              outcome: 'pending',
-            });
-
-            await supabase.from('nudge_logs').insert({
-              user_id: profile.id,
-              enrollment_id: enrollment.id,
-              nudge_type: 'rescue_critical',
-              channel: 'none',
-              content_template: 'rescue_l3_no_buddy',
-              content_variables: { days_missed: daysMissed },
-              delivered: false,
-            });
-
-            stats.l3_no_buddy++;
-          }
-        }
-      } catch (err) {
-        console.error(`[rescue-check] rescue inner error for user ${profile.id}:`, err);
-        stats.errors++;
-      }
-
-      await new Promise(r => setTimeout(r, 100));
-    }
-  });
 
   // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   // SUB-TASK 2: TRIAL COMPLETION
@@ -615,6 +301,37 @@ export async function GET(request: NextRequest) {
 
         if (trialCheckinToday) {
           stats.evening_skipped_already_checked_in++;
+          continue;
+        }
+      }
+
+      // Chủ nhật (lịch VN) = ngày Review, active KHÔNG có buổi tập → không hỏi
+      // "đã tập chưa". (rescue-check là sender chính buổi tối, chạy trước edge fn.)
+      if (en.status === 'active' && getVietnamWeekday(todayVN) === 0) {
+        stats.evening_skipped_rescue++;
+        continue;
+      }
+
+      // Active đang lỡ nhịp (missedDays >= 2) → sáng nay đã nhận tin Rescue THAY tin tập
+      // (hoặc dormant >7). KHÔNG nhắc tối lần nữa (tránh 2 tin/ngày). missedDays tính
+      // theo ngày tập (bỏ CN), đến hôm qua — cùng logic với cron sáng.
+      if (en.status === 'active') {
+        const startAnchor =
+          en.cohort_start_date ?? isoTimestampToVietnamYmd(en.enrolled_at);
+        const { data: lastCheckin } = await supabase
+          .from('daily_checkins')
+          .select('workout_date')
+          .eq('enrollment_id', en.enrollment_id)
+          .order('workout_date', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const missedDays = countMissedWorkoutDays(
+          lastCheckin?.workout_date ?? null,
+          startAnchor,
+          todayVN,
+        );
+        if (missedDays >= 2) {
+          stats.evening_skipped_rescue++;
           continue;
         }
       }
@@ -1002,54 +719,4 @@ export async function GET(request: NextRequest) {
   console.log('[rescue-check] summary:', JSON.stringify(summary));
 
   return NextResponse.json(summary);
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-// FIND BUDDY
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-interface BuddyProfile {
-  id: string;
-  full_name: string | null;
-  channel_user_id: string | null;
-  fcm_token: string | null;
-  notification_via: string | null;
-}
-
-async function findBuddy(
-  supabase: ReturnType<typeof createServiceClient>,
-  userId: string,
-  cohortId: string | null,
-): Promise<BuddyProfile | null> {
-  if (!cohortId) return null;
-
-  const { data: pairA } = await supabase
-    .from('buddy_pairs')
-    .select('user_b')
-    .eq('cohort_id', cohortId)
-    .eq('user_a', userId)
-    .limit(1)
-    .maybeSingle();
-
-  const { data: pairB } = await supabase
-    .from('buddy_pairs')
-    .select('user_a')
-    .eq('cohort_id', cohortId)
-    .eq('user_b', userId)
-    .limit(1)
-    .maybeSingle();
-
-  const buddyId = pairA?.user_b ?? pairB?.user_a ?? null;
-  if (!buddyId) return null;
-
-  const { data: buddyProfile } = await supabase
-    .from('profiles')
-    .select('id, full_name, channel_user_id, fcm_token, notification_via')
-    .eq('id', buddyId)
-    .single();
-
-  if (!buddyProfile) return null;
-  if (!buddyProfile.channel_user_id && !buddyProfile.fcm_token) return null;
-
-  return buddyProfile as BuddyProfile;
 }

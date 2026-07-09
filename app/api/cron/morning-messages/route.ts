@@ -1,8 +1,3 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase/service';
-import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
-import { sendFcmMessage } from '@/lib/messaging/adapters/push';
-import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
 import {
   addCalendarDays,
   calendarDaysBetween,
@@ -10,26 +5,31 @@ import {
   getVietnamWeekday,
   isoTimestampToVietnamYmd,
 } from '@/lib/date/vietnam';
-import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
-import {
-  getEligibleForNudge,
-  type EligibleEnrollment,
-} from '@/lib/notifications/eligible-enrollments';
 import {
   loadExerciseTranslations,
   translateExerciseName,
   type ExerciseTranslationMap,
 } from '@/lib/exercises/translate';
-import { generateWorkoutToken } from '@/lib/workout-token';
+import { sendFcmMessage } from '@/lib/messaging/adapters/push';
+import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
+import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
 import {
-  countMissedWorkoutDays,
-  rescueLevel,
+  getEligibleForNudge,
+  type EligibleEnrollment,
+} from '@/lib/notifications/eligible-enrollments';
+import {
   buildRescueMessage,
+  countMissedWorkoutDays,
   rescueAwaitingUntil,
+  rescueLevel,
   WELCOME_BACK_LINE,
   type RescueLevel,
   type RescueWorkoutContext,
 } from '@/lib/rescue/escalation';
+import { createServiceClient } from '@/lib/supabase/service';
+import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
+import { generateWorkoutToken } from '@/lib/workout-token';
+import { NextRequest, NextResponse } from 'next/server';
 
 const APP_URL = 'https://bodix.fit';
 

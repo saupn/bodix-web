@@ -4,6 +4,7 @@ import { createServiceClient } from '@/lib/supabase/service';
 import { getAccessToken } from '@/lib/messaging/helpers';
 import { matchFAQ, isNonsenseMessage, FALLBACK_REPLY, NONSENSE_REPLY } from '@/lib/zalo/faq';
 import { parseCheckin, roundsToMode } from '@/lib/zalo/parse-checkin';
+import { buildRescueAckMessage } from '@/lib/rescue/escalation';
 import { getTrialMorningAnchorDate, TRIAL_DAYS } from '@/lib/trial/utils';
 import {
   getVietnamDateString,
@@ -359,6 +360,26 @@ async function handleUserMessage(payload: any) {
       }
       // Hoàn toàn chưa enroll → để rơi xuống FAQ/fallback bên dưới.
     }
+
+    // ── Tâm sự sau tin rescue (TRƯỚC nonsense/FAQ, SAU check-in) ──
+    // Chỉ tin CÓ CHỮ mới là tâm sự: tin thuần số ("1", "2", "3", "4", "5") luôn dành
+    // cho check-in / feeling-reply đã xử lý phía trên. Nếu chúng rơi xuống đây (không
+    // có buổi nào mở, không có review chờ) thì cũng KHÔNG phải lời tâm sự.
+    const confideText = messageText.trim();
+    const isPureNumber = /^\d{1,2}$/.test(confideText);
+    if (confideText.length > 0 && !isPureNumber) {
+      const confided = await handleRescueConfide(
+        zaloUserId,
+        profile,
+        primaryEnrollment?.id ?? null,
+        confideText,
+        safeSend,
+      );
+      if (confided) {
+        console.log('[webhook] matched=rescue_confide msg_id:', msgId, 'user:', profile.id);
+        return;
+      }
+    }
   }
 
   // 3. Tầng FAQ — THAY HOÀN TOÀN logic state-aware cũ (không còn "bạn đã thanh
@@ -519,6 +540,84 @@ async function saveUserQuestion(
 }
 
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// XỬ LÝ TÂM SỰ SAU TIN RESCUE
+// Tin rescue mời user "cứ nhắn cho mình biết". Trong 48h sau đó, tin text
+// (không phải số check-in) = tâm sự → câu ấm áp tức thì + flag cho Founder trả
+// lời tay. KHÔNG đẩy vào FAQ/fallback: user vừa mở lòng, câu máy móc phản tác dụng.
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+/** Đóng cửa sổ awaiting khi user đã quay lại tập (không cần theo dõi chia sẻ nữa). */
+async function clearRescueAwaiting(userId: string): Promise<void> {
+  const { error } = await service
+    .from('rescue_interventions')
+    .update({ awaiting_reply_until: null })
+    .eq('user_id', userId)
+    .not('awaiting_reply_until', 'is', null);
+  if (error) {
+    console.error('[webhook] clearRescueAwaiting failed:', userId, error.message);
+  }
+}
+
+async function handleRescueConfide(
+  zaloUserId: string,
+  profile: { id: string; full_name: string | null },
+  enrollmentId: string | null,
+  messageText: string,
+  safeSend: (uid: string, text: string) => Promise<void>,
+): Promise<boolean> {
+  // Cửa sổ 48h còn mở? (rescue gần nhất, awaiting chưa hết hạn và chưa bị check-in đóng)
+  const { data: rescue } = await service
+    .from('rescue_interventions')
+    .select('id, enrollment_id')
+    .eq('user_id', profile.id)
+    .gt('awaiting_reply_until', new Date().toISOString())
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!rescue) return false;
+
+  const todayVN = getVietnamDateString();
+
+  // Câu ấm áp tối đa 1 lần/ngày/user — user nhắn tiếp vẫn được ghi nhận cho Founder,
+  // chỉ không lặp lại câu chào. Check TRƯỚC khi insert để row mới không tự match.
+  const { data: ackedToday } = await service
+    .from('rescue_replies')
+    .select('id')
+    .eq('user_id', profile.id)
+    .eq('received_ymd', todayVN)
+    .eq('ack_sent', true)
+    .limit(1)
+    .maybeSingle();
+
+  const shouldAck = !ackedToday;
+
+  const { error: insertError } = await service.from('rescue_replies').insert({
+    user_id: profile.id,
+    enrollment_id: rescue.enrollment_id ?? enrollmentId,
+    rescue_intervention_id: rescue.id,
+    message_text: messageText,
+    received_ymd: todayVN,
+    ack_sent: shouldAck,
+    status: 'needs_founder_reply',
+  });
+
+  if (insertError) {
+    // Ghi hỏng → vẫn trả lời ấm áp (không để user nhận câu FAQ lạnh), nhưng log to
+    // để Founder biết có tin bị mất khỏi inbox.
+    console.error('[webhook] rescue_replies insert FAILED:', profile.id, insertError.message);
+  }
+
+  if (shouldAck) {
+    const displayName = profile.full_name?.split(' ').pop() || profile.full_name || 'bạn';
+    await safeSend(zaloUserId, buildRescueAckMessage(displayName));
+  }
+
+  // KHÔNG đóng cửa sổ awaiting ở đây — user có thể nhắn tiếp.
+  return true;
+}
+
+// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // XỬ LÝ FEELING REPLY (1-5) CHO WEEKLY REVIEW
 // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -610,6 +709,10 @@ async function handleCheckin(
   rounds: 1 | 2 | 3,
   safeSend: (uid: string, text: string) => Promise<void>,
 ) {
+  // User đã quay lại tập → đóng cửa sổ awaiting của tin rescue (nếu có). Tin text
+  // sau đó xử lý bình thường (FAQ/fallback). rescue_replies đã ghi vẫn chờ Founder.
+  await clearRescueAwaiting(profile.id);
+
   // Số lượt → mode lưu DB (daily_checkins không có cột rounds riêng).
   const checkinMode = roundsToMode(rounds);
 

@@ -25,8 +25,10 @@ import {
   countMissedWorkoutDays,
   rescueLevel,
   buildRescueMessage,
+  rescueAwaitingUntil,
   WELCOME_BACK_LINE,
   type RescueLevel,
+  type RescueWorkoutContext,
 } from '@/lib/rescue/escalation';
 
 const APP_URL = 'https://bodix.fit';
@@ -854,6 +856,15 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       continue;
     }
 
+    // Buổi tập hôm nay — dùng chung cho CẢ tin rescue lẫn tin sáng bình thường.
+    // Tin rescue = thăm hỏi + bài tập + link (thăm hỏi THÊM vào, không thay bài tập).
+    const { data: workout } = await supabase
+      .from('workout_templates')
+      .select('day_number, title, workout_type, exercises')
+      .eq('program_id', en.program_id)
+      .eq('day_number', dayNumber)
+      .maybeSingle();
+
     if (level === 'l1' || level === 'l2' || level === 'l3') {
       if (await alreadySentRescueToday(userId)) {
         sentUserIds.add(userId);
@@ -861,7 +872,28 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         continue;
       }
 
-      const rescueText = buildRescueMessage(level, rescueDisplayName)!;
+      // Không có workout_template (ngày lỗi dữ liệu) → vẫn gửi thăm hỏi, bỏ khối bài tập.
+      // Ngày Recovery → items rỗng, chỉ hiện tên buổi + link.
+      let rescueCtx: RescueWorkoutContext | null = null;
+      if (workout && workout.workout_type !== 'review') {
+        const rescueExercises = getExerciseNames(workout.exercises as WorkoutExercises | null);
+        rescueCtx = {
+          sessionTitle: workout.title,
+          exerciseLines: rescueExercises.map((ex) => translateExerciseName(ex, translationMap)),
+          workoutUrl: await buildWorkoutLink(
+            userId,
+            en.enrollment_id,
+            `/app/program/workout/${dayNumber}`,
+          ),
+        };
+      } else {
+        console.warn(
+          '[morning-messages] rescue without workout block:',
+          userId, `day=${dayNumber}`, `type=${workout?.workout_type ?? 'missing'}`,
+        );
+      }
+
+      const rescueText = buildRescueMessage(level, rescueDisplayName, rescueCtx)!;
       const nudgeType =
         level === 'l1' ? 'rescue_soft' : level === 'l2' ? 'rescue_urgent' : 'rescue_critical';
       const triggerReason = level === 'l1' ? 'missed_2_days' : 'missed_3_plus_days';
@@ -890,6 +922,9 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               action_taken: 'send_rescue_message',
               message_sent: rescueText,
               outcome: 'pending',
+              // Mở cửa sổ 48h: tin text user nhắn lại = tâm sự → bot trả lời ấm áp
+              // + flag cho Founder, KHÔNG rơi vào FAQ/fallback.
+              awaiting_reply_until: rescueAwaitingUntil(),
             });
             await supabase.from('nudge_logs').insert({
               user_id: userId,
@@ -939,6 +974,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
               action_taken: 'send_rescue_message',
               message_sent: `push:rescue_${level}`,
               outcome: 'pending',
+              awaiting_reply_until: rescueAwaitingUntil(),
             });
             await supabase.from('nudge_logs').insert({
               user_id: userId,
@@ -982,18 +1018,17 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
         rescueStats.welcome_back++;
         await supabase
           .from('rescue_interventions')
-          .update({ outcome: 'user_returned', outcome_at: new Date().toISOString() })
+          .update({
+            outcome: 'user_returned',
+            outcome_at: new Date().toISOString(),
+            // User đã quay lại → đóng luôn cửa sổ chờ tâm sự (phòng khi check-in
+            // đến từ đường khác chưa kịp clear).
+            awaiting_reply_until: null,
+          })
           .eq('enrollment_id', en.enrollment_id)
           .eq('outcome', 'pending');
       }
     }
-
-    const { data: workout } = await supabase
-      .from('workout_templates')
-      .select('day_number, title, workout_type, exercises')
-      .eq('program_id', en.program_id)
-      .eq('day_number', dayNumber)
-      .maybeSingle();
 
     if (!workout) {
       fail(userId, `active: no workout_template for day ${dayNumber}`);

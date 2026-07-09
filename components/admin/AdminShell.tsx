@@ -15,6 +15,7 @@ const NAV_ITEMS = [
   { href: "/admin/reviews", label: "Reviews", icon: "📹" },
   { href: "/admin/weekly-review", label: "Review CN", icon: "🪞" },
   { href: "/admin/nudging", label: "Nudging", icon: "🔔" },
+  { href: "/admin/rescue-replies", label: "Tin tâm sự", icon: "💌" },
   { href: "/admin/zalo", label: "Zalo", icon: "💬" },
   { href: "/admin/referral", label: "Referral", icon: "🎁" },
   { href: "/admin/affiliate", label: "Affiliate", icon: "🤝" },

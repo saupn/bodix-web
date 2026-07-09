@@ -111,6 +111,17 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Không thể lưu check-in.' }, { status: 500 })
   }
 
+  // User đã quay lại tập → đóng cửa sổ 48h "chờ tâm sự" của tin rescue (nếu có).
+  // Cùng ngữ nghĩa với check-in qua Zalo (webhook). rescue_replies đã ghi vẫn chờ Founder.
+  const { error: awaitingError } = await service
+    .from('rescue_interventions')
+    .update({ awaiting_reply_until: null })
+    .eq('user_id', auth.userId)
+    .not('awaiting_reply_until', 'is', null)
+  if (awaitingError) {
+    console.error('[checkin] clear rescue awaiting_reply_until:', awaitingError.message)
+  }
+
   // ─── 6 & 7. Compute streak update ───────────────────────────────────────────
   const { data: existingStreak } = await service
     .from('streaks')

@@ -116,25 +116,42 @@ function buildMainMessage(
   );
 }
 
+// Buổi Phục hồi: CÙNG cấu trúc tin ngày thường (liệt kê bài + cho chọn 1/2/3 lượt),
+// chỉ khác GIỌNG (nhẹ nhàng, nhấn phục hồi). "Phục hồi" là LOẠI buổi, KHÔNG phải mức
+// cường độ — nên KHÔNG ép 1 lượt. Số lượt là do user chọn, map sang mode ở webhook.
 function buildRecoveryMessage(
   name: string,
   dayNumber: number,
   totalDays: number,
+  exerciseNames: string[],
+  sessionTitle: string,
   isWeekStart: boolean,
+  translationMap: ExerciseTranslationMap,
   workoutUrl: string,
 ): string {
+  const exerciseList = exerciseNames
+    .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
+    .join('\n');
+  const intro = exerciseList
+    ? `Buổi nhẹ nhàng giúp cơ thể phục hồi sau cả tuần tập. Các bài hôm nay:\n${exerciseList}\n`
+    : `Buổi nhẹ nhàng giúp cơ thể phục hồi sau cả tuần tập.\n`;
   const weekStartTip = isWeekStart
     ? '\n\n💡 Tuần này có thắc mắc gì – nhắn mình bất cứ lúc nào nha!'
     : '';
 
   return (
-    `Hi ${name}! 🧘 Ngày ${dayNumber}/${totalDays} – hôm nay nhẹ nhàng thôi nha.\n` +
+    `Hi ${name}! 🧘 Ngày ${dayNumber}/${totalDays} – hôm nay là buổi ${sessionTitle}.\n` +
     `\n` +
-    `Recovery giúp cơ thể phục hồi. 1 lượt (~7 phút).\n` +
+    intro +
     `\n` +
     `▶️ Xem video: ${workoutUrl}\n` +
     `\n` +
-    `Xong rồi nhắn 1 nha!` +
+    `Tập xong nhắn qua đây:\n` +
+    `  3 → đủ 3 lượt (~21 phút)\n` +
+    `  2 → 2 lượt (~14 phút)\n` +
+    `  1 → 1 lượt (~7 phút)\n` +
+    `\n` +
+    `Hôm nay cứ lắng nghe cơ thể, chọn mức phù hợp với bạn nha. Nhẹ nhàng thôi! 🌿` +
     weekStartTip
   );
 }
@@ -227,21 +244,35 @@ function buildTrialMainMessage(
 function buildTrialRecoveryMessage(
   name: string,
   trialDay: number,
+  exerciseNames: string[],
+  sessionTitle: string,
   isWeekStart: boolean,
+  translationMap: ExerciseTranslationMap,
   workoutUrl: string,
 ): string {
+  const exerciseList = exerciseNames
+    .map(ex => `- ${translateExerciseName(ex, translationMap)}`)
+    .join('\n');
+  const intro = exerciseList
+    ? `Buổi nhẹ nhàng cho cơ thể phục hồi. Các bài hôm nay:\n${exerciseList}\n`
+    : `Buổi nhẹ nhàng cho cơ thể phục hồi.\n`;
   const weekTip = isWeekStart
     ? '\n\n💬 Có gì thắc mắc cứ nhắn mình nha!'
     : '';
 
   return (
-    `Chào ${name}! 🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – hôm nay cho cơ thể phục hồi nhẹ nhàng thôi nha.\n` +
+    `Chào ${name}! 🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – hôm nay là buổi ${sessionTitle}.\n` +
     `\n` +
-    `Recovery ~7 phút một lượt.\n` +
+    intro +
     `\n` +
     `▶️ Xem bài: ${workoutUrl}\n` +
     `\n` +
-    `Xong nhắn 1 là được!` +
+    `Tập xong nhắn qua đây:\n` +
+    `  3 → đủ 3 lượt (~21 phút)\n` +
+    `  2 → 2 lượt (~14 phút)\n` +
+    `  1 → 1 lượt (~7 phút)\n` +
+    `\n` +
+    `Cứ lắng nghe cơ thể, chọn mức phù hợp với bạn nha!` +
     weekTip
   );
 }
@@ -498,7 +529,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
 
     // Source of truth: workout_templates.exercises.items[].name (KHÔNG hardcode).
     const exerciseNames = getExerciseNames(workout.exercises as WorkoutExercises | null);
-    if (!isRecovery && exerciseNames.length === 0) {
+    if (exerciseNames.length === 0) {
       fail(userId, `trial: no exercises.items for day ${trialDay} (title "${workout.title}")`);
       continue;
     }
@@ -509,7 +540,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       `/app/trial/workout/${trialDay}`,
     );
     const zaloMessage = isRecovery
-      ? buildTrialRecoveryMessage(displayName, trialDay, isWeekStart, workoutUrl)
+      ? buildTrialRecoveryMessage(displayName, trialDay, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl)
       : buildTrialMainMessage(displayName, trialDay, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl);
 
     const logVars = {
@@ -519,7 +550,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     };
 
     const chatContent = isRecovery
-      ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
+      ? `🧘 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}\nBuổi nhẹ nhàng – chọn 3, 2 hoặc 1 lượt tùy cơ thể 🌿`
       : `📅 Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
 
     let zaloDone = false;
@@ -560,10 +591,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     if (fcmToken) {
       try {
         const pushTitle = isRecovery
-          ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – Recovery 🧘`
+          ? `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title} 🧘`
           : `Ngày ${trialDay}/${TRIAL_DAYS} tập thử – ${workout.title}`;
         const pushBody = isRecovery
-          ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
+          ? 'Buổi nhẹ nhàng – chọn 3, 2 hoặc 1 lượt tùy cơ thể 🌿'
           : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
         const result = await sendFcmMessage(
@@ -1048,8 +1079,9 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     const contentTemplate = isRecovery ? 'morning_recovery' : 'morning_main';
 
     // Source of truth: workout_templates.exercises.items[].name (KHÔNG hardcode).
+    // Buổi Phục hồi cũng liệt kê bài như ngày thường → yêu cầu exercises.items cho mọi loại.
     const exerciseNames = getExerciseNames(workout.exercises as WorkoutExercises | null);
-    if (!isRecovery && exerciseNames.length === 0) {
+    if (exerciseNames.length === 0) {
       fail(userId, `active: no exercises.items for day ${dayNumber} (title "${workout.title}")`);
       continue;
     }
@@ -1060,13 +1092,13 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
       `/app/program/workout/${dayNumber}`,
     );
     const zaloMessage = welcomePrefix + (isRecovery
-      ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, isWeekStart, workoutUrl)
+      ? buildRecoveryMessage(displayName, dayNumber, config.totalDays, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl)
       : buildMainMessage(displayName, dayNumber, config.totalDays, exerciseNames, workout.title, isWeekStart, translationMap, workoutUrl));
 
     const logVars = { day_number: dayNumber, workout_type: workoutType };
 
     const chatContent = isRecovery
-      ? `🧘 Ngày ${dayNumber}/${config.totalDays} – Recovery\nHôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)`
+      ? `🧘 Ngày ${dayNumber}/${config.totalDays} – ${workout.title}\nBuổi nhẹ nhàng – chọn 3, 2 hoặc 1 lượt tùy cơ thể 🌿`
       : `📅 Ngày ${dayNumber}/${config.totalDays} – ${workout.title}\nMở app check-in: 3, 2 hoặc 1 lượt 💪`;
 
     let zaloDone = false;
@@ -1107,10 +1139,10 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     if (fcmToken) {
       try {
         const pushTitle = isRecovery
-          ? `Ngày ${dayNumber}/${config.totalDays} – Recovery 🧘`
+          ? `Ngày ${dayNumber}/${config.totalDays} – ${workout.title} 🧘`
           : `Ngày ${dayNumber}/${config.totalDays} – ${workout.title}`;
         const pushBody = isRecovery
-          ? 'Hôm nay nhẹ nhàng – 1 lượt Recovery (~7 phút)'
+          ? 'Buổi nhẹ nhàng – chọn 3, 2 hoặc 1 lượt tùy cơ thể 🌿'
           : 'Mở app check-in: 3, 2 hoặc 1 lượt 💪';
 
         const result = await sendFcmMessage(

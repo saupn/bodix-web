@@ -10,6 +10,7 @@ import {
   translateExerciseName,
   type ExerciseTranslationMap,
 } from '@/lib/exercises/translate';
+import { runCohortLifecycle } from '@/lib/cohort/lifecycle';
 import { sendFcmMessage } from '@/lib/messaging/adapters/push';
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo';
 import { insertSupportSystemMessage } from '@/lib/messaging/chat-mirror';
@@ -290,6 +291,14 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
   const supabase = createServiceClient();
   const config = PROGRAM_CONFIG['bodix-21'];
 
+  // ── Vòng đời cohort — CHẠY TRƯỚC khi gửi tin ────────────────────────────
+  // Bước 1: cohort tới ngày start  → active (+ enrollment paid_waiting_cohort → active)
+  // Bước 2: cohort qua ngày end    → completed (+ enrollment active → completed)
+  // Bước 3: gửi morning reminder (phần còn lại của hàm này)
+  // Nhờ chạy trước, user của cohort vừa khai giảng nhận tin ngay sáng Ngày 1,
+  // còn user của cohort vừa kết thúc KHÔNG bị nhắc tập nữa.
+  const cohortLifecycle = await runCohortLifecycle(supabase, getVietnamDateString());
+
   // Lấy program
   const { data: program } = await supabase
     .from('programs')
@@ -298,7 +307,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     .single();
 
   if (!program) {
-    return NextResponse.json({ sent: 0, skipped: 0, errors: 0, message: 'Program bodix-21 not found' });
+    return NextResponse.json({ sent: 0, skipped: 0, errors: 0, cohort_lifecycle: cohortLifecycle, message: 'Program bodix-21 not found' });
   }
 
   const todayVN = getVietnamDateString();
@@ -1202,6 +1211,7 @@ async function handleMorningMessages(request: NextRequest): Promise<NextResponse
     trial_total: trialEnrollments.length,
     skip_reasons: skipReasons,
     error_reasons: errorReasons,
+    cohort_lifecycle: cohortLifecycle,
   };
 
   console.log('[morning-messages] summary:', JSON.stringify(summary));

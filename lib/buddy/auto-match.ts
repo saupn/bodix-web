@@ -1,22 +1,33 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
+import { isBuddyMatchingEnabled } from '@/lib/settings'
 
 interface AutoMatchResult {
   matched: number
   unpaired: number
   zalo_sent: number
   zalo_errors: number
+  /** true khi app_settings.buddy_matching_enabled = false → không ghép ai. */
+  disabled?: boolean
 }
 
 /**
  * Auto-match buddy pairs cho một cohort.
  * Sort theo date_of_birth, ghép cặp liền kề.
  * Gửi Zalo thông báo cho từng cặp.
+ *
+ * Cờ toàn hệ thống `buddy_matching_enabled` (app_settings, mặc định FALSE)
+ * chặn toàn bộ hàm này. Tắt → KHÔNG ghép ai, user giữ trạng thái "chưa ghép".
  */
 export async function autoMatchCohort(
   service: SupabaseClient,
   cohortId: string
 ): Promise<AutoMatchResult> {
+  if (!(await isBuddyMatchingEnabled(service))) {
+    console.log('[buddy/auto-match] buddy_matching_enabled=false → bỏ qua', cohortId)
+    return { matched: 0, unpaired: 0, zalo_sent: 0, zalo_errors: 0, disabled: true }
+  }
+
   // Lấy tất cả enrollments active trong cohort
   const { data: enrollments } = await service
     .from('enrollments')

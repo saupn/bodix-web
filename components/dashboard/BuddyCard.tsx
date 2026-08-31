@@ -17,6 +17,8 @@ interface SearchResult {
 
 interface BuddyStatus {
   has_buddy: boolean;
+  /** app_settings.buddy_matching_enabled — tắt thì KHÔNG hiện phần tìm/ghép buddy. */
+  matching_enabled?: boolean;
   enrollment_status: string | null;
   buddy?: BuddyInfo;
   cohort_id?: string;
@@ -50,7 +52,8 @@ export function BuddyCard() {
 
   // Search debounce
   useEffect(() => {
-    if (!status || status.has_buddy || status.enrollment_status !== "active") return;
+    if (!status || status.has_buddy || !status.matching_enabled) return;
+    if (status.enrollment_status !== "active") return;
     const timer = setTimeout(async () => {
       setSearching(true);
       try {
@@ -102,6 +105,10 @@ export function BuddyCard() {
 
   // Không có enrollment nào → ẩn hoàn toàn
   if (!status.enrollment_status) return null;
+
+  // Ghép cặp đang tắt toàn hệ thống → ẩn hoàn toàn (kể cả preview trial).
+  // Cặp đã ghép từ trước vẫn hiển thị ở nhánh has_buddy bên dưới.
+  if (!status.matching_enabled && !status.has_buddy) return null;
 
   // ── Trial → preview text ──────────────────────────────────────────────────
   if (status.enrollment_status === "trial") {

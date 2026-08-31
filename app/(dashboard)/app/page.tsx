@@ -10,6 +10,7 @@ import { TrialPreviewCard } from "@/components/dashboard/TrialPreviewCard";
 import { BuddyChooser } from "@/components/dashboard/BuddyChooser";
 import { GiftBookCard } from "@/components/dashboard/GiftBookCard";
 import { OtherCohortsLink } from "@/components/dashboard/OtherCohortsLink";
+import { isBuddyMatchingEnabled } from "@/lib/settings";
 
 const PROGRAM_NAME: Record<string, string> = {
   "bodix-21": "BodiX 21",
@@ -316,6 +317,8 @@ export default async function AppPage() {
       }
     }
     const hasBuddy = !!buddyName;
+    // Cờ toàn hệ thống: tắt → KHÔNG hiện ô chọn buddy (giữ trạng thái "chưa ghép").
+    const buddyMatchingEnabled = await isBuddyMatchingEnabled();
 
     const nowMs = new Date().getTime();
     const cohortDaysAway = cohortStartDate
@@ -411,7 +414,9 @@ export default async function AppPage() {
         <GiftBookCard />
 
         {/* Buddy state */}
-        {paidWaitingEnrollment.cohort_id && !hasBuddy && <BuddyChooser />}
+        {paidWaitingEnrollment.cohort_id && !hasBuddy && buddyMatchingEnabled && (
+          <BuddyChooser />
+        )}
         {paidWaitingEnrollment.cohort_id && hasBuddy && buddyName && (
           <div className="rounded-xl border border-neutral-200 bg-white p-6 shadow-sm">
             <h3 className="font-heading text-base font-semibold text-primary">

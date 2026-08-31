@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
 import { sendViaZalo } from '@/lib/messaging/adapters/zalo'
+import { isBuddyMatchingEnabled } from '@/lib/settings'
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 
@@ -12,6 +13,15 @@ export async function POST(request: NextRequest) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
+
+  // Cờ toàn hệ thống (app_settings.buddy_matching_enabled, mặc định FALSE).
+  // Tắt → không tạo cặp nào, user giữ trạng thái "chưa ghép".
+  if (!(await isBuddyMatchingEnabled())) {
+    return NextResponse.json(
+      { error: 'Tính năng ghép đôi đang tạm tắt.', disabled: true },
+      { status: 403 }
+    )
+  }
 
   let body: { buddy_user_id?: unknown }
   try { body = await request.json() } catch {

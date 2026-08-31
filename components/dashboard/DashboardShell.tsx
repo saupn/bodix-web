@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake } from "lucide-react";
+import { Menu, X, LogOut, Home, Dumbbell, BarChart3, User, Users, FileText, Gift, Handshake, Shield } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { NotificationBell } from "./NotificationBell";
 import { StreakBadge } from "@/components/completion/StreakBadge";
@@ -35,6 +35,8 @@ interface DashboardShellProps {
   trialStartedAt?: string | null;
   userEmail: string;
   userId: string;
+  /** profiles.role === 'admin' → hiện nút "Admin" trên header. User thường: false. */
+  isAdmin?: boolean;
   hasActiveProgram?: boolean;
   streak?: { current: number; longest: number } | null;
   rescue?: {
@@ -74,7 +76,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, profile, trialStartedAt, userEmail, userId, hasActiveProgram, streak, rescue }: DashboardShellProps) {
+export function DashboardShell({ children, profile, trialStartedAt, userEmail, userId, isAdmin, hasActiveProgram, streak, rescue }: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [communityBadge, setCommunityBadge] = useState(0);
@@ -235,6 +237,17 @@ export function DashboardShell({ children, profile, trialStartedAt, userEmail, u
           </p>
 
           <div className="flex items-center gap-2 sm:gap-3">
+            {/* Nút Admin — CHỈ hiện với profiles.role='admin'. User thường không thấy. */}
+            {isAdmin && (
+              <Link
+                href="/admin"
+                className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-primary/20 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-colors hover:bg-primary/10"
+                aria-label="Vào khu quản trị"
+              >
+                <Shield className="h-4 w-4 shrink-0" />
+                <span className="hidden sm:inline">Admin</span>
+              </Link>
+            )}
             {streak && (
               <StreakBadge
                 currentStreak={streak.current}

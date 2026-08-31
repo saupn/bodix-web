@@ -1,11 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { isBuddyMatchingEnabled } from '@/lib/settings'
 
 export async function GET() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
+
+  // Cờ toàn hệ thống — tắt thì UI ẩn phần "Tìm buddy" (cặp đã ghép trước đó
+  // vẫn hiển thị bình thường).
+  const matchingEnabled = await isBuddyMatchingEnabled()
 
   // Lấy enrollment trial / paid_waiting_cohort / active (3 state có buddy logic)
   const { data: enrollment } = await supabase
@@ -18,13 +23,14 @@ export async function GET() {
     .maybeSingle()
 
   if (!enrollment) {
-    return NextResponse.json({ has_buddy: false, enrollment_status: null })
+    return NextResponse.json({ has_buddy: false, enrollment_status: null, matching_enabled: matchingEnabled })
   }
 
   // Trial → không có buddy, trả về enrollment_status để BuddyCard hiện preview
   if (enrollment.status === 'trial' || !enrollment.cohort_id) {
     return NextResponse.json({
       has_buddy: false,
+      matching_enabled: matchingEnabled,
       enrollment_status: enrollment.status,
       cohort_id: enrollment.cohort_id ?? null,
     })
@@ -44,6 +50,7 @@ export async function GET() {
   if (!pair) {
     return NextResponse.json({
       has_buddy: false,
+      matching_enabled: matchingEnabled,
       enrollment_status: enrollment.status,
       cohort_id: enrollment.cohort_id,
       enrollment_id: enrollment.id,
@@ -90,6 +97,7 @@ export async function GET() {
 
   return NextResponse.json({
     has_buddy: true,
+    matching_enabled: matchingEnabled,
     enrollment_status: enrollment.status,
     buddy: {
       id: buddyProfile?.id,

@@ -52,7 +52,7 @@ export default async function DashboardLayout({
   const service = createServiceClient();
   const { data: profile, error: profileError } = await service
     .from("profiles")
-    .select("full_name, trial_ends_at, onboarding_completed, payment_status, bodix_program")
+    .select("full_name, trial_ends_at, onboarding_completed, payment_status, bodix_program, role")
     .eq("id", user.id)
     .single();
 
@@ -124,6 +124,7 @@ export default async function DashboardLayout({
       }
       userEmail={user.email ?? ""}
       userId={user.id}
+      isAdmin={profile.role === "admin"}
       hasActiveProgram={hasActiveProgram}
       streak={
         myStats

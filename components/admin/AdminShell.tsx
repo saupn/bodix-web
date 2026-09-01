@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Menu, X } from "lucide-react";
+import { ArrowLeft, Menu, X } from "lucide-react";
 
 const NAV_ITEMS = [
-  { href: "/admin", label: "Dashboard", icon: "📊" },
+  { href: "/admin", label: "Tổng quan", icon: "📊" },
   { href: "/admin/orders", label: "Đơn hàng", icon: "🛒" },
   { href: "/admin/cohorts", label: "Cohorts", icon: "👥" },
   { href: "/admin/analytics/revenue", label: "Revenue", icon: "💰" },
@@ -74,12 +74,25 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               </Link>
             ))}
           </nav>
+
+          {/* Rời khu quản trị → dashboard người dùng. Tách khỏi nav admin bằng
+              border-t để không lẫn với các mục quản trị. */}
+          <div className="mt-4 border-t border-neutral-200 px-3 pt-4">
+            <Link
+              href="/app"
+              onClick={() => setSidebarOpen(false)}
+              className="flex min-h-[44px] items-center gap-2 rounded-lg px-3 py-2.5 text-sm font-medium text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-primary"
+            >
+              <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+              Về trang người dùng
+            </Link>
+          </div>
         </div>
       </aside>
 
       {/* Main */}
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="sticky top-0 z-30 flex h-14 items-center border-b border-neutral-200 bg-white px-4 lg:hidden">
+        <header className="sticky top-0 z-30 flex h-14 items-center justify-between gap-2 border-b border-neutral-200 bg-white px-4 lg:hidden">
           <button
             onClick={() => setSidebarOpen(true)}
             className="p-2 rounded-lg hover:bg-neutral-100 min-h-[44px] min-w-[44px] flex items-center justify-center"
@@ -87,6 +100,13 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           >
             <Menu className="h-6 w-6 text-primary" />
           </button>
+          <Link
+            href="/app"
+            className="inline-flex min-h-[36px] items-center gap-1.5 rounded-full border border-neutral-200 px-3 py-1.5 text-xs font-semibold text-neutral-600 transition-colors hover:bg-neutral-100 hover:text-primary"
+          >
+            <ArrowLeft className="h-4 w-4 shrink-0" aria-hidden="true" />
+            Về trang người dùng
+          </Link>
         </header>
         <main
           id="main-content"

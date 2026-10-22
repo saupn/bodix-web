@@ -1,7 +1,6 @@
 import { Header } from "@/components/layout/Header";
 import { Footer } from "@/components/layout/Footer";
 import { Hero } from "@/components/sections/Hero";
-import IntroVideo from "@/components/sections/IntroVideo";
 import LeadCapture from "@/components/landing/LeadCapture";
 import ForEveryWoman from "@/components/landing/ForEveryWoman";
 import HealthBenefits from "@/components/landing/HealthBenefits";
@@ -20,7 +19,6 @@ export default function Home() {
       <Header />
       <main className="flex-1">
         <Hero />
-        <IntroVideo />
         <Philosophy />
         <ForEveryWoman />
         <HealthBenefits />

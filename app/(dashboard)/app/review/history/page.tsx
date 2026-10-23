@@ -2,18 +2,18 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+import dynamic from "next/dynamic";
 import { MILESTONE_CONFIG } from "@/lib/completion/milestones";
+import { useDashboardSession } from "@/components/dashboard/DashboardSessionContext";
+
+// recharts nặng → chỉ tải khi có dữ liệu xu hướng.
+const ReviewTrendChart = dynamic(
+  () => import("@/components/review/ReviewTrendChart"),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse rounded bg-neutral-100" />,
+  }
+);
 
 const FATIGUE_EMOJI = ["😩", "😫", "😐", "😊", "💪"];
 const PROGRESS_EMOJI = ["😔", "🤔", "🙂", "😄", "🤩"];
@@ -82,6 +82,7 @@ export default function ReviewHistoryPage() {
   const [milestones, setMilestones] = useState<Milestone[]>([]);
   const [photos, setPhotos] = useState<ProgressPhoto[]>([]);
   const [midProgram, setMidProgram] = useState<{ id: string } | null>(null);
+  const session = useDashboardSession();
   const [loading, setLoading] = useState(true);
 
   const [zoomPhoto, setZoomPhoto] = useState<ProgressPhoto | null>(null);
@@ -90,26 +91,33 @@ export default function ReviewHistoryPage() {
   useEffect(() => {
     const load = async () => {
       try {
-        const progRes = await fetch("/api/program/active");
-        if (!progRes.ok) {
+        // enrollment_id có sẵn từ layout → program/active chạy cùng đợt với
+        // 4 API còn lại thay vì phải đợi trước.
+        const knownId = session?.activeEnrollment?.id ?? null;
+        if (session && !knownId) {
           setLoading(false);
           return;
         }
-        const prog = await progRes.json();
-        const enrollmentId = prog.enrollment?.id;
+        const progPromise = fetch("/api/program/active");
+        const applyProgram = async (progRes: Response) => {
+          if (!progRes.ok) return null;
+          const prog = await progRes.json();
+          if (!prog.enrollment?.id) return null;
+          setProgramData({
+            enrollment: prog.enrollment,
+            program: prog.program ?? { name: "Chương trình" },
+            program_day: prog.program_day ?? prog.enrollment?.current_day ?? 0,
+            total_days: prog.total_days ?? 21,
+          });
+          return prog.enrollment.id as string;
+        };
+        const enrollmentId = knownId ?? (await applyProgram(await progPromise));
         if (!enrollmentId) {
           setLoading(false);
           return;
         }
-
-        setProgramData({
-          enrollment: prog.enrollment,
-          program: prog.program ?? { name: "Chương trình" },
-          program_day: prog.program_day ?? prog.enrollment?.current_day ?? 0,
-          total_days: prog.total_days ?? 21,
-        });
-
-        const [reviewsRes, statsRes, photosRes, midRes] = await Promise.all([
+        const [, reviewsRes, statsRes, photosRes, midRes] = await Promise.all([
+          knownId ? progPromise.then(applyProgram) : null,
           fetch(`/api/reviews/weekly?enrollment_id=${enrollmentId}`),
           fetch("/api/completion/my-stats"),
           fetch(`/api/photos?enrollment_id=${enrollmentId}`),
@@ -142,7 +150,7 @@ export default function ReviewHistoryPage() {
       }
     };
     load();
-  }, []);
+  }, [session]);
 
   if (loading) {
     return (
@@ -352,12 +360,10 @@ export default function ReviewHistoryPage() {
           <div className="absolute left-4 top-0 bottom-0 w-0.5 bg-neutral-200" />
           <ul className="space-y-6">
             {timeline.map((item, i) => (
-              <motion.li
+              <li
                 key={`${item.type}-${item.date}-${i}`}
-                className="relative flex gap-4 pl-10"
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: i * 0.05 }}
+                className="relative flex gap-4 pl-10 opacity-0 animate-fade-slide-up"
+                style={{ animationDelay: `${i * 0.05}s` }}
               >
                 <div className="absolute left-2 top-1.5 h-4 w-4 rounded-full bg-primary" />
                 <div className="min-w-0 flex-1 rounded-lg border border-neutral-100 bg-neutral-50/50 p-3">
@@ -372,7 +378,7 @@ export default function ReviewHistoryPage() {
                     />
                   )}
                 </div>
-              </motion.li>
+              </li>
             ))}
           </ul>
         </div>
@@ -385,39 +391,7 @@ export default function ReviewHistoryPage() {
             Biểu đồ xu hướng
           </h2>
           <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-                <XAxis dataKey="week" tick={{ fontSize: 12 }} />
-                <YAxis domain={[1, 5]} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Line
-                  type="monotone"
-                  dataKey="Mệt_mỏi"
-                  name="Mệt mỏi"
-                  stroke="#ef4444"
-                  strokeWidth={2}
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Tiến_bộ"
-                  name="Tiến bộ"
-                  stroke="#22c55e"
-                  strokeWidth={2}
-                  connectNulls
-                />
-                <Line
-                  type="monotone"
-                  dataKey="Độ_khó"
-                  name="Độ khó"
-                  stroke="#3b82f6"
-                  strokeWidth={2}
-                  connectNulls
-                />
-              </LineChart>
-            </ResponsiveContainer>
+            <ReviewTrendChart data={chartData} />
           </div>
         </section>
       )}

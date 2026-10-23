@@ -29,27 +29,29 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Bạn không thuộc cohort này." }, { status: 403 });
   }
 
-  const { count, error } = await supabase
-    .from("community_posts")
-    .select("*", { count: "exact", head: true })
-    .eq("cohort_id", cohortId)
-    .eq("is_hidden", false);
+  const sevenDaysAgo = new Date();
+  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+  const iso = sevenDaysAgo.toISOString();
+
+  // Hai lượt đếm độc lập → song song.
+  const [{ count, error }, { count: newCount, error: newError }] = await Promise.all([
+    supabase
+      .from("community_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("cohort_id", cohortId)
+      .eq("is_hidden", false),
+    supabase
+      .from("community_posts")
+      .select("id", { count: "exact", head: true })
+      .eq("cohort_id", cohortId)
+      .eq("is_hidden", false)
+      .gte("created_at", iso),
+  ]);
 
   if (error) {
     console.error("[community/posts/summary] GET:", error);
     return NextResponse.json({ error: "Lỗi truy vấn." }, { status: 500 });
   }
-
-  const sevenDaysAgo = new Date();
-  sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-  const iso = sevenDaysAgo.toISOString();
-
-  const { count: newCount, error: newError } = await supabase
-    .from("community_posts")
-    .select("*", { count: "exact", head: true })
-    .eq("cohort_id", cohortId)
-    .eq("is_hidden", false)
-    .gte("created_at", iso);
 
   if (newError) {
     return NextResponse.json({ count: count ?? 0, new_in_7d: count ?? 0 });

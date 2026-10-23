@@ -1,18 +1,21 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { QRCodeCanvas } from "qrcode.react";
+import dynamic from "next/dynamic";
 import { Copy, Check } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-} from "recharts";
+
+// recharts và qrcode chỉ cần khi đã có dashboard → tải động, không chặn trang.
+const AffiliateMonthlyChart = dynamic(
+  () => import("@/components/affiliate/AffiliateMonthlyChart"),
+  {
+    ssr: false,
+    loading: () => <div className="h-full w-full animate-pulse rounded bg-neutral-100" />,
+  }
+);
+const QRCodeCanvas = dynamic(
+  () => import("qrcode.react").then((m) => m.QRCodeCanvas),
+  { ssr: false, loading: () => <div className="h-[140px] w-[140px] animate-pulse rounded bg-neutral-100" /> }
+);
 import { formatDateVn } from "@/lib/date/vietnam";
 import { AFFILIATE_COPY } from "@/lib/copy/affiliate";
 import { BankInfoForm } from "@/components/affiliate/BankInfoForm";
@@ -277,6 +280,7 @@ export default function AffiliatePage() {
   const [withdrawSuccess, setWithdrawSuccess] = useState(false);
 
   const [chartYear, setChartYear] = useState(new Date().getFullYear());
+  const approvedRef = useRef(false);
 
   const affiliateCode = dashboard?.code?.code ?? "";
   const afLink = affiliateCode ? `${REFERRAL_BASE}/af/${affiliateCode}` : "";
@@ -285,10 +289,17 @@ export default function AffiliatePage() {
   useEffect(() => {
     const load = async () => {
       try {
+        // Đổi năm biểu đồ: đã biết đã duyệt → chỉ tải lại dashboard.
+        if (approvedRef.current) {
+          const dashRes = await fetch(`/api/affiliate/dashboard?year=${chartYear}`);
+          if (dashRes.ok) setDashboard(await dashRes.json());
+          return;
+        }
         const statusRes = await fetch("/api/affiliate/status");
         if (statusRes.ok) {
           const s = await statusRes.json();
           setStatus(s);
+          approvedRef.current = !!s.is_approved;
           if (s.is_approved) {
             const dashRes = await fetch(`/api/affiliate/dashboard?year=${chartYear}`);
             if (dashRes.ok) {
@@ -661,17 +672,7 @@ export default function AffiliatePage() {
           </select>
         </div>
         <div className="h-64">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={dashboard?.monthly_chart ?? []}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e5" />
-              <XAxis dataKey="month" tick={{ fontSize: 11 }} />
-              <YAxis tick={{ fontSize: 11 }} />
-              <Tooltip formatter={(v) => typeof v === 'number' ? v.toLocaleString("vi-VN") : v} />
-              <Legend />
-              <Bar dataKey="conversions" name="Đơn" fill="#3b82f6" />
-              <Bar dataKey="commission" name="Hoa hồng (đ)" fill="#22c55e" />
-            </BarChart>
-          </ResponsiveContainer>
+          <AffiliateMonthlyChart data={dashboard?.monthly_chart ?? []} />
         </div>
       </section>
 

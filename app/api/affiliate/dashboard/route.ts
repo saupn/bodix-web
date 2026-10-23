@@ -17,18 +17,36 @@ export async function GET() {
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
 
-  // ── Fetch affiliate profile + user name ─────────────────────────────────────
-  const { data: affiliateProfile, error: profileError } = await supabase
-    .from('affiliate_profiles')
-    .select('id, affiliate_tier, is_approved, total_earned, total_paid, pending_balance, bank_name, bank_account_number, bank_account_name')
-    .eq('user_id', user.id)
-    .maybeSingle()
-
-  const { data: userProfile } = await supabase
-    .from('profiles')
-    .select('full_name')
-    .eq('id', user.id)
-    .single()
+  // ── Affiliate profile + user name + mã (đều là dòng của chính user) → song song ──
+  // Single-source: mỗi user chỉ 1 dòng referral_codes (mã chung /r/ + /af/).
+  // KHÔNG lọc code_type — đọc đúng dòng mã của user để cả 3 trang hiện cùng 1 mã.
+  const [
+    { data: affiliateProfile, error: profileError },
+    { data: userProfile },
+    { data: affiliateCode },
+  ] = await Promise.all([
+    supabase
+      .from('affiliate_profiles')
+      .select('id, affiliate_tier, is_approved, total_earned, total_paid, pending_balance, bank_name, bank_account_number, bank_account_name')
+      .eq('user_id', user.id)
+      .maybeSingle(),
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('id', user.id)
+      .single(),
+    supabase
+      .from('referral_codes')
+      .select(`
+        id, code, commission_rate,
+        total_clicks, total_signups, total_conversions, total_revenue_generated
+      `)
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (profileError) {
     console.error('[affiliate/dashboard] profile:', profileError)
@@ -46,21 +64,6 @@ export async function GET() {
       profile: { tier: affiliateProfile.affiliate_tier },
     }, { status: 403 })
   }
-
-  // ── Fetch affiliate code ──────────────────────────────────────────────────
-  // Single-source: mỗi user chỉ 1 dòng referral_codes (mã chung /r/ + /af/).
-  // KHÔNG lọc code_type — đọc đúng dòng mã của user để cả 3 trang hiện cùng 1 mã.
-  const { data: affiliateCode } = await supabase
-    .from('referral_codes')
-    .select(`
-      id, code, commission_rate,
-      total_clicks, total_signups, total_conversions, total_revenue_generated
-    `)
-    .eq('user_id', user.id)
-    .eq('is_active', true)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
 
   const commissionRate = affiliateCode?.commission_rate
     ?? TIER_COMMISSION[affiliateProfile.affiliate_tier] ?? 40
@@ -91,15 +94,65 @@ export async function GET() {
   // ── Fetch recent conversions (last 20) ────────────────────────────────────
   const service = createServiceClient()
 
-  const { data: recentTrackings } = await service
-    .from('referral_tracking')
-    .select(`
-      id, referred_id, program_id, conversion_amount, converted_at, status
-    `)
-    .eq('referral_code_id', affiliateCode.id)
-    .eq('status', 'converted')
-    .order('converted_at', { ascending: false })
-    .limit(20)
+  // Mọi truy vấn dưới chỉ phụ thuộc mã/user → một đợt song song
+  // (trước đây 6 lượt nối tiếp).
+  const yearStart = `${chartYear}-01-01T00:00:00Z`
+  const yearEnd = `${chartYear}-12-31T23:59:59Z`
+  const now = new Date()
+  const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00Z`
+  const [
+    { data: recentTrackings },
+    { data: allConversions },
+    { data: thisMonthData },
+    { data: commissionRows },
+    { data: withdrawals },
+  ] = await Promise.all([
+    service
+      .from('referral_tracking')
+      .select(`
+        id, referred_id, program_id, conversion_amount, converted_at, status
+      `)
+      .eq('referral_code_id', affiliateCode.id)
+      .eq('status', 'converted')
+      .order('converted_at', { ascending: false })
+      .limit(20),
+    // ── Monthly chart — by year ──
+    service
+      .from('referral_tracking')
+      .select('conversion_amount, converted_at')
+      .eq('referral_code_id', affiliateCode.id)
+      .eq('status', 'converted')
+      .gte('converted_at', yearStart)
+      .lte('converted_at', yearEnd)
+      .order('converted_at', { ascending: true }),
+    // ── This month stats ──
+    service
+      .from('referral_tracking')
+      .select('conversion_amount')
+      .eq('referral_code_id', affiliateCode.id)
+      .eq('status', 'converted')
+      .gte('converted_at', thisMonthStart),
+    // ── Commissions V2 (program_type='affiliate', user's own rows) ──
+    service
+      .from('commissions')
+      .select(`
+        id, status, reward_amount_vnd, reward_rate, order_amount_vnd,
+        purchase_at, payable_at, paid_at, cancelled_at, pending_expires_at,
+        cancel_reason, referee_user_id, enrollment_id
+      `)
+      .eq('beneficiary_user_id', user.id)
+      .eq('program_type', 'affiliate')
+      .order('purchase_at', { ascending: false })
+      .limit(50),
+    // ── Withdrawal history ──
+    supabase
+      .from('user_credits')
+      .select('id, amount, balance_after, description, created_at')
+      .eq('user_id', user.id)
+      .eq('transaction_type', 'withdrawal')
+      .order('created_at', { ascending: false })
+      .limit(20),
+  ])
 
   // Collect referred user IDs + program IDs for batch fetch
   const referredIds = [...new Set((recentTrackings ?? [])
@@ -110,13 +163,20 @@ export async function GET() {
     .map(t => t.program_id)
     .filter(Boolean))] as string[]
 
-  const [profilesRes, programsRes] = await Promise.all([
+  const commissionRefereeIds = [...new Set((commissionRows ?? [])
+    .map(c => c.referee_user_id)
+    .filter(Boolean))] as string[]
+
+  const [profilesRes, programsRes, { data: commissionProfiles }] = await Promise.all([
     referredIds.length
       ? service.from('profiles').select('id, full_name').in('id', referredIds)
       : Promise.resolve({ data: [] }),
     programIds.length
       ? service.from('programs').select('id, name').in('id', programIds)
       : Promise.resolve({ data: [] }),
+    commissionRefereeIds.length
+      ? service.from('profiles').select('id, full_name').in('id', commissionRefereeIds)
+      : Promise.resolve({ data: [] as Array<{ id: string; full_name: string | null }> }),
   ])
 
   const profileMap = new Map<string, string>(
@@ -144,51 +204,12 @@ export async function GET() {
   })
 
   // ── Monthly chart — by year ──────────────────────────────────────────────
-  const yearStart = `${chartYear}-01-01T00:00:00Z`
-  const yearEnd = `${chartYear}-12-31T23:59:59Z`
-  const { data: allConversions } = await service
-    .from('referral_tracking')
-    .select('conversion_amount, converted_at')
-    .eq('referral_code_id', affiliateCode.id)
-    .eq('status', 'converted')
-    .gte('converted_at', yearStart)
-    .lte('converted_at', yearEnd)
-    .order('converted_at', { ascending: true })
-
   const monthlyChart = buildMonthlyChartForYear(allConversions ?? [], commissionRate, chartYear)
 
   // ── This month stats ─────────────────────────────────────────────────────
-  const now = new Date()
-  const thisMonthStart = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-01T00:00:00Z`
-  const { data: thisMonthData } = await service
-    .from('referral_tracking')
-    .select('conversion_amount')
-    .eq('referral_code_id', affiliateCode.id)
-    .eq('status', 'converted')
-    .gte('converted_at', thisMonthStart)
   const thisMonthRevenue = (thisMonthData ?? []).reduce((s, c) => s + (c.conversion_amount ?? 0), 0)
   const thisMonthCommission = Math.round(thisMonthRevenue * commissionRate / 100)
 
-  // ── Commissions V2 (program_type='affiliate', user's own rows) ──────────
-  const { data: commissionRows } = await service
-    .from('commissions')
-    .select(`
-      id, status, reward_amount_vnd, reward_rate, order_amount_vnd,
-      purchase_at, payable_at, paid_at, cancelled_at, pending_expires_at,
-      cancel_reason, referee_user_id, enrollment_id
-    `)
-    .eq('beneficiary_user_id', user.id)
-    .eq('program_type', 'affiliate')
-    .order('purchase_at', { ascending: false })
-    .limit(50)
-
-  const commissionRefereeIds = [...new Set((commissionRows ?? [])
-    .map(c => c.referee_user_id)
-    .filter(Boolean))] as string[]
-
-  const { data: commissionProfiles } = commissionRefereeIds.length
-    ? await service.from('profiles').select('id, full_name').in('id', commissionRefereeIds)
-    : { data: [] as Array<{ id: string; full_name: string | null }> }
 
   const commissionProfileMap = new Map<string, string>(
     (commissionProfiles ?? []).map(p => [p.id, p.full_name ?? ''])
@@ -233,14 +254,6 @@ export async function GET() {
     suspicious_count: commissions.filter(c => c.status === 'suspicious').length,
   }
 
-  // ── Withdrawal history ───────────────────────────────────────────────────
-  const { data: withdrawals } = await supabase
-    .from('user_credits')
-    .select('id, amount, balance_after, description, created_at')
-    .eq('user_id', user.id)
-    .eq('transaction_type', 'withdrawal')
-    .order('created_at', { ascending: false })
-    .limit(20)
 
   const withdrawal_history = (withdrawals ?? []).map(w => ({
     id: w.id,

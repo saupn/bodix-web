@@ -1,7 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { getWorkoutRequestUser } from "@/lib/workout-token";
-import { translateWorkoutItems } from "@/lib/exercises/translate";
+import {
+  applyWorkoutTranslations,
+  getCachedExerciseTranslationMap,
+} from "@/lib/exercises/translate";
 
 export async function GET(
   request: NextRequest,
@@ -37,11 +40,30 @@ export async function GET(
     );
   }
 
-  const { data: program } = await supabase
-    .from("programs")
-    .select("duration_days")
-    .eq("id", enrollment.program_id)
-    .single();
+  // Program, bài tập, check-in và bảng dịch độc lập nhau → một đợt song song.
+  const [{ data: program }, { data: workout, error }, { data: checkin }, translationMap] =
+    await Promise.all([
+      supabase
+        .from("programs")
+        .select("duration_days")
+        .eq("id", enrollment.program_id)
+        .single(),
+      supabase
+        .from("workout_templates")
+        .select(
+          "id, day_number, week_number, title, description, duration_minutes, workout_type, exercises"
+        )
+        .eq("program_id", enrollment.program_id)
+        .eq("day_number", day)
+        .single(),
+      supabase
+        .from("daily_checkins")
+        .select("mode, feeling")
+        .eq("enrollment_id", enrollment.id)
+        .eq("day_number", day)
+        .maybeSingle(),
+      getCachedExerciseTranslationMap(),
+    ]);
 
   if (!program || day > program.duration_days) {
     return NextResponse.json(
@@ -50,15 +72,6 @@ export async function GET(
     );
   }
 
-  const { data: workout, error } = await supabase
-    .from("workout_templates")
-    .select(
-      "id, day_number, week_number, title, description, duration_minutes, workout_type, exercises"
-    )
-    .eq("program_id", enrollment.program_id)
-    .eq("day_number", day)
-    .single();
-
   if (error || !workout) {
     return NextResponse.json(
       { error: "Không tìm thấy bài tập." },
@@ -66,17 +79,10 @@ export async function GET(
     );
   }
 
-  await translateWorkoutItems(
-    supabase,
+  applyWorkoutTranslations(
     workout.exercises as { items?: Array<{ name: string }> } | null,
+    translationMap,
   );
-
-  const { data: checkin } = await supabase
-    .from("daily_checkins")
-    .select("mode, feeling")
-    .eq("enrollment_id", enrollment.id)
-    .eq("day_number", day)
-    .maybeSingle();
 
   const isCompleted = !!checkin;
 

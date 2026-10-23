@@ -1,11 +1,16 @@
-import { createClient } from "@/lib/supabase/server";
-import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { cookies, headers } from "next/headers";
 import { DashboardShell } from "@/components/dashboard/DashboardShell";
-import { getUserStatus, canAccessDashboard, getRedirectPath, type StatusEnrollment } from "@/lib/user/status";
-import { getMyStats } from "@/lib/completion/fetch-stats";
-import { getRescueStatus } from "@/lib/rescue/fetch-status";
+import { DashboardSessionProvider } from "@/components/dashboard/DashboardSessionContext";
+import { getUserStatus, canAccessDashboard, getRedirectPath } from "@/lib/user/status";
+import { getStreakSummary } from "@/lib/completion/fetch-stats";
+import { getRescueStatusForEnrollment } from "@/lib/rescue/fetch-status";
+import {
+  getAuthUser,
+  getDashboardEnrollments,
+  getDashboardProfile,
+  getRequestSupabase,
+} from "@/lib/dashboard/session";
 import {
   decodeWorkoutCookie,
   isWorkoutTokenPath,
@@ -20,11 +25,8 @@ export default async function DashboardLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // Auth check with session-aware client
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  // Auth check – getAuthUser() dùng chung với page trong cùng request (React cache).
+  const user = await getAuthUser();
 
   if (!user) {
     // Magic-link phiên tập: cookie workout-token CHỈ mở đúng 2 route workout.
@@ -48,31 +50,16 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  // Profile check with service client (bypasses RLS — same as complete-onboarding API)
-  const service = createServiceClient();
-  const { data: profile, error: profileError } = await service
-    .from("profiles")
-    .select("full_name, trial_ends_at, onboarding_completed, payment_status, bodix_program, role")
-    .eq("id", user.id)
-    .single();
+  // Profile (service client, lọc theo id) và enrollments (session client, RLS)
+  // chạy song song. Page bên dưới gọi lại 2 hàm này sẽ dùng chung kết quả.
+  const [{ profile, error: profileError }, enrollments] = await Promise.all([
+    getDashboardProfile(user.id),
+    getDashboardEnrollments(user.id),
+  ]);
 
   if (profileError) {
     console.error("[dashboard/layout] profile query error:", profileError.message, profileError.code);
   }
-
-  // Fetch enrollments (keep using session client for RLS-protected data)
-  const { data: enrollmentsRaw } = await supabase
-    .from("enrollments")
-    .select(
-      `id, status, program_id, cohort_id, started_at, completed_at,
-       program:programs (slug, name),
-       cohort:cohorts (status, start_date)`
-    )
-    .eq("user_id", user.id)
-    .not("status", "eq", "dropped")
-    .order("enrolled_at", { ascending: false });
-
-  const enrollments = (enrollmentsRaw ?? []) as unknown as StatusEnrollment[];
 
   // Debug: profile query failed — show error instead of redirecting (prevents loop)
   if (!profile) {
@@ -109,8 +96,33 @@ export default async function DashboardLayout({
 
   const hasActiveProgram =
     userStatus === "active_program" || userStatus === "waiting_cohort";
-  const myStats = hasActiveProgram ? await getMyStats(supabase) : null;
-  const rescueStatus = hasActiveProgram ? await getRescueStatus(supabase) : null;
+  // Badge streak + banner rescue: chỉ cần enrollment active → 1 lượt song song.
+  const activeEnrollment = hasActiveProgram
+    ? enrollments.find((e) => e.status === "active") ?? null
+    : null;
+  const supabase = await getRequestSupabase();
+  const [streak, rescueStatus] = activeEnrollment
+    ? await Promise.all([
+        getStreakSummary(supabase, activeEnrollment.id),
+        getRescueStatusForEnrollment(supabase, activeEnrollment.id),
+      ])
+    : [null, null];
+  const myStats = activeEnrollment && streak
+    ? { streak, current_day: activeEnrollment.current_day ?? 0 }
+    : null;
+
+  // Id phiên cho các tab client (bỏ một đợt gọi /api/program/active).
+  const sessionEnrollment = enrollments.find((e) => e.status === "active") ?? null;
+  const session = {
+    userId: user.id,
+    activeEnrollment: sessionEnrollment
+      ? {
+          id: sessionEnrollment.id,
+          cohortId: sessionEnrollment.cohort_id,
+          programId: sessionEnrollment.program_id,
+        }
+      : null,
+  };
 
   return (
     <DashboardShell
@@ -126,6 +138,7 @@ export default async function DashboardLayout({
       userId={user.id}
       isAdmin={profile.role === "admin"}
       hasActiveProgram={hasActiveProgram}
+      hideProgramsLink={!!sessionEnrollment}
       streak={
         myStats
           ? {
@@ -148,7 +161,7 @@ export default async function DashboardLayout({
           : null
       }
     >
-      {children}
+      <DashboardSessionProvider value={session}>{children}</DashboardSessionProvider>
     </DashboardShell>
   );
 }

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { computeProgramDay } from "@/lib/program/day";
 
 export async function GET() {
   const supabase = await createClient();
@@ -73,54 +74,25 @@ export async function GET() {
     );
   }
 
+  // Không lấy cột exercises (JSON nặng) – các trang gọi route này chỉ cần
+  // tiêu đề/thời lượng; chi tiết bài tập lấy ở /api/program/workout/[day].
   const { data: workouts } = await supabase
     .from("workout_templates")
-    .select("id, day_number, title, duration_minutes, workout_type, exercises")
+    .select("id, day_number, title, duration_minutes, workout_type")
     .eq("program_id", program.id)
     .order("day_number", { ascending: true });
 
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const startDate = cohort?.start_date
-    ? new Date(cohort.start_date)
-    : null;
-  const endDate = cohort?.end_date ? new Date(cohort.end_date) : null;
-
-  let programDay = enrollment.current_day ?? 0;
-  if (startDate && cohort) {
-    const start = new Date(cohort.start_date);
-    start.setHours(0, 0, 0, 0);
-    const diff = Math.floor(
-      (today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)
-    );
-    const computedDay = Math.min(
-      Math.max(1, diff + 1),
-      program.duration_days
-    );
-    if (diff >= 0) {
-      programDay = Math.max(enrollment.current_day ?? 0, computedDay);
-    }
-  }
-
-  const cohortNotStarted =
-    startDate && today < startDate;
-  let cohortActive =
-    startDate &&
-    endDate &&
-    today >= startDate &&
-    today <= endDate;
-
-  if (!cohortNotStarted && !cohortActive && programDay > 0) {
-    cohortActive = true;
-  }
-
-  const weekSize = 7;
-  const currentWeek = programDay > 0 ? Math.ceil(programDay / weekSize) : 1;
-  const weekStartDay = (currentWeek - 1) * weekSize + 1;
-  const weekDays = Array.from(
-    { length: Math.min(weekSize, program.duration_days - weekStartDay + 1) },
-    (_, i) => weekStartDay + i
-  ).filter((d) => d >= 1 && d <= program.duration_days);
+  const {
+    programDay,
+    cohortNotStarted,
+    cohortActive,
+    weekDays,
+  } = computeProgramDay({
+    currentDay: enrollment.current_day,
+    durationDays: program.duration_days,
+    cohortStartDate: cohort?.start_date ?? null,
+    cohortEndDate: cohort?.end_date ?? null,
+  });
 
   const todayWorkout = (workouts ?? []).find((w) => w.day_number === programDay);
 

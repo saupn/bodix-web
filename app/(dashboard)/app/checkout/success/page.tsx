@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser, getRequestSupabase } from "@/lib/dashboard/session";
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { CheckoutSuccessClient } from "@/components/checkout/CheckoutSuccessClient";
@@ -19,27 +19,28 @@ export default async function CheckoutSuccessPage({
     redirect("/app");
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = await getRequestSupabase();
+  // getUser dùng chung với layout trong cùng request (React cache).
+  const user = await getAuthUser();
 
   if (!user) redirect("/login");
 
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, name, slug")
-    .eq("slug", slug)
-    .single();
-
-  const { data: cohort } = await supabase
-    .from("cohorts")
-    .select("id, name, start_date")
-    .eq("program_id", program?.id ?? "")
-    .in("status", ["upcoming", "active"])
-    .order("start_date", { ascending: true })
-    .limit(1)
-    .maybeSingle();
+  // Program + đợt gần nhất (lọc qua join theo slug) → song song.
+  const [{ data: program }, { data: cohort }] = await Promise.all([
+    supabase
+      .from("programs")
+      .select("id, name, slug")
+      .eq("slug", slug)
+      .single(),
+    supabase
+      .from("cohorts")
+      .select("id, name, start_date, programs!inner(slug)")
+      .eq("programs.slug", slug)
+      .in("status", ["upcoming", "active"])
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const programName = program?.name ?? "chương trình";
   const cohortName = cohort?.name ?? "Đợt sắp tới";

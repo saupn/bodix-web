@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { ChevronDown, ChevronUp, Lock, Camera } from "lucide-react";
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
+import { useDashboardSession } from "@/components/dashboard/DashboardSessionContext";
+
+// recharts nặng → chỉ tải khi có biểu đồ để vẽ.
+const ProgressTrendChart = dynamic(() => import("./ProgressTrendChart"), {
+  ssr: false,
+  loading: () => <div className="h-full w-full animate-pulse rounded bg-neutral-100" />,
+});
 import { StreakBadge } from "@/components/completion/StreakBadge";
 import { ProgressRing } from "@/components/completion/ProgressRing";
 import { WeeklyCalendar } from "@/components/completion/WeeklyCalendar";
@@ -88,6 +88,7 @@ function useCountdown(targetDate: string | null) {
 
 export function ProgramPageContent() {
   const router = useRouter();
+  const session = useDashboardSession();
   const [data, setData] = useState<ProgramData | null>(null);
   const [stats, setStats] = useState<{
     streak: { current_streak: number; longest_streak: number; total_completed_days: number };
@@ -118,16 +119,24 @@ export function ProgramPageContent() {
   useEffect(() => {
     const load = async () => {
       try {
-        const progRes = await fetch("/api/program/active");
-        if (!progRes.ok) {
-          if (progRes.status === 404) router.replace("/app");
-          throw new Error("Failed");
+        // enrollment_id có sẵn từ layout → 5 API chạy cùng một đợt.
+        // Không có (shell tối giản) → đợi program/active như cũ.
+        const knownId = session?.activeEnrollment?.id ?? null;
+        const progPromise = fetch("/api/program/active");
+        let enrollmentId: string | undefined = knownId ?? undefined;
+        if (!knownId) {
+          const progRes = await progPromise;
+          if (!progRes.ok) {
+            if (progRes.status === 404) router.replace("/app");
+            throw new Error("Failed");
+          }
+          const prog = await progRes.json();
+          setData(prog);
+          enrollmentId = prog.enrollment?.id;
         }
-        const prog = await progRes.json();
-        setData(prog);
 
-        const enrollmentId = prog.enrollment?.id;
-        const [statsRes, histRes, rescueRes, reviewsRes] = await Promise.all([
+        const [progRes, statsRes, histRes, rescueRes, reviewsRes] = await Promise.all([
+          knownId ? progPromise : null,
           fetch("/api/completion/my-stats"),
           enrollmentId
             ? fetch(`/api/completion/history?enrollment_id=${enrollmentId}`)
@@ -137,6 +146,14 @@ export function ProgramPageContent() {
             ? fetch(`/api/reviews/weekly?enrollment_id=${enrollmentId}`)
             : null,
         ]);
+
+        if (progRes) {
+          if (!progRes.ok) {
+            if (progRes.status === 404) router.replace("/app");
+            throw new Error("Failed");
+          }
+          setData(await progRes.json());
+        }
 
         if (rescueRes.ok) {
           const r = await rescueRes.json();
@@ -173,7 +190,7 @@ export function ProgramPageContent() {
       }
     };
     load();
-  }, [router]);
+  }, [router, session]);
 
   if (loading || !data) {
     return (
@@ -409,21 +426,7 @@ export function ProgramPageContent() {
                 Tiến bộ qua các tuần
               </h3>
               <div className="mt-3 h-24">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={progressTrend}>
-                    <XAxis dataKey="week" tick={{ fontSize: 10 }} />
-                    <YAxis domain={[1, 5]} hide />
-                    <Tooltip />
-                    <Line
-                      type="monotone"
-                      dataKey="value"
-                      name="Cảm nhận tiến bộ"
-                      stroke="#22c55e"
-                      strokeWidth={2}
-                      dot={{ r: 3 }}
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <ProgressTrendChart data={progressTrend} />
               </div>
             </div>
           )}

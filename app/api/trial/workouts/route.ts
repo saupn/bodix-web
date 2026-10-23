@@ -12,20 +12,21 @@ export async function GET() {
     return NextResponse.json({ error: "Chưa đăng nhập." }, { status: 401 });
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("trial_ends_at")
-    .eq("id", user.id)
-    .single();
-
-  const { data: enrollment } = await supabase
-    .from("enrollments")
-    .select("id, program_id, status")
-    .eq("user_id", user.id)
-    .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
-    .order("enrolled_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const [{ data: profile }, { data: enrollment }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("trial_ends_at")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("enrollments")
+      .select("id, program_id, status")
+      .eq("user_id", user.id)
+      .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
+      .order("enrolled_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (!enrollment || !canAccessTrialContent({
     status: enrollment.status,

@@ -38,6 +38,8 @@ interface DashboardShellProps {
   /** profiles.role === 'admin' → hiện nút "Admin" trên header. User thường: false. */
   isAdmin?: boolean;
   hasActiveProgram?: boolean;
+  /** Có enrollment status=active → ẩn link /app/programs (trang đó chỉ redirect về /app). */
+  hideProgramsLink?: boolean;
   streak?: { current: number; longest: number } | null;
   rescue?: {
     riskLevel: string;
@@ -76,7 +78,7 @@ function getInitials(name: string | null, email: string): string {
   return email?.[0]?.toUpperCase() ?? "?";
 }
 
-export function DashboardShell({ children, profile, trialStartedAt, userEmail, userId, isAdmin, hasActiveProgram, streak, rescue }: DashboardShellProps) {
+export function DashboardShell({ children, profile, trialStartedAt, userEmail, userId, isAdmin, hasActiveProgram, hideProgramsLink, streak, rescue }: DashboardShellProps) {
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [communityBadge, setCommunityBadge] = useState(0);
@@ -202,7 +204,11 @@ export function DashboardShell({ children, profile, trialStartedAt, userEmail, u
             {hasActiveProgram && (
               <NavLink key={PROGRAM_NAV.href} {...PROGRAM_NAV} />
             )}
-            {NAV_LINKS_BASE.map((link) => (
+            {NAV_LINKS_BASE.filter(
+              // Có enrollment active thì /app/programs chỉ redirect về /app →
+              // ẩn link để khỏi tốn một lượt render + redirect.
+              (link) => !(hideProgramsLink && link.href === "/app/programs")
+            ).map((link) => (
               <NavLink key={link.href} {...link} />
             ))}
           </nav>

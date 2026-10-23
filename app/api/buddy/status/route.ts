@@ -10,17 +10,19 @@ export async function GET() {
 
   // Cờ toàn hệ thống — tắt thì UI ẩn phần "Tìm buddy" (cặp đã ghép trước đó
   // vẫn hiển thị bình thường).
-  const matchingEnabled = await isBuddyMatchingEnabled()
-
   // Lấy enrollment trial / paid_waiting_cohort / active (3 state có buddy logic)
-  const { data: enrollment } = await supabase
-    .from('enrollments')
-    .select('id, cohort_id, current_day, status')
-    .eq('user_id', user.id)
-    .in('status', ['active', 'paid_waiting_cohort', 'trial'])
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
+  // song song với cờ hệ thống.
+  const [matchingEnabled, { data: enrollment }] = await Promise.all([
+    isBuddyMatchingEnabled(),
+    supabase
+      .from('enrollments')
+      .select('id, cohort_id, current_day, status')
+      .eq('user_id', user.id)
+      .in('status', ['active', 'paid_waiting_cohort', 'trial'])
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ])
 
   if (!enrollment) {
     return NextResponse.json({ has_buddy: false, enrollment_status: null, matching_enabled: matchingEnabled })
@@ -59,41 +61,35 @@ export async function GET() {
 
   const buddyId = pair.user_a === user.id ? pair.user_b : pair.user_a
 
-  // Lấy thông tin buddy
-  const { data: buddyProfile } = await service
-    .from('profiles')
-    .select('id, full_name, channel_user_id')
-    .eq('id', buddyId)
-    .single()
-
-  // Buddy enrollment cùng cohort (active hoặc paid_waiting_cohort)
+  // Thông tin buddy + enrollment cùng cohort của buddy (kèm streak và check-in
+  // hôm nay qua embed) → một đợt song song thay vì 4 query nối tiếp.
   const today = new Date().toISOString().split('T')[0]
-  const { data: buddyEnrollment } = await service
-    .from('enrollments')
-    .select('id')
-    .eq('user_id', buddyId)
-    .eq('cohort_id', enrollment.cohort_id)
-    .in('status', ['active', 'paid_waiting_cohort'])
-    .maybeSingle()
+  const [{ data: buddyProfile }, { data: buddyEnrollment }] = await Promise.all([
+    service
+      .from('profiles')
+      .select('id, full_name, channel_user_id')
+      .eq('id', buddyId)
+      .single(),
+    // Buddy enrollment cùng cohort (active hoặc paid_waiting_cohort)
+    service
+      .from('enrollments')
+      .select('id, streaks(current_streak), daily_checkins(id)')
+      .eq('user_id', buddyId)
+      .eq('cohort_id', enrollment.cohort_id)
+      .in('status', ['active', 'paid_waiting_cohort'])
+      .eq('daily_checkins.workout_date', today)
+      .limit(1, { referencedTable: 'daily_checkins' })
+      .maybeSingle(),
+  ])
 
-  let buddyCheckedInToday = false
-  if (buddyEnrollment) {
-    const { data: checkin } = await service
-      .from('daily_checkins')
-      .select('id')
-      .eq('enrollment_id', buddyEnrollment.id)
-      .eq('workout_date', today)
-      .limit(1)
-      .maybeSingle()
-    buddyCheckedInToday = !!checkin
-  }
-
-  // Buddy streak
-  const { data: buddyStreak } = await service
-    .from('streaks')
-    .select('current_streak')
-    .eq('enrollment_id', buddyEnrollment?.id ?? '')
-    .maybeSingle()
+  const embedded = buddyEnrollment as unknown as {
+    streaks: { current_streak: number } | { current_streak: number }[] | null
+    daily_checkins: { id: string }[] | null
+  } | null
+  const buddyCheckedInToday = (embedded?.daily_checkins?.length ?? 0) > 0
+  const buddyStreak = Array.isArray(embedded?.streaks)
+    ? embedded.streaks[0] ?? null
+    : embedded?.streaks ?? null
 
   return NextResponse.json({
     has_buddy: true,

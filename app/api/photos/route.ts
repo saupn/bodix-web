@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createServiceClient } from '@/lib/supabase/service'
+import { signStoragePaths } from '@/lib/storage/signed-urls'
 
 const SIGNED_URL_TTL = 3600 // 1 hour
 
@@ -47,27 +48,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ photos: [] })
   }
 
-  // ── Generate signed URLs in parallel ─────────────────────────────────────
+  // ── Signed URLs: một request cho cả danh sách ───────────────────────────
   const service = createServiceClient()
-
-  const photosWithUrls = await Promise.all(
-    photos.map(async (photo) => {
-      const { data: signedData } = await service.storage
-        .from('progress-photos')
-        .createSignedUrl(photo.photo_url, SIGNED_URL_TTL)
-
-      return {
-        id: photo.id,
-        photo_type: photo.photo_type,
-        photo_url: photo.photo_url,          // storage path
-        signed_url: signedData?.signedUrl ?? null,
-        week_number: photo.week_number,
-        notes: photo.notes,
-        is_public: photo.is_public,
-        uploaded_at: photo.uploaded_at,
-      }
-    })
+  const signed = await signStoragePaths(
+    service,
+    'progress-photos',
+    photos.map((p) => p.photo_url),
+    SIGNED_URL_TTL,
   )
+
+  const photosWithUrls = photos.map((photo) => ({
+    id: photo.id,
+    photo_type: photo.photo_type,
+    photo_url: photo.photo_url,          // storage path
+    signed_url: signed.get(photo.photo_url) ?? null,
+    week_number: photo.week_number,
+    notes: photo.notes,
+    is_public: photo.is_public,
+    uploaded_at: photo.uploaded_at,
+  }))
 
   return NextResponse.json({ photos: photosWithUrls })
 }

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
+import { signStoragePaths } from "@/lib/storage/signed-urls";
 
 function truncate(str: string | null | undefined, maxLen: number): string {
   if (!str?.trim()) return "";
@@ -57,20 +58,31 @@ export async function GET(request: NextRequest) {
   const postList = posts ?? [];
   const userIds = [...new Set(postList.map((p) => p.user_id))];
 
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, full_name, avatar_url")
-    .in("id", userIds);
-
-  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
-
   const postIds = postList.map((p) => p.id);
   const service = createServiceClient();
 
-  const { data: reactions } = await service
-    .from("community_reactions")
-    .select("post_id, user_id, reaction_type")
-    .in("post_id", postIds);
+  // Tên tác giả, reaction và signed URL của mọi ảnh chỉ phụ thuộc postList →
+  // một đợt song song; ảnh ký trong MỘT request thay vì từng ảnh nối tiếp.
+  // (profiles không có cột avatar_url – select cột đó làm cả query lỗi và mọi
+  // tác giả hiện "Ẩn danh".)
+  const [{ data: profiles }, { data: reactions }, signedMap] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, full_name")
+      .in("id", userIds),
+    service
+      .from("community_reactions")
+      .select("post_id, user_id, reaction_type")
+      .in("post_id", postIds),
+    signStoragePaths(
+      service,
+      "progress-photos",
+      postList.flatMap((p) => (p.media_urls ?? []) as string[]),
+      SIGNED_URL_TTL
+    ),
+  ]);
+
+  const profileMap = new Map((profiles ?? []).map((p) => [p.id, p]));
 
   const reactionCounts = new Map<string, Record<string, number>>();
   const myReactions = new Map<string, string>();
@@ -83,8 +95,7 @@ export async function GET(request: NextRequest) {
     if (r.user_id === user.id) myReactions.set(key, r.reaction_type);
   }
 
-  const rows = await Promise.all(
-    postList.map(async (p) => {
+  const rows = postList.map((p) => {
       const profile = profileMap.get(p.user_id);
       const name = profile?.full_name?.trim() ?? "Ẩn danh";
       const parts = name.split(/\s+/);
@@ -94,19 +105,15 @@ export async function GET(request: NextRequest) {
           : name;
 
       const mediaPaths = (p.media_urls ?? []) as string[];
-      const signedMedia: string[] = [];
-      for (const path of mediaPaths) {
-        const { data } = await service.storage
-          .from("progress-photos")
-          .createSignedUrl(path, SIGNED_URL_TTL);
-        if (data?.signedUrl) signedMedia.push(data.signedUrl);
-      }
+      const signedMedia = mediaPaths
+        .map((path) => signedMap.get(path))
+        .filter((url): url is string => !!url);
 
     return {
       id: p.id,
       user_id: p.user_id,
       display_name: displayName,
-      avatar_url: profile?.avatar_url ?? null,
+      avatar_url: null,
       post_type: p.post_type,
       content: p.content,
       media_urls: signedMedia,
@@ -115,8 +122,7 @@ export async function GET(request: NextRequest) {
       reaction_counts: reactionCounts.get(p.id) ?? { heart: 0, clap: 0, fire: 0, like: 0 },
       my_reaction: myReactions.get(p.id) ?? null,
     };
-    })
-  );
+  });
 
   return NextResponse.json({
     posts: rows,

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser, getRequestSupabase } from "@/lib/dashboard/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import { Check, Lock } from "lucide-react";
@@ -96,39 +96,55 @@ const TRIAL_DONE_STATUSES = new Set<EnrollmentStatus>([
 ]);
 
 export default async function ProgramsPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = await getRequestSupabase();
+  // getUser dùng chung với layout trong cùng request (React cache).
+  const user = await getAuthUser();
 
   if (!user) redirect("/login");
 
-  const { data: activeEnrollment } = await supabase
-    .from("enrollments")
-    .select("id")
-    .eq("user_id", user.id)
-    .eq("status", "active")
-    .limit(1)
-    .maybeSingle();
+  // Mọi truy vấn chỉ cần user.id → một đợt song song (trước đây 4 lượt nối tiếp).
+  const service = createServiceClient();
+  const [
+    { data: activeEnrollment },
+    { data: programs },
+    { data: enrollments },
+    { data: pendingOrder },
+  ] = await Promise.all([
+    supabase
+      .from("enrollments")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("programs")
+      .select("id, slug")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("enrollments")
+      .select("status, programs(slug)")
+      .eq("user_id", user.id),
+    // Pending order — ưu tiên hiển thị nút "Tiếp tục thanh toán".
+    service
+      .from("orders")
+      .select("program")
+      .eq("user_id", user.id)
+      .eq("payment_status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (activeEnrollment) {
     redirect("/app");
   }
-
-  const { data: programs } = await supabase
-    .from("programs")
-    .select("id, slug")
-    .order("sort_order", { ascending: true });
 
   const programIdBySlug: Record<string, string> = {};
   for (const p of programs ?? []) {
     programIdBySlug[p.slug] = p.id;
   }
 
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("status, programs(slug)")
-    .eq("user_id", user.id);
 
   // Slug → set of statuses user has for that program
   const statusesBySlug = new Map<string, Set<EnrollmentStatus>>();
@@ -157,16 +173,6 @@ export default async function ProgramsPage() {
     return false;
   };
 
-  // Pending order — ưu tiên hiển thị nút "Tiếp tục thanh toán".
-  const service = createServiceClient();
-  const { data: pendingOrder } = await service
-    .from("orders")
-    .select("program")
-    .eq("user_id", user.id)
-    .eq("payment_status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
   const pendingOrderSlug = pendingOrder?.program ?? null;
 
   const upgradeBanner =

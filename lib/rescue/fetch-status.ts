@@ -49,19 +49,27 @@ export async function getRescueStatus(
 
   if (enrollmentError || !enrollment) return null;
 
+  return getRescueStatusForEnrollment(supabase, enrollment.id);
+}
+
+/** Như getRescueStatus nhưng khi đã biết enrollment active (bỏ 2 lượt getUser + enrollment). */
+export async function getRescueStatusForEnrollment(
+  supabase: SupabaseClient,
+  enrollmentId: string
+): Promise<RescueStatusData> {
   const [streakResult, riskResult, interventionsResult] = await Promise.all([
     supabase
       .from("streaks")
       .select("last_checkin_date")
-      .eq("enrollment_id", enrollment.id)
+      .eq("enrollment_id", enrollmentId)
       .maybeSingle(),
     supabase.rpc("calculate_risk_score", {
-      p_enrollment_id: enrollment.id,
+      p_enrollment_id: enrollmentId,
     }),
     supabase
       .from("rescue_interventions")
       .select("id, trigger_reason, action_taken, created_at, message_sent, outcome")
-      .eq("enrollment_id", enrollment.id)
+      .eq("enrollment_id", enrollmentId)
       .order("created_at", { ascending: false })
       .limit(5),
   ]);

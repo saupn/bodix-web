@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Camera } from "lucide-react";
+import { useDashboardSession } from "@/components/dashboard/DashboardSessionContext";
 
 const PHOTO_TYPES = [
   { id: "before", label: "Ngày 1 (Before)" },
@@ -12,7 +13,10 @@ const PHOTO_TYPES = [
 ] as const;
 
 export default function PhotosPage() {
-  const [enrollmentId, setEnrollmentId] = useState<string | null>(null);
+  const session = useDashboardSession();
+  const [enrollmentId, setEnrollmentId] = useState<string | null>(
+    session?.activeEnrollment?.id ?? null
+  );
   const [photoType, setPhotoType] = useState<string>("before");
   const [weekNumber, setWeekNumber] = useState<string>("1");
   const [file, setFile] = useState<File | null>(null);
@@ -22,6 +26,8 @@ export default function PhotosPage() {
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
+    // Layout đã có enrollment active → không cần gọi API.
+    if (session) return;
     const load = async () => {
       const res = await fetch("/api/program/active");
       if (!res.ok) return;
@@ -29,7 +35,7 @@ export default function PhotosPage() {
       setEnrollmentId(prog.enrollment?.id ?? null);
     };
     load();
-  }, []);
+  }, [session]);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const f = e.target.files?.[0];

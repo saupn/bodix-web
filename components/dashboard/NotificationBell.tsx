@@ -95,13 +95,22 @@ export function NotificationBell({ userId }: { userId: string }) {
         setLoadingMore(true);
       }
 
-      const { data, error } = await supabase
-        .from("notifications")
-        .select("id, type, title, content, is_read, created_at, metadata")
-        .eq("user_id", userId)
-        .eq("channel", "in_app")
-        .order("created_at", { ascending: false })
-        .range(offset, offset + PAGE_SIZE - 1);
+      // Danh sách + số chưa đọc chạy song song (trước đây nối tiếp).
+      const [{ data, error }, { count }] = await Promise.all([
+        supabase
+          .from("notifications")
+          .select("id, type, title, content, is_read, created_at, metadata")
+          .eq("user_id", userId)
+          .eq("channel", "in_app")
+          .order("created_at", { ascending: false })
+          .range(offset, offset + PAGE_SIZE - 1),
+        supabase
+          .from("notifications")
+          .select("id", { count: "exact", head: true })
+          .eq("user_id", userId)
+          .eq("channel", "in_app")
+          .eq("is_read", false),
+      ]);
 
       if (error) {
         if (reset) setLoading(false);
@@ -122,13 +131,6 @@ export function NotificationBell({ userId }: { userId: string }) {
       setHasMore(list.length === PAGE_SIZE);
       if (reset) setLoading(false);
       else setLoadingMore(false);
-
-      const { count } = await supabase
-        .from("notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("user_id", userId)
-        .eq("channel", "in_app")
-        .eq("is_read", false);
 
       setUnreadCount(count ?? 0);
     },

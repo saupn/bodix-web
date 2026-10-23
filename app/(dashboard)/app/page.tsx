@@ -1,10 +1,21 @@
 import Link from "next/link";
 import { Check } from "lucide-react";
-import { createClient } from "@/lib/supabase/server";
+import { Suspense } from "react";
 import { createServiceClient } from "@/lib/supabase/service";
+import {
+  getAuthUser,
+  getDashboardEnrollments,
+  getDashboardProfile,
+  getRequestSupabase,
+  type DashboardEnrollment,
+} from "@/lib/dashboard/session";
+import { getHomeData } from "@/lib/dashboard/home-data";
 import { getTrialDisplayStatus } from "@/lib/trial/status";
 import { formatDateVn } from "@/lib/date/vietnam";
-import { DashboardHomeContent } from "@/components/dashboard/DashboardHomeContent";
+import {
+  DashboardHomeContent,
+  DashboardHomeSkeleton,
+} from "@/components/dashboard/DashboardHomeContent";
 import { TrialSignupCard } from "@/components/dashboard/TrialSignupCard";
 import { TrialPreviewCard } from "@/components/dashboard/TrialPreviewCard";
 import { BuddyChooser } from "@/components/dashboard/BuddyChooser";
@@ -196,30 +207,54 @@ function UpgradeBanner({ upgradeBanner }: { upgradeBanner: { message: string; ta
   );
 }
 
+/** Phần dữ liệu nặng của trang chủ – stream sau khung trang (Suspense). */
+async function ActiveHome({
+  userId,
+  enrollment,
+  displayName,
+  phoneVerified,
+}: {
+  userId: string;
+  enrollment: DashboardEnrollment;
+  displayName: string;
+  phoneVerified: boolean;
+}) {
+  const supabase = await getRequestSupabase();
+  const data = await getHomeData(supabase, userId, enrollment);
+  return (
+    <DashboardHomeContent
+      displayName={displayName}
+      phoneVerified={phoneVerified}
+      data={data}
+    />
+  );
+}
+
 export default async function AppPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const user = await getAuthUser();
 
   if (!user) return null;
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, trial_ends_at, phone_verified")
-    .eq("id", user.id)
-    .single();
+  const supabase = await getRequestSupabase();
+  const service = createServiceClient();
+
+  // Profile + enrollments dùng chung với layout (React cache – không query lại);
+  // pending order chạy song song.
+  const [{ profile }, allEnrollments, { data: pendingOrder }] = await Promise.all([
+    getDashboardProfile(user.id),
+    getDashboardEnrollments(user.id),
+    // Pending order — hiện banner ở mọi state để user resume thanh toán.
+    service
+      .from("orders")
+      .select("id, program, amount, payment_code, payment_status")
+      .eq("user_id", user.id)
+      .eq("payment_status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   const displayName = profile?.full_name?.trim() || user.email || "bạn";
-
-  // Fetch all enrollments to determine state
-  const { data: enrollments } = await supabase
-    .from("enrollments")
-    .select("id, status, program_id, cohort_id, started_at, current_day, programs(slug, name)")
-    .eq("user_id", user.id)
-    .order("enrolled_at", { ascending: false });
-
-  const allEnrollments = enrollments ?? [];
   const activeEnrollment = allEnrollments.find((e) => e.status === "active");
   const trialEnrollment = allEnrollments.find((e) => e.status === "trial");
   const trialCompletedEnrollment = allEnrollments.find((e) => e.status === "trial_completed");
@@ -229,17 +264,6 @@ export default async function AppPage() {
   const hasEverTrialed = allEnrollments.some((e) =>
     ["trial", "trial_completed", "pending_payment", "paid_waiting_cohort", "active", "completed"].includes(e.status)
   );
-
-  // Pending order — hiện banner ở mọi state để user resume thanh toán.
-  const service = createServiceClient();
-  const { data: pendingOrder } = await service
-    .from("orders")
-    .select("id, program, amount, payment_code, payment_status")
-    .eq("user_id", user.id)
-    .eq("payment_status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
 
   const pendingBanner =
     pendingOrder && pendingOrder.payment_code ? (
@@ -255,7 +279,14 @@ export default async function AppPage() {
     return (
       <>
         {pendingBanner && <div className="mb-6">{pendingBanner}</div>}
-        <DashboardHomeContent displayName={displayName} phoneVerified={profile?.phone_verified ?? false} />
+        <Suspense fallback={<DashboardHomeSkeleton />}>
+          <ActiveHome
+            userId={user.id}
+            enrollment={activeEnrollment}
+            displayName={displayName}
+            phoneVerified={profile?.phone_verified ?? false}
+          />
+        </Suspense>
       </>
     );
   }
@@ -268,43 +299,47 @@ export default async function AppPage() {
     const trialEndsAt = profile?.trial_ends_at ?? null;
 
     // Fetch cohort name + start_date — nếu chưa gán cohort, query upcoming gần nhất
-    let cohortName: string | null = null;
-    let cohortStartDate: string | null = null;
+    // Cohort, cặp buddy và cờ buddy-matching độc lập nhau → chạy song song.
+    const todayStr = new Date().toISOString().split("T")[0];
+    const [cohortResult, pairResult, buddyMatchingEnabled] = await Promise.all([
+      paidWaitingEnrollment.cohort_id
+        ? supabase
+            .from("cohorts")
+            .select("name, start_date")
+            .eq("id", paidWaitingEnrollment.cohort_id)
+            .single()
+        : paidWaitingEnrollment.program_id
+          ? supabase
+              .from("cohorts")
+              .select("name, start_date")
+              .eq("program_id", paidWaitingEnrollment.program_id)
+              .eq("status", "upcoming")
+              .gte("start_date", todayStr)
+              .order("start_date", { ascending: true })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      // Đã có buddy chưa? Chỉ check khi đã được gán cohort_id.
+      paidWaitingEnrollment.cohort_id
+        ? service
+            .from("buddy_pairs")
+            .select("user_a, user_b")
+            .eq("cohort_id", paidWaitingEnrollment.cohort_id)
+            .eq("status", "active")
+            .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
+            .limit(1)
+            .maybeSingle()
+        : Promise.resolve({ data: null }),
+      // Cờ toàn hệ thống: tắt → KHÔNG hiện ô chọn buddy (giữ trạng thái "chưa ghép").
+      isBuddyMatchingEnabled(),
+    ]);
+    const cohortRow = cohortResult.data as { name: string; start_date: string } | null;
+    const cohortName: string | null = cohortRow?.name ?? null;
+    const cohortStartDate: string | null = cohortRow?.start_date ?? null;
 
-    if (paidWaitingEnrollment.cohort_id) {
-      const { data: cohort } = await supabase
-        .from("cohorts")
-        .select("name, start_date")
-        .eq("id", paidWaitingEnrollment.cohort_id)
-        .single();
-      cohortName = cohort?.name ?? null;
-      cohortStartDate = cohort?.start_date ?? null;
-    } else if (paidWaitingEnrollment.program_id) {
-      const todayStr = new Date().toISOString().split("T")[0];
-      const { data: nextCohort } = await supabase
-        .from("cohorts")
-        .select("name, start_date")
-        .eq("program_id", paidWaitingEnrollment.program_id)
-        .eq("status", "upcoming")
-        .gte("start_date", todayStr)
-        .order("start_date", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      cohortName = nextCohort?.name ?? null;
-      cohortStartDate = nextCohort?.start_date ?? null;
-    }
-
-    // Đã có buddy chưa? Chỉ check khi đã được gán cohort_id.
     let buddyName: string | null = null;
-    if (paidWaitingEnrollment.cohort_id) {
-      const { data: existingPair } = await service
-        .from("buddy_pairs")
-        .select("user_a, user_b")
-        .eq("cohort_id", paidWaitingEnrollment.cohort_id)
-        .eq("status", "active")
-        .or(`user_a.eq.${user.id},user_b.eq.${user.id}`)
-        .limit(1)
-        .maybeSingle();
+    {
+      const existingPair = pairResult.data as { user_a: string; user_b: string } | null;
       if (existingPair) {
         const buddyUserId =
           existingPair.user_a === user.id ? existingPair.user_b : existingPair.user_a;
@@ -317,8 +352,6 @@ export default async function AppPage() {
       }
     }
     const hasBuddy = !!buddyName;
-    // Cờ toàn hệ thống: tắt → KHÔNG hiện ô chọn buddy (giữ trạng thái "chưa ghép").
-    const buddyMatchingEnabled = await isBuddyMatchingEnabled();
 
     const nowMs = new Date().getTime();
     const cohortDaysAway = cohortStartDate
@@ -340,7 +373,7 @@ export default async function AppPage() {
         )
       : 0;
     const paidProgramSlug =
-      (paidWaitingEnrollment.programs as unknown as { slug?: string } | null)?.slug ??
+      paidWaitingEnrollment.program?.slug ??
       null;
 
     return (
@@ -435,7 +468,7 @@ export default async function AppPage() {
 
   // --- State 3: Selected by admin, pending payment ---
   if (pendingPaymentEnrollment) {
-    const prog = pendingPaymentEnrollment.programs as unknown as { slug: string; name: string } | null;
+    const prog = pendingPaymentEnrollment.program;
     const slug = prog?.slug ?? "bodix-21";
 
     return (
@@ -606,7 +639,7 @@ export default async function AppPage() {
   // --- State 6: No enrollment at all ---
   const completedSlugs = completedEnrollments
     .map((e) => {
-      const prog = e.programs as unknown as { slug: string } | null;
+      const prog = e.program;
       return prog?.slug;
     })
     .filter(Boolean) as string[];
@@ -644,23 +677,26 @@ export default async function AppPage() {
   }
 
   // Brand new user — show trial signup card
-  const { data: bodix21 } = await supabase
-    .from("programs")
-    .select("id")
-    .eq("slug", "bodix-21")
-    .eq("is_active", true)
-    .maybeSingle();
-
-  const { data: nextCohort } = bodix21?.id
-    ? await supabase
-        .from("cohorts")
-        .select("id, start_date, name")
-        .eq("program_id", bodix21.id)
-        .eq("status", "upcoming")
-        .order("start_date", { ascending: true })
-        .limit(1)
-        .maybeSingle()
-    : { data: null };
+  // Program + đợt sắp tới chạy song song (cohort lọc qua join theo slug).
+  const [{ data: bodix21 }, { data: nextCohortRow }] = await Promise.all([
+    supabase
+      .from("programs")
+      .select("id")
+      .eq("slug", "bodix-21")
+      .eq("is_active", true)
+      .maybeSingle(),
+    supabase
+      .from("cohorts")
+      .select("id, start_date, name, program_id, programs!inner(slug, is_active)")
+      .eq("programs.slug", "bodix-21")
+      .eq("programs.is_active", true)
+      .eq("status", "upcoming")
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+  ]);
+  const nextCohort =
+    bodix21?.id && nextCohortRow?.program_id === bodix21.id ? nextCohortRow : null;
 
   // BD-FLEXIBLE-ENROLLMENT: cho đăng ký tập thử bất cứ lúc nào (bỏ ràng buộc 3 ngày).
   // Chỉ cần chưa từng trial. nextCohortDate dùng để hiển thị đợt gần nhất (không chặn).

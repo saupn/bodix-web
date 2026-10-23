@@ -2,8 +2,14 @@
 
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
-import { QRCodeCanvas } from "qrcode.react";
+import dynamic from "next/dynamic";
 import { Copy, Info } from "lucide-react";
+
+// qrcode chỉ cần khi đã có mã → tải động, không chặn trang.
+const QRCodeCanvas = dynamic(
+  () => import("qrcode.react").then((m) => m.QRCodeCanvas),
+  { ssr: false, loading: () => <div className="h-[160px] w-[160px] animate-pulse rounded bg-neutral-100" /> }
+);
 import { REFERRAL_COPY } from "@/lib/copy/referral";
 
 const REFERRAL_BASE =

@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server";
+import { getAuthUser, getRequestSupabase } from "@/lib/dashboard/session";
 import { createServiceClient } from "@/lib/supabase/service";
 import { redirect } from "next/navigation";
 import Link from "next/link";
@@ -17,18 +17,53 @@ export default async function CheckoutPage({
     redirect("/app/programs");
   }
 
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase = await getRequestSupabase();
+  // getUser dùng chung với layout trong cùng request (React cache).
+  const user = await getAuthUser();
 
   if (!user) redirect("/login");
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("full_name, phone, trial_ends_at")
-    .eq("id", user.id)
-    .single();
+  // Profile, program, đợt gần nhất (lọc qua join theo slug) và đơn đang chờ
+  // độc lập nhau → một đợt song song (trước đây 4 lượt nối tiếp).
+  const todayStr = new Date().toISOString().split("T")[0];
+  const service = createServiceClient();
+  const [
+    { data: profile },
+    { data: program },
+    { data: cohortRow },
+    { data: pendingOrder },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("full_name, phone, trial_ends_at")
+      .eq("id", user.id)
+      .single(),
+    supabase
+      .from("programs")
+      .select("id, slug, name, description, price_vnd, duration_days")
+      .eq("slug", slug)
+      .eq("is_active", true)
+      .single(),
+    supabase
+      .from("cohorts")
+      .select("id, name, start_date, max_members, current_members, program_id, programs!inner(slug)")
+      .eq("programs.slug", slug)
+      .in("status", ["upcoming", "active"])
+      .gte("start_date", todayStr)
+      .order("start_date", { ascending: true })
+      .limit(1)
+      .maybeSingle(),
+    // Resume: nếu user đã có pending order cho program này, mở thẳng QR view.
+    service
+      .from("orders")
+      .select("id, amount, payment_code, payment_status")
+      .eq("user_id", user.id)
+      .eq("program", slug)
+      .eq("payment_status", "pending")
+      .order("created_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   // Determine trial state for cohort-info copy: "trial_active" (in trial period),
   // "trial_completed" (had trial, expired), or "no_trial" (never trialled).
@@ -40,37 +75,18 @@ export default async function CheckoutPage({
         : "trial_completed";
   }
 
-  const { data: program } = await supabase
-    .from("programs")
-    .select("id, slug, name, description, price_vnd, duration_days")
-    .eq("slug", slug)
-    .eq("is_active", true)
-    .single();
-
   if (!program) redirect("/app/programs");
 
-  const todayStr = new Date().toISOString().split("T")[0];
-  const { data: cohort } = await supabase
-    .from("cohorts")
-    .select("id, name, start_date, max_members, current_members")
-    .eq("program_id", program.id)
-    .in("status", ["upcoming", "active"])
-    .gte("start_date", todayStr)
-    .order("start_date", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  // Resume: nếu user đã có pending order cho program này, mở thẳng QR view.
-  const service = createServiceClient();
-  const { data: pendingOrder } = await service
-    .from("orders")
-    .select("id, amount, payment_code, payment_status")
-    .eq("user_id", user.id)
-    .eq("program", slug)
-    .eq("payment_status", "pending")
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const cohort =
+    cohortRow && cohortRow.program_id === program.id
+      ? {
+          id: cohortRow.id,
+          name: cohortRow.name,
+          start_date: cohortRow.start_date,
+          max_members: cohortRow.max_members,
+          current_members: cohortRow.current_members,
+        }
+      : null;
 
   const initialPayment =
     pendingOrder && pendingOrder.payment_code

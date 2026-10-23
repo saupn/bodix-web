@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { createClient } from "@/lib/supabase/client";
 import { Camera } from "lucide-react";
+import { useDashboardSession } from "@/components/dashboard/DashboardSessionContext";
 
 const MODE_EMOJI: Record<string, string> = {
   hard: "💪",
@@ -127,6 +128,7 @@ export default function CommunityPage() {
   useEffect(() => {
     if (tabParam === "feed") setTab("feed");
   }, [tabParam]);
+  const session = useDashboardSession();
   const [boardData, setBoardData] = useState<BoardData | null>(null);
   const [programData, setProgramData] = useState<ProgramActiveData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -177,6 +179,25 @@ export default function CommunityPage() {
 
     const load = async () => {
       try {
+        // Layout đã có cohort_id + user id → gọi program/active và bảng hoàn
+        // thành song song, không cần getUser() ở client.
+        const known = session?.activeEnrollment?.cohortId ?? null;
+        if (session) currentUserIdRef.current = session.userId;
+        if (session && !session.activeEnrollment) {
+          setError("Bạn chưa có chương trình đang hoạt động.");
+          return;
+        }
+        if (known) {
+          const [progRes, board] = await Promise.all([
+            fetch("/api/program/active"),
+            fetchBoard(known),
+          ]);
+          if (!mounted) return;
+          if (progRes.ok) setProgramData(await progRes.json());
+          setBoardData(board);
+          return;
+        }
+
         const progRes = await fetch("/api/program/active");
         if (!progRes.ok) {
           if (progRes.status === 404) {
@@ -210,13 +231,15 @@ export default function CommunityPage() {
 
     load();
     return () => { mounted = false; };
-  }, [fetchBoard]);
+  }, [fetchBoard, session]);
 
+  // Tab bảng tin: có cohort_id từ layout thì tải bài song song với bảng hoàn thành.
+  const feedCohortId = boardData?.cohort_id ?? session?.activeEnrollment?.cohortId ?? null;
   useEffect(() => {
-    if (tab === "feed" && boardData?.cohort_id) {
-      fetchPosts(boardData.cohort_id, 0, false);
+    if (tab === "feed" && feedCohortId) {
+      fetchPosts(feedCohortId, 0, false);
     }
-  }, [tab, boardData?.cohort_id, fetchPosts]);
+  }, [tab, feedCohortId, fetchPosts]);
 
   useEffect(() => {
     if (!boardData?.cohort_id) return;

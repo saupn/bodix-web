@@ -38,6 +38,28 @@ export async function getMyStats(
     name: string;
     duration_days: number;
   };
+
+  return getMyStatsForEnrollment(supabase, {
+    id: enrollment.id,
+    current_day: enrollment.current_day,
+    cohort_id: enrollment.cohort_id,
+    program,
+  });
+}
+
+export interface StatsEnrollmentInput {
+  id: string;
+  current_day: number | null;
+  cohort_id: string | null;
+  program: { name: string; duration_days: number };
+}
+
+/** Như getMyStats nhưng khi đã có enrollment active (bỏ getUser + query enrollment). */
+export async function getMyStatsForEnrollment(
+  supabase: SupabaseClient,
+  enrollment: StatsEnrollmentInput
+): Promise<MyStatsData> {
+  const program = enrollment.program;
   const enrollmentId = enrollment.id;
 
   const [streakResult, checkinsResult, milestonesResult, rateResult] =
@@ -105,8 +127,6 @@ export async function getHistory(
   supabase: SupabaseClient,
   enrollmentId: string
 ): Promise<{ start_date: string; days: HistoryDay[] } | null> {
-  const today = new Date().toISOString().slice(0, 10);
-
   const { data: enrollment, error: enrollmentError } = await supabase
     .from("enrollments")
     .select("id, started_at, program_id, programs(duration_days)")
@@ -116,6 +136,28 @@ export async function getHistory(
   if (enrollmentError || !enrollment?.started_at) return null;
 
   const program = enrollment.programs as unknown as { duration_days: number };
+  return getHistoryForEnrollment(supabase, {
+    id: enrollment.id,
+    started_at: enrollment.started_at,
+    program_id: enrollment.program_id,
+    duration_days: program.duration_days,
+  });
+}
+
+/** Như getHistory nhưng khi đã có sẵn enrollment (bỏ 1 lượt query). */
+export async function getHistoryForEnrollment(
+  supabase: SupabaseClient,
+  enrollment: {
+    id: string;
+    started_at: string | null;
+    program_id: string;
+    duration_days: number;
+  }
+): Promise<{ start_date: string; days: HistoryDay[] } | null> {
+  if (!enrollment.started_at) return null;
+  const today = new Date().toISOString().slice(0, 10);
+  const enrollmentId = enrollment.id;
+  const program = { duration_days: enrollment.duration_days };
   const startDate = enrollment.started_at.slice(0, 10);
 
   function dayDate(start: string, dayNum: number): string {
@@ -185,4 +227,19 @@ export async function getCohortStats(
     completed_today: typeof r.today_completed === "number" ? r.today_completed : 0,
     total_members: typeof r.total_members === "number" ? r.total_members : 0,
   };
+}
+
+/** Chỉ số streak cho badge trên shell – 1 query, không kéo toàn bộ check-in. */
+export async function getStreakSummary(
+  supabase: SupabaseClient,
+  enrollmentId: string
+): Promise<MyStatsData["streak"]> {
+  const { data } = await supabase
+    .from("streaks")
+    .select("current_streak, longest_streak, total_completed_days")
+    .eq("enrollment_id", enrollmentId)
+    .maybeSingle();
+  return (
+    data ?? { current_streak: 0, longest_streak: 0, total_completed_days: 0 }
+  );
 }

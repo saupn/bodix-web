@@ -7,7 +7,10 @@ import {
   TRIAL_ACCESSIBLE_STATUSES,
 } from "@/lib/trial/utils";
 import { getCurrentTrialDay, resolveTrialStartDate } from "@/lib/trial/status";
-import { translateWorkoutItems } from "@/lib/exercises/translate";
+import {
+  applyWorkoutTranslations,
+  getCachedExerciseTranslationMap,
+} from "@/lib/exercises/translate";
 
 export async function GET(
   request: NextRequest,
@@ -27,20 +30,22 @@ export async function GET(
   }
   const supabase = createServiceClient();
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("trial_ends_at, bodix_start_date, trial_started_at")
-    .eq("id", auth.userId)
-    .single();
-
-  const { data: enrollment } = await supabase
-    .from("enrollments")
-    .select("id, program_id, status, started_at, enrolled_at")
-    .eq("user_id", auth.userId)
-    .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
-    .order("enrolled_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  // Profile và enrollment độc lập nhau → song song.
+  const [{ data: profile }, { data: enrollment }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("trial_ends_at, bodix_start_date, trial_started_at")
+      .eq("id", auth.userId)
+      .single(),
+    supabase
+      .from("enrollments")
+      .select("id, program_id, status, started_at, enrolled_at")
+      .eq("user_id", auth.userId)
+      .in("status", Array.from(TRIAL_ACCESSIBLE_STATUSES))
+      .order("enrolled_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+  ]);
 
   if (
     !enrollment ||
@@ -84,14 +89,26 @@ export async function GET(
 
   // Nội dung trial là content cố định (độc lập cohort/current_day) — đã qua các
   // gate ở trên (quyền truy cập + ngày đã mở) thì load bài tập của ngày đó.
-  const { data: workout, error } = await supabase
-    .from("workout_templates")
-    .select(
-      "id, day_number, title, description, duration_minutes, workout_type, exercises"
-    )
-    .eq("program_id", enrollment.program_id)
-    .eq("day_number", day)
-    .single();
+  // Bài tập, trạng thái hoàn thành và bảng dịch → một đợt song song.
+  const [{ data: workout, error }, { data: completedActivities }, translationMap] =
+    await Promise.all([
+      supabase
+        .from("workout_templates")
+        .select(
+          "id, day_number, title, description, duration_minutes, workout_type, exercises"
+        )
+        .eq("program_id", enrollment.program_id)
+        .eq("day_number", day)
+        .single(),
+      supabase
+        .from("trial_activities")
+        .select("id, metadata")
+        .eq("user_id", auth.userId)
+        .eq("program_id", enrollment.program_id)
+        .eq("activity_type", "complete_trial_day")
+        .limit(20),
+      getCachedExerciseTranslationMap(),
+    ]);
 
   if (error || !workout) {
     return NextResponse.json(
@@ -100,18 +117,10 @@ export async function GET(
     );
   }
 
-  await translateWorkoutItems(
-    supabase,
+  applyWorkoutTranslations(
     workout.exercises as { items?: Array<{ name: string }> } | null,
+    translationMap,
   );
-
-  const { data: completedActivities } = await supabase
-    .from("trial_activities")
-    .select("id, metadata")
-    .eq("user_id", auth.userId)
-    .eq("program_id", enrollment.program_id)
-    .eq("activity_type", "complete_trial_day")
-    .limit(20);
 
   const isCompleted =
     (completedActivities ?? []).some(

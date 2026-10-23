@@ -13,52 +13,54 @@ export async function GET() {
     return NextResponse.json({ error: 'Chưa đăng nhập.' }, { status: 401 })
   }
 
-  // --- Lấy profile (trial timestamps) ---
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('trial_started_at, trial_ends_at, bodix_start_date, bodix_current_day')
-    .eq('id', user.id)
-    .single()
+  // Profile, enrollment trial và hoạt động trial độc lập nhau → song song.
+  const [{ data: profile }, { data: enrollment }, { data: activities }] = await Promise.all([
+    // --- Lấy profile (trial timestamps) ---
+    supabase
+      .from('profiles')
+      .select('trial_started_at, trial_ends_at, bodix_start_date, bodix_current_day')
+      .eq('id', user.id)
+      .single(),
+    // --- Lấy enrollment đang trial (kèm thông tin program) ---
+    supabase
+      .from('enrollments')
+      .select(
+        `
+        id,
+        program_id,
+        status,
+        enrolled_at,
+        started_at,
+        current_day,
+        program:programs (
+          id,
+          slug,
+          name,
+          description,
+          duration_days,
+          price_vnd,
+          features
+        )
+      `
+      )
+      .eq('user_id', user.id)
+      .in('status', Array.from(TRIAL_ACCESSIBLE_STATUSES))
+      .order('enrolled_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    // --- Lấy hoạt động trial gần đây ---
+    supabase
+      .from('trial_activities')
+      .select('id, activity_type, metadata, created_at')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false })
+      .limit(50),
+  ])
 
   const trialStatus = getTrialStatus({
     trial_ends_at: profile?.trial_ends_at ?? null,
   })
 
-  // --- Lấy enrollment đang trial (kèm thông tin program) ---
-  const { data: enrollment } = await supabase
-    .from('enrollments')
-    .select(
-      `
-      id,
-      program_id,
-      status,
-      enrolled_at,
-      started_at,
-      current_day,
-      program:programs (
-        id,
-        slug,
-        name,
-        description,
-        duration_days,
-        price_vnd,
-        features
-      )
-    `
-    )
-    .eq('user_id', user.id)
-    .in('status', Array.from(TRIAL_ACCESSIBLE_STATUSES))
-    .order('enrolled_at', { ascending: false })
-    .limit(1)
-    .maybeSingle()
-
-  // --- Lấy hoạt động trial gần đây ---
-  const { data: activities } = await supabase
-    .from('trial_activities')
-    .select('id, activity_type, metadata, created_at')
-    .eq('user_id', user.id)
-    .order('created_at', { ascending: false })
-    .limit(50)
 
   // --- Tính canAccess dựa trên cả enrollment status lẫn thời hạn ---
   const canAccess = enrollment

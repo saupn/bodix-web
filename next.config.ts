@@ -22,12 +22,16 @@ const nextConfig: NextConfig = {
 
   async headers() {
     return [
+      // API mặc định KHÔNG cache ở CDN: phần lớn route trả dữ liệu riêng của
+      // user (đăng nhập bằng cookie – Vercel CDN không tách cache theo cookie).
+      // Route công khai muốn cache thì tự set Cache-Control trong response
+      // (header của response ghi đè header ở đây).
       {
         source: "/api/:path*",
         headers: [
           {
             key: "Cache-Control",
-            value: "public, s-maxage=60, stale-while-revalidate=300",
+            value: "private, no-store",
           },
         ],
       },
